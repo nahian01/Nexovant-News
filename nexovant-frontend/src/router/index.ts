@@ -18,6 +18,7 @@ import BillingView from '@/views/subscriber/BillingView.vue'
 import OrganizationView from '@/views/subscriber/OrganizationView.vue'
 
 // Administrative Views
+import AdminLoginView from '@/views/admin/AdminLoginView.vue'
 import AdminDashboardView from '@/views/admin/AdminDashboardView.vue'
 import AdminArticlesView from '@/views/admin/AdminArticlesView.vue'
 import AdminClustersView from '@/views/admin/AdminClustersView.vue'
@@ -32,9 +33,11 @@ import AdminAdvertisingView from '@/views/admin/AdminAdvertisingView.vue'
 import AdminReportsView from '@/views/admin/AdminReportsView.vue'
 import AdminSystemView from '@/views/admin/AdminSystemView.vue'
 import AdminAuditLogsView from '@/views/admin/AdminAuditLogsView.vue'
+import AdminTaxonomyView from '@/views/admin/AdminTaxonomyView.vue'
+import AdminNotificationsView from '@/views/admin/AdminNotificationsView.vue'
 
 const routes = [
-  // 1. Public Intelligence Network (3-Column Layout & Story Details)
+  // 1. Public Intelligence Network
   {
     path: '/',
     name: 'home',
@@ -125,6 +128,11 @@ const routes = [
 
   // 3. Administrative Control Centre Routes
   {
+    path: '/admin/login',
+    name: 'admin-login',
+    component: AdminLoginView,
+  },
+  {
     path: '/admin',
     redirect: '/admin/dashboard',
   },
@@ -132,85 +140,97 @@ const routes = [
     path: '/admin/dashboard',
     name: 'admin-dashboard',
     component: AdminDashboardView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/articles',
     name: 'admin-articles',
     component: AdminArticlesView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/taxonomy',
+    name: 'admin-taxonomy',
+    component: AdminTaxonomyView,
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/clusters',
     name: 'admin-clusters',
     component: AdminClustersView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/sources',
     name: 'admin-sources',
     component: AdminSourcesView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/automation',
     name: 'admin-automation',
     component: AdminAutomationView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/social-intelligence',
     name: 'admin-social-intelligence',
     component: AdminSocialIntelligenceView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/ai-router',
     name: 'admin-ai-router',
     component: AIRouterDashboard,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/rag-knowledge',
     name: 'admin-rag-knowledge',
     component: AdminRagKnowledgeView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/users',
     name: 'admin-users',
     component: AdminUsersView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/payments',
     name: 'admin-payments',
     component: PaymentVerificationView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/notifications',
+    name: 'admin-notifications',
+    component: AdminNotificationsView,
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/advertising',
     name: 'admin-advertising',
     component: AdminAdvertisingView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/reports',
     name: 'admin-reports',
     component: AdminReportsView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/system',
     name: 'admin-system',
     component: AdminSystemView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/audit-logs',
     name: 'admin-audit-logs',
     component: AdminAuditLogsView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
 
   // Catch-all
@@ -228,13 +248,23 @@ export const router = createRouter({
   },
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const token = localStorage.getItem('nxv_auth_token')
-  if (to.meta.requiresAuth && !token) {
-    next({ name: 'login', query: { redirect: to.fullPath } })
-  } else {
-    next()
+
+  // Check admin portal protection
+  if (to.meta.requiresAdmin) {
+    if (!token) {
+      return next({ name: 'admin-login', query: { redirect: to.fullPath } })
+    }
   }
+
+  // Check general subscriber protection
+  if (to.meta.requiresAuth && !token) {
+    return next({ name: 'login', query: { redirect: to.fullPath } })
+  }
+
+  // If visiting /admin/login while already authenticated with token, allow through or redirect
+  next()
 })
 
 export default router
