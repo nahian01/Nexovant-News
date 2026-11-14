@@ -1,0 +1,186 @@
+services:
+  # ==============================================================================
+  # Database Service (PostgreSQL 16 + pgvector)
+  # ==============================================================================
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: nexovant_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-nexovant_production}
+      POSTGRES_USER: ${DB_USERNAME:-nexovant_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-nexovant_secret}
+    volumes:
+      - nexovant_pgdata:/var/lib/postgresql/data
+    networks:
+      - nexovant_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-nexovant_app} -d ${DB_DATABASE:-nexovant_production}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.40'
+          memory: 1024M
+
+  # ==============================================================================
+  # Backend API Service (PHP 8.4-FPM / Laravel 12)
+  # ==============================================================================
+  backend:
+    build:
+      context: ../../
+      dockerfile: nexovant-infrastructure/docker/php/Dockerfile
+    container_name: nexovant_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../../nexovant-backend:/var/www/nexovant-backend
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-nexovant_production}
+      DB_USERNAME: ${DB_USERNAME:-nexovant_app}
+      DB_PASSWORD: ${DB_PASSWORD:-nexovant_secret}
+      AI_ENGINE_HOST: ai-engine
+      AI_ENGINE_PORT: 8000
+      AI_ENGINE_INTERNAL_SECRET: ${AI_ENGINE_INTERNAL_SECRET}
+    networks:
+      - nexovant_internal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.30'
+          memory: 768M
+
+  # ==============================================================================
+  # Queue Worker Service (Database Queue / Sequential Execution)
+  # ==============================================================================
+  queue-worker:
+    build:
+      context: ../../
+      dockerfile: nexovant-infrastructure/docker/php/Dockerfile
+    container_name: nexovant_queue_worker
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    volumes:
+      - ../../nexovant-backend:/var/www/nexovant-backend
+    command: ["php", "artisan", "queue:work", "--queue=default,high,intelligence", "--max-jobs=50", "--memory=256", "--sleep=3", "--tries=3"]
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${APP_KEY}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-nexovant_production}
+      DB_USERNAME: ${DB_USERNAME:-nexovant_app}
+      DB_PASSWORD: ${DB_PASSWORD:-nexovant_secret}
+      AI_ENGINE_HOST: ai-engine
+      AI_ENGINE_PORT: 8000
+      AI_ENGINE_INTERNAL_SECRET: ${AI_ENGINE_INTERNAL_SECRET}
+    networks:
+      - nexovant_internal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.15'
+          memory: 256M
+
+  # ==============================================================================
+  # Laravel Task Scheduler Service
+  # ==============================================================================
+  scheduler:
+    build:
+      context: ../../
+      dockerfile: nexovant-infrastructure/docker/php/Dockerfile
+    container_name: nexovant_scheduler
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    volumes:
+      - ../../nexovant-backend:/var/www/nexovant-backend
+    command: ["php", "artisan", "schedule:work"]
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${APP_KEY}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-nexovant_production}
+      DB_USERNAME: ${DB_USERNAME:-nexovant_app}
+      DB_PASSWORD: ${DB_PASSWORD:-nexovant_secret}
+    networks:
+      - nexovant_internal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.05'
+          memory: 128M
+
+  # ==============================================================================
+  # Python AI & Cognitive Engine Service (FastAPI)
+  # ==============================================================================
+  ai-engine:
+    build:
+      context: ../../
+      dockerfile: nexovant-infrastructure/docker/python/Dockerfile
+    container_name: nexovant_ai_engine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../../nexovant-ai-engine:/app
+    environment:
+      ENVIRONMENT: ${APP_ENV:-production}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_DATABASE:-nexovant_production}
+      DB_USER: ${DB_USERNAME:-nexovant_app}
+      DB_PASSWORD: ${DB_PASSWORD:-nexovant_secret}
+      INTERNAL_SERVICE_SECRET: ${AI_ENGINE_INTERNAL_SECRET}
+    networks:
+      - nexovant_internal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 768M
+
+  # ==============================================================================
+  # Nginx Reverse Proxy Service
+  # ==============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: nexovant_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ../docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../../nexovant-backend/public:/var/www/nexovant-backend/public:ro
+    depends_on:
+      - backend
+      - ai-engine
+    networks:
+      - nexovant_internal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
+          memory: 128M
+
+networks:
+  nexovant_internal:
+    driver: bridge
+
+volumes:
+  nexovant_pgdata:
+    driver: local

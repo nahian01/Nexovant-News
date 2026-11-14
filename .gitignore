@@ -1,0 +1,41 @@
+# Local environment and credentials
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+
+# Dependencies and generated frontend assets
+**/node_modules/
+**/vendor/
+**/dist/
+**/build/
+**/.vite/
+
+# Python caches and virtual environments
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.venv/
+**/venv/
+**/env/
+*.py[cod]
+.coverage
+htmlcov/
+
+# Local application state and generated runtime files
+**/database/*.sqlite
+**/database/*.sqlite-*
+**/storage/logs/*
+**/storage/framework/cache/*
+**/storage/framework/sessions/*
+**/storage/framework/views/*
+**/storage/app/settings.json
+**/bootstrap/cache/*.php
+**/bootstrap/cache/*.json
+**/.phpunit.result.cache
+
+# Editor and operating system files
+.DS_Store
+Thumbs.db
+**/.idea/
+**/.vscode/
