@@ -130,12 +130,159 @@ class RegionalPaymentSelectionService
     }
 
     /**
+     * Get list of supported countries with localization and regional currency defaults.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getSupportedCountries(): array
+    {
+        return [
+            [
+                'code' => 'BD',
+                'name' => 'Bangladesh',
+                'flag' => '🇧🇩',
+                'default_currency' => 'BDT',
+                'supported_currencies' => ['BDT', 'USD'],
+                'region' => 'South Asia',
+            ],
+            [
+                'code' => 'US',
+                'name' => 'United States',
+                'flag' => '🇺🇸',
+                'default_currency' => 'USD',
+                'supported_currencies' => ['USD'],
+                'region' => 'North America',
+            ],
+            [
+                'code' => 'GB',
+                'name' => 'United Kingdom',
+                'flag' => '🇬🇧',
+                'default_currency' => 'GBP',
+                'supported_currencies' => ['GBP', 'USD', 'EUR'],
+                'region' => 'Europe',
+            ],
+            [
+                'code' => 'CA',
+                'name' => 'Canada',
+                'flag' => '🇨🇦',
+                'default_currency' => 'CAD',
+                'supported_currencies' => ['CAD', 'USD'],
+                'region' => 'North America',
+            ],
+            [
+                'code' => 'DE',
+                'name' => 'Germany',
+                'flag' => '🇩🇪',
+                'default_currency' => 'EUR',
+                'supported_currencies' => ['EUR', 'USD'],
+                'region' => 'Europe',
+            ],
+            [
+                'code' => 'FR',
+                'name' => 'France',
+                'flag' => '🇫🇷',
+                'default_currency' => 'EUR',
+                'supported_currencies' => ['EUR', 'USD'],
+                'region' => 'Europe',
+            ],
+            [
+                'code' => 'AU',
+                'name' => 'Australia',
+                'flag' => '🇦🇺',
+                'default_currency' => 'USD',
+                'supported_currencies' => ['USD', 'AUD'],
+                'region' => 'Oceania',
+            ],
+            [
+                'code' => 'SG',
+                'name' => 'Singapore',
+                'flag' => '🇸🇬',
+                'default_currency' => 'USD',
+                'supported_currencies' => ['USD', 'SGD'],
+                'region' => 'Southeast Asia',
+            ],
+            [
+                'code' => 'IN',
+                'name' => 'India',
+                'flag' => '🇮🇳',
+                'default_currency' => 'USD',
+                'supported_currencies' => ['USD', 'INR'],
+                'region' => 'South Asia',
+            ],
+            [
+                'code' => 'GLOBAL',
+                'name' => 'Other / International',
+                'flag' => '🌐',
+                'default_currency' => 'USD',
+                'supported_currencies' => ['USD', 'EUR', 'GBP', 'CAD'],
+                'region' => 'Global',
+            ],
+        ];
+    }
+
+    /**
+     * Get list of supported billing currencies with symbol, decimals, and flags.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getSupportedCurrencies(): array
+    {
+        return [
+            [
+                'code' => 'BDT',
+                'name' => 'Bangladeshi Taka',
+                'symbol' => '৳',
+                'flag' => '🇧🇩',
+                'decimals' => 2,
+                'is_default_for' => ['BD'],
+            ],
+            [
+                'code' => 'USD',
+                'name' => 'US Dollar',
+                'symbol' => '$',
+                'flag' => '🇺🇸',
+                'decimals' => 2,
+                'is_default_for' => ['US', 'GLOBAL', 'AU', 'SG', 'IN'],
+            ],
+            [
+                'code' => 'EUR',
+                'name' => 'Euro',
+                'symbol' => '€',
+                'flag' => '🇪🇺',
+                'decimals' => 2,
+                'is_default_for' => ['DE', 'FR'],
+            ],
+            [
+                'code' => 'GBP',
+                'name' => 'British Pound',
+                'symbol' => '£',
+                'flag' => '🇬🇧',
+                'decimals' => 2,
+                'is_default_for' => ['GB'],
+            ],
+            [
+                'code' => 'CAD',
+                'name' => 'Canadian Dollar',
+                'symbol' => 'CA$',
+                'flag' => '🇨🇦',
+                'decimals' => 2,
+                'is_default_for' => ['CA'],
+            ],
+        ];
+    }
+
+    /**
      * Validate that selected country and currency are compatible.
      */
     public function validateCountryCurrency(string $country, string $currency): bool
     {
         $country = strtoupper(trim($country));
         $currency = strtoupper(trim($currency));
+
+        $validCurrencies = ['BDT', 'USD', 'EUR', 'GBP', 'CAD', 'INR', 'SGD', 'MYR', 'AUD'];
+        if (!in_array($currency, $validCurrencies, true)) {
+            return false;
+        }
 
         if ($currency === 'BDT' && $country !== 'BD') {
             // Only BD residents use BDT

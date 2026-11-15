@@ -195,10 +195,10 @@ class GatewayRegistryService
             [
                 'gateway_key' => 'manual_bank',
                 'name' => 'Corporate Bank Transfer / Wire',
-                'supported_countries' => ['ALL', 'BD', 'US', 'GB', 'EU'],
-                'supported_currencies' => ['BDT', 'USD', 'EUR'],
+                'supported_countries' => ['ALL', 'BD', 'US', 'GB', 'EU', 'CA', 'AU', 'SG', 'GLOBAL'],
+                'supported_currencies' => ['BDT', 'USD', 'EUR', 'GBP', 'CAD'],
                 'supported_methods' => ['bank_transfer', 'wire_swift', 'manual_verification'],
-                'settlement_currencies' => ['BDT', 'USD', 'EUR'],
+                'settlement_currencies' => ['BDT', 'USD', 'EUR', 'GBP', 'CAD'],
                 'supports_refunds' => true,
                 'supports_recurring' => false,
                 'supports_webhooks' => false,
@@ -211,7 +211,15 @@ class GatewayRegistryService
         ];
 
         foreach ($defaults as $item) {
-            PaymentGateway::firstOrCreate(['gateway_key' => $item['gateway_key']], $item);
+            $existing = PaymentGateway::where('gateway_key', $item['gateway_key'])->first();
+            if (!$existing) {
+                PaymentGateway::create($item);
+            } elseif ($item['gateway_key'] === 'manual_bank' || $item['gateway_key'] === 'stripe') {
+                $existing->update([
+                    'supported_currencies' => $item['supported_currencies'],
+                    'supported_countries' => $item['supported_countries'],
+                ]);
+            }
         }
     }
 }

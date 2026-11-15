@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Subscriber;
 
 use App\Models\Invoice;
+use App\Models\Payment;
 use App\Models\PaymentProof;
 use App\Models\Plan;
 use App\Models\SubscriberInteraction;
@@ -15,6 +16,7 @@ use App\Services\Billing\CheckoutService;
 use App\Services\Billing\CouponService;
 use App\Services\Billing\EntitlementService;
 use App\Services\Billing\InvoiceService;
+use App\Services\Billing\PaymentGatewayManager;
 use App\Services\Billing\PaymentVerificationService;
 use App\Services\Billing\RegionalPaymentSelectionService;
 use App\Services\Billing\SubscriptionLifecycleService;
@@ -35,7 +37,8 @@ class BillingPortalController
         protected SubscriptionProrationService $prorationService,
         protected SubscriptionLifecycleService $lifecycleService,
         protected InvoiceService $invoiceService,
-        protected PaymentVerificationService $verificationService
+        protected PaymentVerificationService $verificationService,
+        protected PaymentGatewayManager $gatewayManager
     ) {}
 
     /**
@@ -271,8 +274,8 @@ class BillingPortalController
         $request->validate([
             'plan_id' => ['required'],
             'billing_cycle' => ['required', 'in:monthly,annual'],
-            'currency' => ['required', 'in:BDT,USD'],
-            'country' => ['nullable', 'string', 'size:2'],
+            'currency' => ['required', 'in:BDT,USD,EUR,GBP,CAD'],
+            'country' => ['nullable', 'string', 'max:10'],
             'payment_method' => ['required', 'string'],
             'coupon_code' => ['nullable', 'string', 'max:50'],
             'idempotency_key' => ['nullable', 'string', 'max:64'],
@@ -539,5 +542,193 @@ class BillingPortalController
             'message' => 'Payment reference submitted successfully. Our compliance desk will review and credit your subscription.',
             'data' => $payment->load('proof'),
         ], 201);
+    }
+
+    /**
+     * Get complete checkout options including supported countries, currencies, and eligible payment methods.
+     */
+    public function checkoutOptions(Request $request): JsonResponse
+    {
+        $country = strtoupper($request->query('country', $request->header('CF-IPCountry', 'US')));
+        $currency = strtoupper($request->query('currency', $country === 'BD' ? 'BDT' : 'USD'));
+        $interval = strtolower($request->query('interval', 'monthly'));
+
+        $countries = $this->regionalPaymentService->getSupportedCountries();
+        $currencies = $this->regionalPaymentService->getSupportedCurrencies();
+        $methods = $this->regionalPaymentService->getEligiblePaymentMethods($country, $currency, $interval);
+
+        return response()->json([
+            'success' => true,
+            'country' => $country,
+            'currency' => $currency,
+            'interval' => $interval,
+            'countries' => $countries,
+            'currencies' => $currencies,
+            'eligible_payment_methods' => $methods,
+        ]);
+    }
+
+    /**
+     * Authoritative payment status resolution with strict subscriber ownership enforcement.
+     */
+    public function paymentStatus(string $reference, Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // 1. Locate payment by transaction reference (provider_reference) or payment ID
+        $payment = Payment::with(['invoice.subscription.plan', 'proof'])
+            ->where('provider_reference', $reference)
+            ->orWhere('id', $reference)
+            ->first();
+
+        $invoice = null;
+        if ($payment) {
+            $invoice = $payment->invoice;
+        } else {
+            // Check if reference is an invoice ID
+            $invoice = Invoice::with(['subscription.plan', 'payments.proof'])->find($reference);
+            if ($invoice) {
+                $payment = $invoice->payments()->latest()->first();
+            }
+        }
+
+        if (!$invoice) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment reference not found.',
+            ], 404);
+        }
+
+        // 2. Strict tenant and subscriber isolation check
+        if ($invoice->subscription && $invoice->subscription->user_id !== $user->id && !$user->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access to payment status.',
+            ], 403);
+        }
+
+        $subscription = $invoice->subscription;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'reference' => $reference,
+                'status' => $payment?->status ?? $invoice->status,
+                'invoice' => [
+                    'id' => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number,
+                    'status' => $invoice->status,
+                    'subtotal' => (float) $invoice->subtotal,
+                    'discount' => (float) $invoice->discount,
+                    'total' => (float) $invoice->total,
+                    'currency' => $invoice->currency,
+                    'due_date' => $invoice->due_date?->toIso8601String(),
+                    'paid_at' => $invoice->paid_at?->toIso8601String(),
+                ],
+                'payment' => $payment ? [
+                    'id' => $payment->id,
+                    'gateway_key' => $payment->gateway_key,
+                    'payment_method' => $payment->payment_method,
+                    'amount' => (float) $payment->amount,
+                    'currency' => $payment->currency,
+                    'status' => $payment->status,
+                    'provider_reference' => $payment->provider_reference,
+                    'proof' => $payment->proof ? [
+                        'transaction_id' => $payment->proof->transaction_id,
+                        'sender_account' => $payment->proof->sender_account_number,
+                        'created_at' => $payment->proof->created_at?->toIso8601String(),
+                    ] : null,
+                    'created_at' => $payment->created_at?->toIso8601String(),
+                ] : null,
+                'subscription' => $subscription ? [
+                    'id' => $subscription->id,
+                    'status' => $subscription->status,
+                    'is_active' => $subscription->isActive(),
+                    'plan_name' => $subscription->plan?->name,
+                    'billing_cycle' => $subscription->billing_cycle,
+                    'next_renewal_at' => $subscription->next_renewal_at?->toIso8601String(),
+                ] : null,
+                'receipt_url' => $invoice->status === 'paid' ? "/api/v1/billing/invoices/{$invoice->id}/download" : null,
+                'instructions' => $payment?->gateway_key === 'manual_bank' ? [
+                    'bank' => $invoice->currency === 'BDT' ? 'City Bank PLC' : 'Standard Chartered Bank',
+                    'reference' => $invoice->id,
+                    'notes' => 'Please include your invoice reference in wire transfer narrative.'
+                ] : null,
+            ],
+        ]);
+    }
+
+    /**
+     * Safe retry of a failed or pending payment without generating orphan duplicate invoices.
+     */
+    public function retryPayment(Request $request): JsonResponse
+    {
+        $request->validate([
+            'invoice_id' => ['required', 'exists:invoices,id'],
+            'payment_method' => ['required', 'string'],
+            'return_url' => ['nullable', 'url'],
+        ]);
+
+        $user = $request->user();
+        $invoice = Invoice::with('subscription')->findOrFail($request->input('invoice_id'));
+
+        // Security check
+        if ($invoice->subscription && $invoice->subscription->user_id !== $user->id && !$user->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access to invoice.',
+            ], 403);
+        }
+
+        if ($invoice->status === 'paid') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This invoice has already been paid.',
+            ], 422);
+        }
+
+        $gatewayKey = strtolower($request->input('payment_method'));
+        $adapter = $this->gatewayManager->getGateway($gatewayKey);
+
+        $intent = new \App\Services\Billing\DTO\PaymentIntentDTO(
+            invoiceId: $invoice->id,
+            userId: $user->id,
+            amount: (float) $invoice->total,
+            currency: $invoice->currency,
+            paymentMethod: $gatewayKey,
+            country: $invoice->subscription->billing_country ?? 'US',
+            customerEmail: $user->email,
+            customerName: $user->name,
+            idempotencyKey: 'retry_' . \Illuminate\Support\Str::random(16),
+            returnUrl: $request->input('return_url')
+        );
+
+        $initiation = $adapter->initiatePayment($intent);
+
+        $payment = Payment::create([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'invoice_id' => $invoice->id,
+            'payment_method' => $gatewayKey,
+            'gateway_key' => $gatewayKey,
+            'provider_reference' => $initiation->transactionReference,
+            'idempotency_key' => $intent->idempotencyKey,
+            'amount' => $invoice->total,
+            'currency' => $invoice->currency,
+            'status' => $initiation->status,
+            'raw_response' => $initiation->rawResponse,
+        ]);
+
+        return response()->json([
+            'success' => $initiation->success,
+            'message' => 'Payment retry initiated.',
+            'data' => [
+                'invoice' => $invoice,
+                'payment' => $payment,
+                'transaction_reference' => $initiation->transactionReference,
+                'redirect_url' => $initiation->redirectUrl,
+                'client_secret' => $initiation->clientSecret,
+                'instructions' => $initiation->instructions,
+            ],
+        ]);
     }
 }

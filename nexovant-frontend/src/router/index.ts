@@ -24,6 +24,8 @@ import PersonalLibraryView from '@/views/subscriber/PersonalLibraryView.vue'
 import NotificationsView from '@/views/subscriber/NotificationsView.vue'
 import PersonalResearchView from '@/views/subscriber/PersonalResearchView.vue'
 import SubscriberPreferencesView from '@/views/subscriber/SubscriberPreferencesView.vue'
+import CheckoutView from '@/views/subscriber/CheckoutView.vue'
+import CheckoutStatusView from '@/views/subscriber/CheckoutStatusView.vue'
 
 // Administrative Views
 import AdminLoginView from '@/views/admin/AdminLoginView.vue'
@@ -148,6 +150,18 @@ const routes = [
     path: '/billing/history',
     name: 'billing-history',
     component: BillingView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/checkout',
+    name: 'checkout',
+    component: CheckoutView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/checkout/status/:reference',
+    name: 'checkout-status',
+    component: CheckoutStatusView,
     meta: { requiresAuth: true },
   },
   {

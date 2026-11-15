@@ -83,6 +83,7 @@ Route::get('/subscriptions/plans', [SubscriptionController::class, 'plans'])->na
 Route::get('/payments/methods', [PaymentController::class, 'methods'])->name('api.payments.methods');
 Route::get('/billing/plans', [BillingPortalController::class, 'plans'])->name('api.billing.plans');
 Route::get('/billing/payment-methods', [BillingPortalController::class, 'paymentMethods'])->name('api.billing.payment-methods');
+Route::get('/billing/checkout-options', [BillingPortalController::class, 'checkoutOptions'])->name('api.billing.checkout-options.public');
 Route::post('/webhooks/{gateway}', [WebhookController::class, 'handle'])->name('api.webhooks.handle');
 Route::get('/publications', [PublicationController::class, 'index'])->name('api.publications.index');
 Route::get('/publications/{id}', [PublicationController::class, 'show'])->name('api.publications.show');
@@ -139,6 +140,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/start-trial', [BillingPortalController::class, 'startTrial'])->name('api.billing.start-trial');
         Route::post('/validate-coupon', [BillingPortalController::class, 'validateCoupon'])->name('api.billing.validate-coupon');
         Route::post('/checkout', [BillingPortalController::class, 'checkout'])->name('api.billing.checkout');
+        Route::get('/checkout-options', [BillingPortalController::class, 'checkoutOptions'])->name('api.billing.checkout-options');
+        Route::get('/checkout/status/{reference}', [BillingPortalController::class, 'paymentStatus'])->name('api.billing.checkout.status');
+        Route::post('/checkout/retry', [BillingPortalController::class, 'retryPayment'])->name('api.billing.checkout.retry');
         Route::post('/preview-proration', [BillingPortalController::class, 'previewProration'])->name('api.billing.preview-proration');
         Route::post('/change-plan', [BillingPortalController::class, 'changePlan'])->name('api.billing.change-plan');
         Route::post('/cancel', [BillingPortalController::class, 'cancel'])->name('api.billing.cancel');

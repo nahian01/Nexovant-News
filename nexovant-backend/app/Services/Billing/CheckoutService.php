@@ -61,15 +61,22 @@ class CheckoutService
         }
 
         // 3. Backend Price Recalculation (NEVER trust client price)
-        $subtotal = $currency === 'BDT'
-            ? ($billingCycle === 'annual' ? (float) $plan->price_bdt_annual : (float) $plan->price_bdt_monthly)
-            : ($billingCycle === 'annual' ? (float) $plan->price_usd_annual : (float) $plan->price_usd_monthly);
+        if ($currency === 'BDT') {
+            $subtotal = $billingCycle === 'annual' ? (float) $plan->price_bdt_annual : (float) $plan->price_bdt_monthly;
+        } else {
+            $baseUsd = $billingCycle === 'annual' ? (float) $plan->price_usd_annual : (float) $plan->price_usd_monthly;
+            if ($billingCycle === 'annual' && (float) $plan->promotional_price_annual > 0) {
+                $baseUsd = (float) $plan->promotional_price_annual;
+            } elseif ($billingCycle === 'monthly' && (float) $plan->promotional_price_monthly > 0) {
+                $baseUsd = (float) $plan->promotional_price_monthly;
+            }
 
-        // Check if promotional price applies
-        if ($billingCycle === 'annual' && (float) $plan->promotional_price_annual > 0) {
-            $subtotal = (float) $plan->promotional_price_annual;
-        } elseif ($billingCycle === 'monthly' && (float) $plan->promotional_price_monthly > 0) {
-            $subtotal = (float) $plan->promotional_price_monthly;
+            $subtotal = match ($currency) {
+                'EUR' => round($baseUsd * 0.92, 2),
+                'GBP' => round($baseUsd * 0.79, 2),
+                'CAD' => round($baseUsd * 1.35, 2),
+                default => round($baseUsd, 2),
+            };
         }
 
         // 4. Validate and apply coupon

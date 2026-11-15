@@ -149,6 +149,21 @@ export const billingService = {
     return res.data
   },
 
+  async getCheckoutOptions(params?: { country?: string; currency?: string; interval?: string }) {
+    const res = await apiClient.get('/billing/checkout-options', { params })
+    return res.data
+  },
+
+  async getPaymentStatus(reference: string) {
+    const res = await apiClient.get(`/billing/checkout/status/${reference}`)
+    return res.data
+  },
+
+  async retryPayment(payload: { invoice_id: string; payment_method: string; return_url?: string }) {
+    const res = await apiClient.post('/billing/checkout/retry', payload)
+    return res.data
+  },
+
   async validateCoupon(payload: { code: string; plan_id: string; country?: string; subtotal: number }) {
     const res = await apiClient.post('/billing/validate-coupon', payload)
     return res.data
@@ -157,7 +172,7 @@ export const billingService = {
   async checkout(payload: {
     plan_id: string
     billing_cycle: 'monthly' | 'annual'
-    currency: 'USD' | 'BDT'
+    currency: 'USD' | 'BDT' | 'EUR' | 'GBP' | 'CAD' | string
     country?: string
     payment_method: string
     coupon_code?: string

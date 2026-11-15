@@ -467,30 +467,39 @@ onMounted(() => {
           </p>
         </div>
 
-        <!-- Currency Selector Toggle -->
-        <div class="flex items-center bg-nexo-surface border border-nexo-border rounded-xl p-1 self-start md:self-auto shadow-sm">
-          <button
-            @click="selectedCurrency = 'USD'"
-            :class="[
-              'px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all',
-              selectedCurrency === 'USD'
-                ? 'bg-primary-600 text-white shadow-sm font-semibold'
-                : 'text-nexo-muted hover:text-white'
-            ]"
+        <!-- Currency Selector Toggle & Intelligent Checkout Shortcut -->
+        <div class="flex items-center gap-2 self-start md:self-auto">
+          <router-link
+            to="/checkout"
+            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-primary-600/20 text-primary-400 border border-primary-500/30 hover:bg-primary-600/30 transition-colors shadow-sm"
           >
-            USD ($) Global
-          </button>
-          <button
-            @click="selectedCurrency = 'BDT'"
-            :class="[
-              'px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all',
-              selectedCurrency === 'BDT'
-                ? 'bg-primary-600 text-white shadow-sm font-semibold'
-                : 'text-nexo-muted hover:text-white'
-            ]"
-          >
-            BDT (৳) Bangladesh
-          </button>
+            <Sparkles class="w-3.5 h-3.5" />
+            Intelligent Checkout
+          </router-link>
+          <div class="flex items-center bg-nexo-surface border border-nexo-border rounded-xl p-1 shadow-sm">
+            <button
+              @click="selectedCurrency = 'USD'"
+              :class="[
+                'px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all',
+                selectedCurrency === 'USD'
+                  ? 'bg-primary-600 text-white shadow-sm font-semibold'
+                  : 'text-nexo-muted hover:text-white'
+              ]"
+            >
+              USD ($) Global
+            </button>
+            <button
+              @click="selectedCurrency = 'BDT'"
+              :class="[
+                'px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all',
+                selectedCurrency === 'BDT'
+                  ? 'bg-primary-600 text-white shadow-sm font-semibold'
+                  : 'text-nexo-muted hover:text-white'
+              ]"
+            >
+              BDT (৳) Bangladesh
+            </button>
+          </div>
         </div>
       </div>
 
