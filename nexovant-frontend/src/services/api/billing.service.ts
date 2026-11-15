@@ -26,6 +26,9 @@ export interface SubscriberSubscription {
   id: string
   status: 'active' | 'trialing' | 'cancel_at_period_end' | 'canceled' | 'past_due' | 'paused' | 'expired'
   is_active: boolean
+  is_trialing?: boolean
+  trial_ends_at?: string
+  days_left_in_trial?: number
   billing_cycle: 'monthly' | 'annual'
   currency: 'USD' | 'BDT'
   starts_at?: string
@@ -34,6 +37,25 @@ export interface SubscriberSubscription {
   canceled_at?: string
   auto_renew: boolean
   plan?: BillingPlan
+}
+
+export interface SubscriberOrganization {
+  id: string
+  name: string
+  slug: string
+  role: string
+  is_owner: boolean
+  is_admin: boolean
+  seats_count: number
+  max_seats: number | string
+  is_pooled: boolean
+  subscription?: {
+    id: string
+    status: string
+    plan_name?: string
+    billing_cycle?: string
+    next_renewal_at?: string
+  } | null
 }
 
 export interface EntitlementsSnapshot {
@@ -114,6 +136,11 @@ export const billingService = {
 
   async getPlans() {
     const res = await apiClient.get('/billing/plans')
+    return res.data
+  },
+
+  async startTrial(planId: string) {
+    const res = await apiClient.post('/billing/start-trial', { plan_id: planId })
     return res.data
   },
 

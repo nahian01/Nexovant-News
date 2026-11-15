@@ -145,6 +145,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/billing/history',
+    name: 'billing-history',
+    component: BillingView,
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/organization',
     name: 'organization',
     component: OrganizationView,

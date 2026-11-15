@@ -71,6 +71,31 @@ class BillingPortalController
             $subscription?->billing_cycle ?? 'monthly'
         );
 
+        $org = $user->activeOrganization();
+        $orgDetails = null;
+        if ($org) {
+            $orgRole = $user->organizationRole($org);
+            $orgSub = $org->activeSubscription();
+            $orgDetails = [
+                'id' => $org->id,
+                'name' => $org->name,
+                'slug' => $org->slug,
+                'role' => $orgRole,
+                'is_owner' => $orgRole === 'owner',
+                'is_admin' => in_array($orgRole, ['owner', 'admin'], true),
+                'seats_count' => $org->members()->count(),
+                'max_seats' => $orgSub ? $this->entitlementService->getLimit($user, 'team_seats', 5) : 5,
+                'is_pooled' => $entitlements['is_organization_pooled'] ?? false,
+                'subscription' => $orgSub ? [
+                    'id' => $orgSub->id,
+                    'status' => $orgSub->status,
+                    'plan_name' => $orgSub->plan?->name,
+                    'billing_cycle' => $orgSub->billing_cycle,
+                    'next_renewal_at' => $orgSub->next_renewal_at?->toIso8601String(),
+                ] : null,
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -83,6 +108,11 @@ class BillingPortalController
                     'id' => $subscription->id,
                     'status' => $subscription->status,
                     'is_active' => $subscription->isActive(),
+                    'is_trialing' => $subscription->isTrialing(),
+                    'trial_ends_at' => $subscription->trial_ends_at?->toIso8601String(),
+                    'days_left_in_trial' => $subscription->trial_ends_at && $subscription->trial_ends_at->isFuture()
+                        ? (int) ceil(now()->diffInRealSeconds($subscription->trial_ends_at) / 86400)
+                        : 0,
                     'billing_cycle' => $subscription->billing_cycle,
                     'currency' => $subscription->currency,
                     'starts_at' => $subscription->starts_at?->toIso8601String(),
@@ -101,6 +131,7 @@ class BillingPortalController
                         'price_bdt_annual' => (float) $subscription->plan->price_bdt_annual,
                     ] : null,
                 ] : null,
+                'organization' => $orgDetails,
                 'entitlements' => $entitlements,
                 'usage' => [
                     'watchlists' => [
@@ -120,6 +151,48 @@ class BillingPortalController
                 'eligible_payment_methods' => $eligibleMethods,
             ],
         ]);
+    }
+
+    /**
+     * Start a complimentary trial for an eligible plan.
+     */
+    public function startTrial(Request $request): JsonResponse
+    {
+        $request->validate([
+            'plan_id' => ['required'],
+        ]);
+
+        $user = $request->user();
+
+        // Check if user already had a trial or has active subscription
+        $existing = Subscription::where('user_id', $user->id)
+            ->where(function ($q) {
+                $q->where('status', 'active')
+                  ->orWhere('status', 'trialing')
+                  ->orWhereNotNull('trial_ends_at');
+            })
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Free trial is only available once per account, or you already have an active subscription.',
+            ], 422);
+        }
+
+        $plan = Plan::where('id', $request->input('plan_id'))
+            ->orWhere('slug', $request->input('plan_id'))
+            ->firstOrFail();
+
+        $trialDays = $plan->trial_period_days > 0 ? $plan->trial_period_days : 14;
+
+        $subscription = $this->lifecycleService->startTrial($user, $plan, $trialDays);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Your {$trialDays}-day trial of {$plan->name} has started.",
+            'data' => $subscription->load('plan.entitlements'),
+        ], 201);
     }
 
     /**

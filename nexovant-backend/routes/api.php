@@ -133,9 +133,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/invoices', [PaymentController::class, 'invoices'])->name('api.payments.invoices');
     });
 
-    // Billing & Subscription Management Platform (Phase 7D)
+    // Billing & Subscription Management Platform (Phase 7D & Stage 9)
     Route::prefix('billing')->group(function () {
         Route::get('/overview', [BillingPortalController::class, 'overview'])->name('api.billing.overview');
+        Route::post('/start-trial', [BillingPortalController::class, 'startTrial'])->name('api.billing.start-trial');
         Route::post('/validate-coupon', [BillingPortalController::class, 'validateCoupon'])->name('api.billing.validate-coupon');
         Route::post('/checkout', [BillingPortalController::class, 'checkout'])->name('api.billing.checkout');
         Route::post('/preview-proration', [BillingPortalController::class, 'previewProration'])->name('api.billing.preview-proration');

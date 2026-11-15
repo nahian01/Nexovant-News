@@ -801,5 +801,30 @@ class DatabaseSeeder extends Seeder
                 'next_run_at' => now()->tomorrow()->setTime(6, 0),
             ]
         );
+
+        // Promotional Coupons
+        \App\Models\Coupon::updateOrCreate(
+            ['code' => 'NEXO25'],
+            [
+                'name' => '25% Executive Launch Discount',
+                'discount_type' => 'percentage',
+                'discount_value' => 25.00,
+                'is_active' => true,
+                'valid_from' => now()->subDay(),
+                'valid_until' => now()->addYear(),
+            ]
+        );
+
+        \App\Models\Coupon::updateOrCreate(
+            ['code' => 'WELCOME50'],
+            [
+                'name' => '50% First Month Welcome Credit',
+                'discount_type' => 'percentage',
+                'discount_value' => 50.00,
+                'is_active' => true,
+                'valid_from' => now()->subDay(),
+                'valid_until' => now()->addYear(),
+            ]
+        );
     }
 }
