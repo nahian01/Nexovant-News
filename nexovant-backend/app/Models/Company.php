@@ -58,4 +58,9 @@ class Company extends Model
         return $this->belongsToMany(Company::class, 'company_relationships', 'company_id', 'related_company_id')
             ->wherePivot('relationship_type', 'competitor');
     }
+
+    public function intelligenceEntity(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    {
+        return $this->morphOne(IntelligenceEntity::class, 'entityable');
+    }
 }

@@ -4,12 +4,16 @@ import AdminLayout from '@/components/layout/AdminLayout.vue'
 import Card from '@/components/ui/Card.vue'
 import Table from '@/components/ui/Table.vue'
 import Button from '@/components/ui/Button.vue'
+import Alert from '@/components/ui/Alert.vue'
 import { adminService } from '@/services/api/admin.service'
+import { Zap, RefreshCw, XCircle } from 'lucide-vue-next'
 
 const jobs = ref<any[]>([])
 const stages = ref<string[]>([])
 const isLoading = ref(true)
+const isScanning = ref(false)
 const statusMessage = ref('')
+const errorMessage = ref('')
 
 const headers = ['Job ID', 'Source & Target', 'Stage & Status', 'AI Model', 'Tokens & Cost', 'Latency', 'Actions']
 
@@ -17,10 +21,10 @@ const fetchJobs = async () => {
   isLoading.value = true
   try {
     const res = await adminService.getAutomationJobs()
-    jobs.value = res.data
+    jobs.value = res.data || []
     stages.value = res.stages || []
-  } catch {
-    //
+  } catch (err: any) {
+    errorMessage.value = 'Failed to load pipeline jobs.'
   } finally {
     isLoading.value = false
   }
@@ -29,22 +33,33 @@ const fetchJobs = async () => {
 const handleRetry = async (id: string) => {
   try {
     const res = await adminService.retryJob(id)
-    statusMessage.value = res.message
-    setTimeout(() => (statusMessage.value = ''), 4000)
-    fetchJobs()
-  } catch {
-    //
+    statusMessage.value = res.message || 'Job queued for re-execution.'
+    await fetchJobs()
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || 'Failed to retry job.'
   }
 }
 
 const handleCancel = async (id: string) => {
   try {
     const res = await adminService.cancelJob(id)
-    statusMessage.value = res.message
-    setTimeout(() => (statusMessage.value = ''), 4000)
-    fetchJobs()
-  } catch {
-    //
+    statusMessage.value = res.message || 'Job cancelled.'
+    await fetchJobs()
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || 'Failed to cancel job.'
+  }
+}
+
+const handleBatchScan = async () => {
+  isScanning.value = true
+  try {
+    const res = await adminService.triggerBatchScan()
+    statusMessage.value = res.message || 'Batch ingestion scan triggered across active sources.'
+    await fetchJobs()
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || 'Failed to trigger batch scan.'
+  } finally {
+    isScanning.value = false
   }
 }
 
@@ -57,7 +72,7 @@ onMounted(() => {
   <AdminLayout>
     <div class="space-y-6 text-left">
       <!-- Title & Explanation -->
-      <div class="flex items-center justify-between border-b border-nexo-border/80 pb-4">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-nexo-border/80 pb-4">
         <div>
           <h1 class="editorial-title text-2xl font-medium text-nexo-text-primary">
             14-Stage Cognitive Automation Pipeline
@@ -67,20 +82,38 @@ onMounted(() => {
           </p>
         </div>
 
-        <Button variant="secondary" size="sm" @click="fetchJobs">
-          Refresh Pipeline Queue
-        </Button>
+        <div class="flex items-center space-x-2">
+          <Button
+            variant="primary"
+            size="sm"
+            :disabled="isScanning"
+            @click="handleBatchScan"
+            class="bg-nexo-accent-gold hover:bg-[#8e6e18]"
+          >
+            <span v-if="isScanning" class="flex items-center gap-1.5">
+              <RefreshCw class="h-3.5 w-3.5 animate-spin" /> Ingesting...
+            </span>
+            <span v-else class="flex items-center gap-1.5">
+              <Zap class="h-3.5 w-3.5" /> Trigger Batch Scan
+            </span>
+          </Button>
+
+          <Button variant="secondary" size="sm" @click="fetchJobs">
+            Refresh Pipeline Queue
+          </Button>
+        </div>
       </div>
 
-      <div
-        v-if="statusMessage"
-        class="p-3 bg-nexo-surface border border-nexo-status-confirmed text-nexo-status-confirmed text-xs font-mono rounded"
-      >
+      <!-- Alerts -->
+      <Alert v-if="statusMessage" variant="success" dismissible @dismiss="statusMessage = ''">
         {{ statusMessage }}
-      </div>
+      </Alert>
+      <Alert v-if="errorMessage" variant="danger" dismissible @dismiss="errorMessage = ''">
+        {{ errorMessage }}
+      </Alert>
 
       <!-- 14-Stage Visual Progress Ribbon -->
-      <Card class="p-4 space-y-3">
+      <Card class="p-4 space-y-3 bg-white border border-nexo-border">
         <span class="text-[10px] font-mono uppercase text-nexo-text-muted tracking-wider font-bold">
           Pipeline Processing Architecture (Sequential VPS Safe)
         </span>
@@ -88,11 +121,11 @@ onMounted(() => {
           <div
             v-for="(st, i) in stages"
             :key="i"
-            class="p-2 rounded bg-nexo-surface border border-nexo-border text-center truncate"
+            class="p-2 rounded-lg bg-nexo-surface/40 border border-nexo-border text-center truncate"
             :title="st"
           >
-            <span class="text-nexo-accent-cyan font-bold block">{{ i + 1 }}</span>
-            <span class="text-nexo-text-primary truncate block">{{ st.replace(/^\d+\.\s*/, '') }}</span>
+            <span class="text-nexo-accent-gold font-bold block">{{ i + 1 }}</span>
+            <span class="text-nexo-text-primary truncate block font-medium">{{ st.replace(/^\d+\.\s*/, '') }}</span>
           </div>
         </div>
       </Card>
@@ -112,7 +145,8 @@ onMounted(() => {
             <span
               :class="[
                 'px-1.5 py-0.2 rounded text-[9px] uppercase font-bold',
-                j.status === 'completed' ? 'bg-nexo-status-confirmed/20 text-nexo-status-confirmed' : 'bg-nexo-accent-cyan/20 text-nexo-accent-cyan animate-pulse'
+                j.status === 'completed' ? 'bg-emerald-100 text-emerald-800' :
+                j.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800 animate-pulse'
               ]"
             >
               {{ j.status }}
@@ -128,19 +162,19 @@ onMounted(() => {
           <td class="py-3.5 px-4 font-mono text-xs text-nexo-text-muted">
             {{ j.duration_seconds }}s
           </td>
-          <td class="py-3.5 px-4 font-mono">
+          <td class="py-3.5 px-4 font-mono text-xs">
             <div class="flex items-center space-x-2">
               <button
                 v-if="j.status === 'processing'"
                 @click="handleCancel(j.id)"
-                class="px-2 py-1 rounded bg-nexo-surface hover:bg-nexo-elevated border border-nexo-status-disputed/40 text-nexo-status-disputed text-xs"
+                class="px-2 py-1 rounded bg-white hover:bg-red-50 border border-red-200 text-red-600 text-xs"
               >
                 Cancel
               </button>
               <button
                 v-else
                 @click="handleRetry(j.id)"
-                class="px-2 py-1 rounded bg-nexo-surface hover:bg-nexo-elevated border border-nexo-border text-xs text-nexo-text-primary"
+                class="px-2.5 py-1 rounded bg-white hover:bg-nexo-bg border border-nexo-border text-xs text-nexo-text-primary shadow-xs font-semibold"
               >
                 Retry
               </button>

@@ -26,9 +26,9 @@ htmlcov/
 **/database/*.sqlite
 **/database/*.sqlite-*
 **/storage/logs/*
-**/storage/framework/cache/*
-**/storage/framework/sessions/*
-**/storage/framework/views/*
+**/storage/framework/*
+**/storage/app/private/*
+**/storage/app/public/*
 **/storage/app/settings.json
 **/bootstrap/cache/*.php
 **/bootstrap/cache/*.json

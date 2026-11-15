@@ -10,6 +10,8 @@ use App\Models\AIProviderCredential;
 use App\Models\AIRoutingLog;
 use App\Models\AITaskConfig;
 use App\Models\AuditLog;
+use App\Services\AI\AIRouterService;
+use App\Services\AI\DTO\AIRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -17,6 +19,10 @@ use Illuminate\Support\Str;
 
 class AIRouterAdminController
 {
+    public function __construct(
+        protected AIRouterService $routerService
+    ) {
+    }
     /**
      * Dashboard: List all AI provider connections, health, credentials count, and live quota usage.
      */
@@ -284,41 +290,86 @@ class AIRouterAdminController
     }
 
     /**
-     * Test credential connectivity.
+     * Test credential connectivity using the AI Provider Integration Engine.
      */
     public function testCredential(string $id): JsonResponse
     {
         $credential = AIProviderCredential::with('provider')->findOrFail($id);
 
+        $testResult = $this->routerService->testProviderConnection($credential->provider_id, $credential->id);
+
+        if ($testResult->success) {
+            return response()->json([
+                'success' => true,
+                'message' => $testResult->message,
+                'latency_ms' => $testResult->latencyMs,
+                'status' => 'healthy',
+                'is_valid' => true,
+                'model_verified' => $testResult->modelVerified,
+                'last_tested_at' => now()->toIso8601String(),
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $testResult->message,
+            'latency_ms' => $testResult->latencyMs,
+            'status' => 'error',
+            'is_valid' => false,
+            'status_code' => $testResult->statusCode,
+            'details' => $testResult->details,
+        ], 422);
+    }
+
+    /**
+     * Execute live test prompt routing from Admin Panel.
+     */
+    public function executeTest(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'prompt' => ['required', 'string', 'max:2000'],
+            'task_type' => ['nullable', 'string', 'max:100'],
+            'provider_id' => ['nullable', 'exists:ai_providers,id'],
+            'model_identifier' => ['nullable', 'string', 'max:100'],
+            'routing_strategy' => ['nullable', 'in:priority,round_robin,least_utilized,lowest_cost,health,capability'],
+        ]);
+
+        $taskType = $validated['task_type'] ?? 'article_summarization';
+        $options = [];
+        if (!empty($validated['provider_id'])) {
+            $options['provider_id'] = $validated['provider_id'];
+        }
+        if (!empty($validated['model_identifier'])) {
+            $options['model_identifier'] = $validated['model_identifier'];
+        }
+        if (!empty($validated['routing_strategy'])) {
+            $options['routing_strategy'] = $validated['routing_strategy'];
+        }
+
         try {
-            $decrypted = Crypt::decryptString($credential->encrypted_api_key);
+            $aiRequest = AIRequest::fromPrompt(
+                taskType: $taskType,
+                prompt: $validated['prompt'],
+                options: $options
+            );
+            $aiRequest->userId = $request->user()?->id;
+            $aiRequest->module = 'admin_test_console';
+
+            $response = $this->routerService->execute($aiRequest);
+
+            return response()->json([
+                'success' => true,
+                'data' => $response->toArray(),
+            ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'error' => [
-                    'code' => 'DECRYPTION_FAILED',
-                    'message' => 'Failed to decrypt credential secret with application encryption key.',
+                    'code' => 'AI_EXECUTION_FAILED',
+                    'message' => $e->getMessage(),
                 ]
             ], 500);
         }
-
-        // Test connectivity simulation / format verification
-        $credential->update([
-            'is_valid' => true,
-            'last_tested_at' => now(),
-            'last_health_check_at' => now(),
-            'error_count' => 0,
-            'last_error_reason' => null,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => "Connection test to '{$credential->provider->name}' verified successfully (HTTP 200 OK). Latency: 128ms.",
-            'latency_ms' => 128,
-            'status' => 'healthy',
-            'is_valid' => true,
-            'last_tested_at' => $credential->last_tested_at->toIso8601String(),
-        ]);
     }
 
     /**

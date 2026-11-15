@@ -28,4 +28,9 @@ class Technology extends Model
             'is_active' => 'boolean',
         ];
     }
+
+    public function intelligenceEntity(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    {
+        return $this->morphOne(IntelligenceEntity::class, 'entityable');
+    }
 }

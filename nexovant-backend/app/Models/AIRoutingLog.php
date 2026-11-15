@@ -48,6 +48,7 @@ class AIRoutingLog extends Model
             'fallback_attempted' => 'boolean',
             'estimated_cost_usd' => 'decimal:6',
             'latency_ms' => 'integer',
+            'error_details' => 'array',
             'created_at' => 'datetime',
         ];
     }

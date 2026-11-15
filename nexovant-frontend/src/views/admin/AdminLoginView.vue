@@ -43,11 +43,6 @@ const handleAdminLogin = async () => {
     isSubmitting.value = false
   }
 }
-
-const fillDemoAdmin = () => {
-  email.value = 'admin@nexovant.si'
-  password.value = 'AdminSecret2026!'
-}
 </script>
 
 <template>
@@ -150,13 +145,9 @@ const fillDemoAdmin = () => {
         </form>
 
         <div class="pt-3 border-t border-nexo-border/60 flex items-center justify-between text-[11px]">
-          <button
-            type="button"
-            @click="fillDemoAdmin"
-            class="font-mono text-nexo-accent-gold hover:underline font-semibold"
-          >
-            ⚡ Auto-fill Super Admin
-          </button>
+          <span class="font-mono text-nexo-text-muted">
+            🔒 Hardware Key / SSO / Token Required
+          </span>
 
           <RouterLink to="/" class="text-nexo-text-secondary hover:text-nexo-text-primary transition">
             ← Public Network

@@ -20,9 +20,11 @@ class Article extends Model
 
     protected $fillable = [
         'source_id',
+        'cluster_id',
         'title',
         'slug',
         'canonical_url',
+        'content',
         'content_raw',
         'content_normalized',
         'content_hash',
@@ -34,6 +36,7 @@ class Article extends Model
         'status', // DRAFT, REVIEW, SCHEDULED, PUBLISHED, UNPUBLISHED, ARCHIVED
         'scheduled_at',
         'featured_image',
+        'hero_image',
         'featured_image_caption',
         'meta_title',
         'meta_description',
@@ -59,6 +62,42 @@ class Article extends Model
             'lock_image' => 'boolean',
             'lock_tags' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Article $article): void {
+            if (empty($article->content_raw) && !empty($article->content)) {
+                $article->content_raw = $article->content;
+            }
+            if (empty($article->content_normalized) && !empty($article->content_raw)) {
+                $article->content_normalized = $article->content_raw;
+            }
+            if (empty($article->content_hash)) {
+                $article->content_hash = hash('sha256', ($article->slug ?? '') . '|' . ($article->title ?? ''));
+            }
+        });
+    }
+
+    public function getContentAttribute(): string
+    {
+        return $this->content_normalized ?? $this->content_raw ?? '';
+    }
+
+    public function setContentAttribute(string $value): void
+    {
+        $this->attributes['content_raw'] = $value;
+        $this->attributes['content_normalized'] = $value;
+    }
+
+    public function getHeroImageAttribute(): ?string
+    {
+        return $this->featured_image;
+    }
+
+    public function setHeroImageAttribute(?string $value): void
+    {
+        $this->attributes['featured_image'] = $value;
     }
 
     public function source(): BelongsTo
@@ -106,6 +145,16 @@ class Article extends Model
     public function assessment(): HasOne
     {
         return $this->hasOne(ArticleAssessment::class);
+    }
+
+    public function sources(): HasMany
+    {
+        return $this->hasMany(ArticleSource::class, 'article_id');
+    }
+
+    public function cluster(): HasOne
+    {
+        return $this->hasOne(StoryCluster::class, 'article_id');
     }
 
     public function revisions(): HasMany

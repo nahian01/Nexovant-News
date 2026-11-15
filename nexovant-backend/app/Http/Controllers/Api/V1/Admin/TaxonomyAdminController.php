@@ -28,6 +28,8 @@ class TaxonomyAdminController
             ->orderBy('sort_order')
             ->get();
 
+        $subcategories = Subcategory::with('category')->where('is_active', true)->orderBy('name')->get();
+        $topics = Topic::with('parent')->where('is_active', true)->orderBy('name')->get();
         $industries = Industry::where('is_active', true)->orderBy('name')->get();
         $technologies = Technology::where('is_active', true)->orderBy('name')->get();
         $series = EditorialSeries::withCount('articles')->orderBy('title')->get();
@@ -36,9 +38,12 @@ class TaxonomyAdminController
         return response()->json([
             'success' => true,
             'categories' => $categories,
+            'subcategories' => $subcategories,
+            'topics' => $topics,
             'industries' => $industries,
             'technologies' => $technologies,
             'series' => $series,
+            'editorial_series' => $series,
             'tags' => $tags,
         ]);
     }
@@ -170,24 +175,56 @@ class TaxonomyAdminController
         ], 201);
     }
 
-    public function storeSeries(Request $request): JsonResponse
+    public function categories(): JsonResponse
     {
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-        ]);
-
-        $series = EditorialSeries::create([
-            'title' => $validated['title'],
-            'slug' => Str::slug($validated['title']),
-            'description' => $validated['description'] ?? null,
-            'is_active' => true,
-        ]);
-
         return response()->json([
             'success' => true,
-            'message' => "Editorial series '{$series->title}' established.",
-            'series' => $series,
-        ], 201);
+            'data' => Category::withCount('articles')->orderBy('sort_order')->get(),
+        ]);
+    }
+
+    public function destroyCategory(string $id): JsonResponse
+    {
+        Category::findOrFail($id)->delete();
+        return response()->json(['success' => true, 'message' => 'Category deleted.']);
+    }
+
+    public function subcategories(Request $request): JsonResponse
+    {
+        $query = Subcategory::with('category')->where('is_active', true);
+        if ($catId = $request->query('category_id')) {
+            $query->where('category_id', $catId);
+        }
+        return response()->json(['success' => true, 'data' => $query->orderBy('name')->get()]);
+    }
+
+    public function topics(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => Topic::with('parent')->where('is_active', true)->orderBy('name')->get(),
+        ]);
+    }
+
+    public function tags(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => Tag::withCount('articles')->orderBy('name')->get(),
+        ]);
+    }
+
+    public function destroyTag(string $id): JsonResponse
+    {
+        Tag::findOrFail($id)->delete();
+        return response()->json(['success' => true, 'message' => 'Tag deleted.']);
+    }
+
+    public function series(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => EditorialSeries::withCount('articles')->orderBy('title')->get(),
+        ]);
     }
 }

@@ -13,10 +13,17 @@ class OrganizationMember extends Model
 {
     use HasFactory, HasUuids;
 
+    public const ROLE_OWNER = 'owner';
+    public const ROLE_ADMIN = 'admin';
+    public const ROLE_ANALYST = 'analyst';
+    public const ROLE_MANAGER = 'manager';
+    public const ROLE_MEMBER = 'member';
+    public const ROLE_VIEWER = 'viewer';
+
     protected $fillable = [
         'organization_id',
         'user_id',
-        'role', // owner, admin, manager, member, viewer
+        'role', // owner, admin, manager, analyst, member, viewer
     ];
 
     public function organization(): BelongsTo
@@ -27,5 +34,30 @@ class OrganizationMember extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function isOwner(): bool
+    {
+        return $this->role === self::ROLE_OWNER;
+    }
+
+    public function isAdmin(): bool
+    {
+        return in_array($this->role, [self::ROLE_OWNER, self::ROLE_ADMIN], true);
+    }
+
+    public function isAnalystOrHigher(): bool
+    {
+        return in_array($this->role, [self::ROLE_OWNER, self::ROLE_ADMIN, self::ROLE_MANAGER, self::ROLE_ANALYST], true);
+    }
+
+    public function canManageMembers(): bool
+    {
+        return $this->isAdmin();
+    }
+
+    public function canManageAssets(): bool
+    {
+        return $this->isAnalystOrHigher();
     }
 }

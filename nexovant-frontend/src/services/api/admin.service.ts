@@ -207,6 +207,11 @@ export const adminService = {
     return res.data
   },
 
+  async executeAITest(data: { prompt: string; task_type?: string; provider_id?: string; model_identifier?: string; routing_strategy?: string }) {
+    const res = await apiClient.post('/admin/ai-router/execute-test', data)
+    return res.data
+  },
+
   // 7. Taxonomy & Knowledge Entities
   async getTaxonomy() {
     const res = await apiClient.get('/admin/taxonomy')
@@ -383,18 +388,39 @@ export const adminService = {
   },
 
   // 12. Knowledge Center & Advertising
-  async getRagKnowledge() {
-    const res = await apiClient.get('/admin/rag-knowledge')
+  async getRagKnowledge(tenantId?: string) {
+    const res = await apiClient.get('/admin/rag-knowledge', { params: tenantId ? { tenant_id: tenantId } : undefined })
     return res.data
   },
 
-  async reindexDocument(id: string) {
-    const res = await apiClient.post(`/admin/rag-knowledge/${id}/reindex`)
+  async ingestKnowledgeDocument(data: {
+    title: string
+    document_type: string
+    content: string
+    source_url?: string
+    tenant_id?: string
+  }) {
+    const res = await apiClient.post('/admin/rag-knowledge/ingest', data)
     return res.data
   },
 
-  async clearSemanticCache() {
-    const res = await apiClient.post('/admin/rag-knowledge/clear-cache')
+  async getDocumentChunks(id: string) {
+    const res = await apiClient.get(`/admin/rag-knowledge/documents/${id}/chunks`)
+    return res.data
+  },
+
+  async deleteKnowledgeDocument(id: string) {
+    const res = await apiClient.delete(`/admin/rag-knowledge/${id}`)
+    return res.data
+  },
+
+  async reindexDocument(id: string, content?: string) {
+    const res = await apiClient.post(`/admin/rag-knowledge/${id}/reindex`, { content })
+    return res.data
+  },
+
+  async clearSemanticCache(tenantId?: string) {
+    const res = await apiClient.post('/admin/rag-knowledge/clear-cache', { tenant_id: tenantId })
     return res.data
   },
 
@@ -405,6 +431,399 @@ export const adminService = {
 
   async updateAdStatus(id: string, status: string, reason?: string) {
     const res = await apiClient.put(`/admin/advertising/${id}/status`, { status, reason })
+    return res.data
+  },
+
+  // 13. Phase 5 Intelligence Ingestion & Pipeline Automation
+  async getIntelligenceDashboard() {
+    const res = await apiClient.get('/admin/intelligence')
+    return res.data.data
+  },
+
+  async getIntelligenceIngestion() {
+    const res = await apiClient.get('/admin/intelligence/ingestion')
+    return res.data.data
+  },
+
+  async triggerIntelligenceIngestion(sourceId?: string) {
+    const res = await apiClient.post('/admin/intelligence/ingestion/trigger', { source_id: sourceId })
+    return res.data
+  },
+
+  async toggleIntelligencePause(paused: boolean, reason?: string) {
+    const res = await apiClient.post('/admin/intelligence/ingestion/toggle-pause', { is_paused: paused, reason })
+    return res.data
+  },
+
+  async getIntelligenceDiscoveries(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/intelligence/discoveries', { params })
+    return res.data
+  },
+
+  async getDiscoveryDetail(id: string) {
+    const res = await apiClient.get(`/admin/intelligence/discoveries/${id}`)
+    return res.data.data
+  },
+
+  async assignDiscoveryCluster(id: string, clusterId: string) {
+    const res = await apiClient.post(`/admin/intelligence/discoveries/${id}/assign-cluster`, { cluster_id: clusterId })
+    return res.data
+  },
+
+  async markDiscoveryFalseDuplicate(id: string, notes?: string) {
+    const res = await apiClient.post(`/admin/intelligence/discoveries/${id}/false-duplicate`, { notes })
+    return res.data
+  },
+
+  async excludeDiscovery(id: string, reason?: string) {
+    const res = await apiClient.post(`/admin/intelligence/discoveries/${id}/exclude`, { reason })
+    return res.data
+  },
+
+  async getIntelligenceClusters(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/intelligence/clusters', { params })
+    return res.data
+  },
+
+  async getClusterDetail(id: string) {
+    const res = await apiClient.get(`/admin/intelligence/clusters/${id}`)
+    return res.data.data
+  },
+
+  async mergeIntelligenceClusters(primaryId: string, secondaryId: string, reason?: string) {
+    const res = await apiClient.post('/admin/intelligence/clusters/merge', {
+      primary_cluster_id: primaryId,
+      secondary_cluster_id: secondaryId,
+      reason,
+    })
+    return res.data
+  },
+
+  async splitIntelligenceCluster(clusterId: string, storyIds: string[], reason?: string) {
+    const res = await apiClient.post('/admin/intelligence/clusters/split', {
+      cluster_id: clusterId,
+      story_ids_to_detach: storyIds,
+      reason,
+    })
+    return res.data
+  },
+
+  async getIntelligenceFacts(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/intelligence/facts', { params })
+    return res.data
+  },
+
+  async updateFactStatus(id: string, verificationStatus: string, notes?: string) {
+    const res = await apiClient.put(`/admin/intelligence/facts/${id}`, {
+      verification_status: verificationStatus,
+      notes,
+    })
+    return res.data
+  },
+
+  async getIntelligencePipeline(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/intelligence/pipeline', { params })
+    return res.data
+  },
+
+  async retryPipelineJob(id: string) {
+    const res = await apiClient.post(`/admin/intelligence/pipeline/${id}/retry`)
+    return res.data
+  },
+
+  async cancelPipelineJob(id: string) {
+    const res = await apiClient.post(`/admin/intelligence/pipeline/${id}/cancel`)
+    return res.data
+  },
+
+  async getIntelligenceAutomationSettings() {
+    const res = await apiClient.get('/admin/intelligence/automation')
+    return res.data.data
+  },
+
+  async updateIntelligenceAutomationSettings(settings: Record<string, any>) {
+    const res = await apiClient.put('/admin/intelligence/automation', settings)
+    return res.data
+  },
+
+  // 12. Phase 6: Intelligence Quality, Verification & Deep Research
+  async getResearchOverview() {
+    const res = await apiClient.get('/admin/research')
+    return res.data.data
+  },
+
+  async getResearchEntities(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/research/entities', { params })
+    return res.data.data
+  },
+
+  async createResearchEntity(data: Record<string, any>) {
+    const res = await apiClient.post('/admin/research/entities', data)
+    return res.data
+  },
+
+  async getResearchEntity(id: string) {
+    const res = await apiClient.get(`/admin/research/entities/${id}`)
+    return res.data.data
+  },
+
+  async updateResearchEntity(id: string, data: Record<string, any>) {
+    const res = await apiClient.put(`/admin/research/entities/${id}`, data)
+    return res.data
+  },
+
+  async verifyResearchEntity(id: string) {
+    const res = await apiClient.post(`/admin/research/entities/${id}/verify`)
+    return res.data
+  },
+
+  async disputeResearchEntity(id: string, reason: string) {
+    const res = await apiClient.post(`/admin/research/entities/${id}/dispute`, { reason })
+    return res.data
+  },
+
+  async mergeResearchEntities(targetId: string, sourceId: string, reason: string) {
+    const res = await apiClient.post(`/admin/research/entities/${targetId}/merge`, {
+      source_entity_id: sourceId,
+      reason,
+    })
+    return res.data
+  },
+
+  async splitResearchEntity(entityId: string, aliasIds: string[], newCanonicalName: string, reason: string) {
+    const res = await apiClient.post(`/admin/research/entities/${entityId}/split`, {
+      alias_ids: aliasIds,
+      new_canonical_name: newCanonicalName,
+      reason,
+    })
+    return res.data
+  },
+
+  async getResearchReviewQueue() {
+    const res = await apiClient.get('/admin/research/entities/reviews/queue')
+    return res.data.data
+  },
+
+  async decisionResearchReview(reviewId: string, decision: 'merge' | 'reject' | 'keep_distinct', reason?: string) {
+    const res = await apiClient.post(`/admin/research/entities/reviews/${reviewId}/decision`, {
+      decision,
+      reason,
+    })
+    return res.data
+  },
+
+  async getResearchCompanies(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/research/companies', { params })
+    return res.data.data
+  },
+
+  async getResearchExecutives(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/research/executives', { params })
+    return res.data.data
+  },
+
+  async getResearchTechnology(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/research/technology', { params })
+    return res.data.data
+  },
+
+  async getResearchGraph(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/research/graph', { params })
+    return res.data.data
+  },
+
+  async createResearchRelationship(data: Record<string, any>) {
+    const res = await apiClient.post('/admin/research/relationships', data)
+    return res.data
+  },
+
+  async verifyResearchRelationship(id: string) {
+    const res = await apiClient.post(`/admin/research/relationships/${id}/verify`)
+    return res.data
+  },
+
+  async getResearchVerificationFacts(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/research/verification', { params })
+    return res.data.data
+  },
+
+  async attachFactEvidence(factId: string, data: Record<string, any>) {
+    const res = await apiClient.post(`/admin/research/verification/${factId}/evidence`, data)
+    return res.data
+  },
+
+  async recordFactVerdict(factId: string, status: string, reason: string) {
+    const res = await apiClient.post(`/admin/research/verification/${factId}/verdict`, {
+      status,
+      reason,
+    })
+    return res.data
+  },
+
+  async getResearchTimeline(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/research/timeline', { params })
+    return res.data.data
+  },
+
+  async createResearchEvent(data: Record<string, any>) {
+    const res = await apiClient.post('/admin/research/timeline', data)
+    return res.data
+  },
+
+  async correctResearchEventDate(id: string, occurredAt: string, reason: string) {
+    const res = await apiClient.put(`/admin/research/timeline/${id}/date-correction`, {
+      occurred_at: occurredAt,
+      reason,
+    })
+    return res.data
+  },
+
+  async getResearchTrends(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/research/trends', { params })
+    return res.data.data
+  },
+
+  async triggerResearchTrendScan() {
+    const res = await apiClient.post('/admin/research/trends/scan')
+    return res.data
+  },
+
+  async getResearchProjects() {
+    const res = await apiClient.get('/admin/research/workspace/projects')
+    return res.data.data
+  },
+
+  async initiateResearchProject(data: Record<string, any>) {
+    const res = await apiClient.post('/admin/research/workspace/projects', data)
+    return res.data
+  },
+
+  async getResearchReports(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/research/reports', { params })
+    return res.data.data
+  },
+
+  async getResearchReport(id: string) {
+    const res = await apiClient.get(`/admin/research/reports/${id}`)
+    return res.data.data
+  },
+
+  async updateResearchReportStatus(id: string, status: string, isPublic?: boolean) {
+    const res = await apiClient.put(`/admin/research/reports/${id}/status`, {
+      editorial_status: status,
+      is_public: isPublic,
+    })
+    return res.data
+  },
+
+  // 10. Executive Publications & PDF Engine (Phase 7B)
+  async getPublicationsOverview() {
+    const res = await apiClient.get('/admin/publications/overview')
+    return res.data
+  },
+
+  async getPublications(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/publications', { params })
+    return res.data
+  },
+
+  async createPublication(data: Record<string, any>) {
+    const res = await apiClient.post('/admin/publications', data)
+    return res.data
+  },
+
+  async getPublication(id: string) {
+    const res = await apiClient.get(`/admin/publications/${id}`)
+    return res.data
+  },
+
+  async updatePublication(id: string, data: Record<string, any>) {
+    const res = await apiClient.put(`/admin/publications/${id}`, data)
+    return res.data
+  },
+
+  async deletePublication(id: string) {
+    const res = await apiClient.delete(`/admin/publications/${id}`)
+    return res.data
+  },
+
+  async approvePublication(id: string) {
+    const res = await apiClient.post(`/admin/publications/${id}/approve`)
+    return res.data
+  },
+
+  async publishPublication(id: string) {
+    const res = await apiClient.post(`/admin/publications/${id}/publish`)
+    return res.data
+  },
+
+  async archivePublication(id: string) {
+    const res = await apiClient.post(`/admin/publications/${id}/archive`)
+    return res.data
+  },
+
+  async getPublicationTemplates() {
+    const res = await apiClient.get('/admin/publications/templates')
+    return res.data
+  },
+
+  async createPublicationTemplate(data: Record<string, any>) {
+    const res = await apiClient.post('/admin/publications/templates', data)
+    return res.data
+  },
+
+  async getPublicationSchedules() {
+    const res = await apiClient.get('/admin/publications/schedules')
+    return res.data
+  },
+
+  async createPublicationSchedule(data: Record<string, any>) {
+    const res = await apiClient.post('/admin/publications/schedules', data)
+    return res.data
+  },
+
+  async triggerPublicationSchedule(id: string) {
+    const res = await apiClient.post(`/admin/publications/schedules/${id}/trigger`)
+    return res.data
+  },
+
+  async generatePublicationToken(id: string, data?: Record<string, any>) {
+    const res = await apiClient.post(`/admin/publications/${id}/tokens`, data || {})
+    return res.data
+  },
+
+  async revokePublicationTokens(id: string) {
+    const res = await apiClient.post(`/admin/publications/${id}/tokens/revoke`)
+    return res.data
+  },
+
+  async getPublicationDownloadLogs(publicationId?: string) {
+    const res = await apiClient.get('/admin/publications/downloads/logs', {
+      params: publicationId ? { publication_id: publicationId } : {},
+    })
+    return res.data
+  },
+
+  // 11. Subscriber Workspace Administration (Phase 7C)
+  async getSubscriberWorkspaceOverview() {
+    const res = await apiClient.get('/admin/subscriber-intelligence/overview')
+    return res.data
+  },
+
+  async getSubscriberDeliveryLogs(status?: string) {
+    const res = await apiClient.get('/admin/subscriber-intelligence/delivery-logs', {
+      params: status ? { status } : {},
+    })
+    return res.data
+  },
+
+  async getSubscriberPolicies() {
+    const res = await apiClient.get('/admin/subscriber-intelligence/policies')
+    return res.data
+  },
+
+  async updateSubscriberPolicies(data: Record<string, any>) {
+    const res = await apiClient.post('/admin/subscriber-intelligence/policies', data)
     return res.data
   },
 }

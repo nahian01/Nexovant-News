@@ -71,6 +71,12 @@ class DatabaseSeeder extends Seeder
 
             // Billing & Payments
             ['name' => 'billing.payments.verify', 'display_name' => 'Verify Manual Payment Proofs', 'module' => 'billing'],
+
+            // Intelligence Research
+            ['name' => 'research.entities.manage', 'display_name' => 'Manage Intelligence Entities and Graph', 'module' => 'research'],
+            ['name' => 'research.verification.manage', 'display_name' => 'Verify Claims and Conflicting Evidence', 'module' => 'research'],
+            ['name' => 'research.workspace.manage', 'display_name' => 'Execute Deep Research Projects', 'module' => 'research'],
+            ['name' => 'research.reports.manage', 'display_name' => 'Publish and Review Research Reports', 'module' => 'research'],
         ];
 
         foreach ($permissionsData as $p) {
@@ -78,7 +84,7 @@ class DatabaseSeeder extends Seeder
             $roles['super_admin']->permissions()->syncWithoutDetaching([$perm->id]);
             $roles['admin']->permissions()->syncWithoutDetaching([$perm->id]);
 
-            if (str_starts_with($p['module'], 'editorial')) {
+            if (str_starts_with($p['module'], 'editorial') || str_starts_with($p['module'], 'research')) {
                 $roles['editorial_admin']->permissions()->syncWithoutDetaching([$perm->id]);
             }
             if (str_starts_with($p['module'], 'billing')) {
@@ -87,11 +93,22 @@ class DatabaseSeeder extends Seeder
         }
 
         // 1. Create Default Admin & Subscriber Accounts
-        $admin = User::firstOrCreate(
+        // Security Hardening: In production, never use default demo passwords; rely on env or generate secure random string
+        $adminPassword = env('SEED_ADMIN_PASSWORD');
+        if (empty($adminPassword)) {
+            $adminPassword = app()->environment('production') ? Str::random(40) : (env('APP_DEBUG') ? 'NexoDev-' . Str::random(16) : Str::random(40));
+        }
+
+        $execPassword = env('SEED_EXECUTIVE_PASSWORD');
+        if (empty($execPassword)) {
+            $execPassword = app()->environment('production') ? Str::random(40) : (env('APP_DEBUG') ? 'NexoDev-' . Str::random(16) : Str::random(40));
+        }
+
+        $admin = User::updateOrCreate(
             ['email' => 'admin@nexovant.si'],
             [
                 'name' => 'Nexovant Chief Administrator',
-                'password' => Hash::make('AdminSecret2026!'),
+                'password' => Hash::make($adminPassword),
                 'account_type' => 'admin',
                 'is_active' => true,
                 'email_verified_at' => now(),
@@ -103,7 +120,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'executive@enterprise.corp'],
             [
                 'name' => 'Alexander Vance',
-                'password' => Hash::make('ExecutivePass2026!'),
+                'password' => Hash::make($execPassword),
                 'account_type' => 'individual',
                 'is_active' => true,
                 'email_verified_at' => now(),
@@ -469,6 +486,35 @@ class DatabaseSeeder extends Seeder
                 ['provider_id' => $prov->id],
                 ['rpm_limit' => $rpm, 'tpm_limit' => $tpm]
             );
+
+            // Register default initial encrypted credential
+            $sampleKey = match ($prov->slug) {
+                'google-gemini' => 'AIzaSyA88901234567890abcdefghijklmnopqrst',
+                'anthropic' => 'sk-ant-api03-abcdef1234567890abcdef123456-8877',
+                'openai' => 'sk-proj-openai1234567890abcdef1234567890-9900',
+                default => 'sk-generic-credential-key-9999',
+            };
+            $fp = hash('sha256', $sampleKey);
+
+            \App\Models\AIProviderCredential::updateOrCreate(
+                ['key_fingerprint' => $fp],
+                [
+                    'provider_id' => $prov->id,
+                    'label' => $prov->name . ' Primary Key',
+                    'display_name' => $prov->name . ' Production Gateway',
+                    'encrypted_api_key' => \Illuminate\Support\Facades\Crypt::encryptString($sampleKey),
+                    'account_label' => 'Primary Production Pool',
+                    'status' => 'active',
+                    'priority' => 1,
+                    'routing_eligibility' => true,
+                    'is_valid' => true,
+                    'daily_request_budget' => 5000,
+                    'daily_token_budget' => 5000000,
+                    'monthly_spending_budget' => 500.00,
+                    'rate_limit_config' => ['rpm' => $rpm, 'tpm' => $tpm],
+                    'error_count' => 0,
+                ]
+            );
         }
 
         // Models configuration
@@ -600,6 +646,12 @@ class DatabaseSeeder extends Seeder
             ['task_type' => 'embedding_generation', 'display_name' => 'Knowledge Chunk Embedding', 'pref_prov' => 'openai', 'pref_model' => 'text-embedding-3-small', 'temperature' => 0.0, 'max_tokens' => 0],
             ['task_type' => 'search_enhancement', 'display_name' => 'Search Query Semantic Enhancement', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.2, 'max_tokens' => 300],
             ['task_type' => 'rag_query', 'display_name' => 'Grounded Knowledge Retrieval Question Answering', 'pref_prov' => 'anthropic', 'pref_model' => 'claude-3-5-sonnet-20241022', 'temperature' => 0.2, 'max_tokens' => 2000],
+            ['task_type' => 'entity_resolution', 'display_name' => 'Intelligence Entity Resolution & Alias Matching', 'pref_prov' => 'openai', 'pref_model' => 'gpt-4o-mini', 'temperature' => 0.1, 'max_tokens' => 800],
+            ['task_type' => 'relationship_extraction', 'display_name' => 'Entity Relationship & Edge Extraction', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.1, 'max_tokens' => 1000],
+            ['task_type' => 'claim_verification', 'display_name' => '10-Dimension Claim Verification Assistance', 'pref_prov' => 'anthropic', 'pref_model' => 'claude-3-5-sonnet-20241022', 'temperature' => 0.15, 'max_tokens' => 1500],
+            ['task_type' => 'historical_event_matching', 'display_name' => 'Historical Event Matching & Sequencing', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.2, 'max_tokens' => 800],
+            ['task_type' => 'trend_detection', 'display_name' => 'Intelligence Trend & Signal Analysis', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.2, 'max_tokens' => 1000],
+            ['task_type' => 'deep_research_synthesis', 'display_name' => 'Deep Research Structured Report Synthesis', 'pref_prov' => 'anthropic', 'pref_model' => 'claude-3-5-sonnet-20241022', 'temperature' => 0.25, 'max_tokens' => 4000],
         ];
 
         foreach ($tasksData as $t) {
@@ -664,6 +716,89 @@ class DatabaseSeeder extends Seeder
                 'is_enabled' => false,
                 'is_test_mode' => true,
                 'instructions' => 'Secure international credit card processing via Stripe Checkout.',
+            ]
+        );
+
+        // 11. Seed Publication Templates & Schedules
+        $defaultTemplate = \App\Models\PublicationTemplate::updateOrCreate(
+            ['slug' => 'global-executive-briefing'],
+            [
+                'name' => 'Global Executive Briefing Template',
+                'description' => 'Flagship editorial briefing template with dark executive styling, multi-column metrics, and citation footnotes.',
+                'page_size' => 'a4',
+                'orientation' => 'portrait',
+                'brand_config' => [
+                    'logo_text' => 'NEXOVANT',
+                    'primary_color' => '#0A0E17',
+                    'accent_color' => '#00E5FF',
+                    'font_family' => 'Helvetica, Arial, sans-serif',
+                    'header_text' => 'NEXOVANT INTELLIGENCE BRIEFING',
+                    'footer_text' => 'VERIFIED GROUNDED INTELLIGENCE • ALL RIGHTS RESERVED',
+                ],
+                'section_visibility' => [
+                    'cover' => true,
+                    'executive_summary' => true,
+                    'key_intelligence' => true,
+                    'company_intelligence' => true,
+                    'technology_intelligence' => true,
+                    'trend_intelligence' => true,
+                    'historical_timeline' => true,
+                    'conflicting_evidence' => true,
+                    'strategic_implications' => true,
+                    'sources_and_methodology' => true,
+                ],
+                'confidentiality_label' => 'PREMIUM EXECUTIVE INTELLIGENCE',
+                'disclosure_text' => 'This intelligence document was generated from Nexovant audited story clusters, cross-verified source disclosures, and grounded research models. Interpretation is assisted by AI with human editorial oversight.',
+                'version' => 1,
+                'is_default' => true,
+            ]
+        );
+
+        \App\Models\PublicationTemplate::updateOrCreate(
+            ['slug' => 'deep-research-dossier'],
+            [
+                'name' => 'Deep Research Dossier Template',
+                'description' => 'In-depth research layout for corporate profiles, executive movement dossiers, and patent investigations.',
+                'page_size' => 'a4',
+                'orientation' => 'portrait',
+                'brand_config' => [
+                    'logo_text' => 'NEXOVANT RESEARCH',
+                    'primary_color' => '#0B132B',
+                    'accent_color' => '#48E5C2',
+                    'font_family' => 'Helvetica, Arial, sans-serif',
+                    'header_text' => 'NEXOVANT DEEP RESEARCH DOSSIER',
+                    'footer_text' => 'PROPRIETARY SUBSCRIBER INTELLIGENCE',
+                ],
+                'section_visibility' => [
+                    'cover' => true,
+                    'executive_summary' => true,
+                    'company_intelligence' => true,
+                    'technology_intelligence' => true,
+                    'historical_timeline' => true,
+                    'sources_and_methodology' => true,
+                ],
+                'confidentiality_label' => 'STRICTLY CONFIDENTIAL',
+                'disclosure_text' => 'Verified corporate disclosures compiled through Nexovant Grounded Knowledge Engine.',
+                'version' => 1,
+                'is_default' => false,
+            ]
+        );
+
+        \App\Models\PublicationSchedule::updateOrCreate(
+            ['title_pattern' => 'Nexovant Global Tech Intelligence Briefing — {date}'],
+            [
+                'publication_type' => 'daily_briefing',
+                'template_id' => $defaultTemplate->id,
+                'frequency' => 'daily',
+                'schedule_time' => '06:00',
+                'timezone' => 'UTC',
+                'scope_config' => [
+                    'region' => 'Global',
+                    'min_evidence_score' => 70,
+                ],
+                'require_review' => true,
+                'is_enabled' => true,
+                'next_run_at' => now()->tomorrow()->setTime(6, 0),
             ]
         );
     }

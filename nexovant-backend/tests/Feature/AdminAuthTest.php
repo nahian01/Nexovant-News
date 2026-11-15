@@ -37,9 +37,12 @@ class AdminAuthTest extends TestCase
 
     public function test_admin_can_login_via_admin_login_endpoint(): void
     {
+        $admin = User::where('email', 'admin@nexovant.si')->firstOrFail();
+        $admin->update(['password' => \Illuminate\Support\Facades\Hash::make('TestFixtureAuthPass123!')]);
+
         $response = $this->postJson('/api/v1/auth/admin-login', [
             'email' => 'admin@nexovant.si',
-            'password' => 'AdminSecret2026!',
+            'password' => 'TestFixtureAuthPass123!',
         ]);
 
         $response->assertStatus(200)
@@ -55,9 +58,12 @@ class AdminAuthTest extends TestCase
 
     public function test_non_admin_is_rejected_at_admin_login(): void
     {
+        $subscriber = User::where('email', 'executive@enterprise.corp')->firstOrFail();
+        $subscriber->update(['password' => \Illuminate\Support\Facades\Hash::make('TestFixtureAuthPass123!')]);
+
         $response = $this->postJson('/api/v1/auth/admin-login', [
             'email' => 'executive@enterprise.corp',
-            'password' => 'ExecutivePass2026!',
+            'password' => 'TestFixtureAuthPass123!',
         ]);
 
         $response->assertStatus(403)

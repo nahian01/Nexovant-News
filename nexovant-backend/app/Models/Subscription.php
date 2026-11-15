@@ -25,6 +25,15 @@ class Subscription extends Model
         'ends_at',
         'trial_ends_at',
         'canceled_at',
+        'renewals_count',
+        'next_renewal_at',
+        'payment_method_id',
+        'gateway_key',
+        'gateway_subscription_id',
+        'billing_country',
+        'prorated_credit',
+        'paused_at',
+        'grace_period_ends_at',
     ];
 
     protected function casts(): array
@@ -34,6 +43,11 @@ class Subscription extends Model
             'ends_at' => 'datetime',
             'trial_ends_at' => 'datetime',
             'canceled_at' => 'datetime',
+            'next_renewal_at' => 'datetime',
+            'paused_at' => 'datetime',
+            'grace_period_ends_at' => 'datetime',
+            'renewals_count' => 'integer',
+            'prorated_credit' => 'decimal:2',
         ];
     }
 
@@ -60,5 +74,39 @@ class Subscription extends Model
     public function histories(): HasMany
     {
         return $this->hasMany(SubscriptionHistory::class);
+    }
+
+    public function overrides(): HasMany
+    {
+        return $this->hasMany(SubscriptionEntitlementOverride::class);
+    }
+
+    public function isActive(): bool
+    {
+        if (in_array($this->status, ['active', 'trialing', 'cancel_at_period_end'], true)) {
+            return $this->ends_at === null || $this->ends_at->isFuture();
+        }
+
+        // Within grace period
+        if ($this->status === 'past_due' && $this->grace_period_ends_at && $this->grace_period_ends_at->isFuture()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function isTrialing(): bool
+    {
+        return $this->status === 'trialing' && $this->trial_ends_at && $this->trial_ends_at->isFuture();
+    }
+
+    public function isPastDue(): bool
+    {
+        return $this->status === 'past_due';
+    }
+
+    public function isCanceled(): bool
+    {
+        return in_array($this->status, ['canceled', 'cancel_at_period_end'], true);
     }
 }

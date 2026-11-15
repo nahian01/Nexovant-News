@@ -41,4 +41,9 @@ class Product extends Model
     {
         return $this->belongsToMany(Article::class, 'article_products');
     }
+
+    public function intelligenceEntity(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    {
+        return $this->morphOne(IntelligenceEntity::class, 'entityable');
+    }
 }

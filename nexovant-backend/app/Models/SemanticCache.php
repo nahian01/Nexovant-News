@@ -31,4 +31,9 @@ class SemanticCache extends Model
             'expires_at' => 'datetime',
         ];
     }
+
+    public function organization(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Organization::class, 'tenant_id');
+    }
 }

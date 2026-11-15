@@ -18,10 +18,17 @@ class Invoice extends Model
         'subscription_id',
         'invoice_number',
         'subtotal',
+        'discount',
+        'coupon_id',
         'tax',
         'total',
         'currency',
         'status',
+        'billing_name',
+        'billing_email',
+        'billing_address',
+        'pdf_path',
+        'notes',
         'due_date',
         'paid_at',
     ];
@@ -30,10 +37,12 @@ class Invoice extends Model
     {
         return [
             'subtotal' => 'decimal:2',
+            'discount' => 'decimal:2',
             'tax' => 'decimal:2',
             'total' => 'decimal:2',
             'due_date' => 'datetime',
             'paid_at' => 'datetime',
+            'billing_address' => 'array',
         ];
     }
 
@@ -42,8 +51,28 @@ class Invoice extends Model
         return $this->belongsTo(Subscription::class);
     }
 
+    public function coupon(): BelongsTo
+    {
+        return $this->belongsTo(Coupon::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(InvoiceItem::class);
+    }
+
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
+    }
+
+    public function isPaid(): bool
+    {
+        return $this->status === 'paid';
     }
 }

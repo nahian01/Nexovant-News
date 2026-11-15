@@ -1,5 +1,9 @@
 /vendor
 /storage/*.key
+/storage/app/private/*
+/storage/app/public/*
+/storage/framework/*
+/storage/logs/*
 .env
 .env.backup
 .env.production

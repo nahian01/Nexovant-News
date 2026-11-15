@@ -34,4 +34,19 @@ class OrganizationInvitation extends Model
     {
         return $this->belongsTo(Organization::class);
     }
+
+    public function isExpired(): bool
+    {
+        return $this->expires_at->isPast();
+    }
+
+    public function isAccepted(): bool
+    {
+        return $this->accepted_at !== null;
+    }
+
+    public function isValid(): bool
+    {
+        return ! $this->isAccepted() && ! $this->isExpired();
+    }
 }

@@ -23,6 +23,16 @@ class SocialTrendController
             $query->where('status', $status);
         }
 
+        if ($timeWindow = $request->query('time_window')) {
+            if ($timeWindow === '24h') {
+                $query->where('created_at', '>=', now()->subHours(24));
+            } elseif ($timeWindow === '7d') {
+                $query->where('created_at', '>=', now()->subDays(7));
+            } elseif ($timeWindow === '30d') {
+                $query->where('created_at', '>=', now()->subDays(30));
+            }
+        }
+
         $trends = $query->paginate((int) $request->query('per_page', 15));
 
         return response()->json([

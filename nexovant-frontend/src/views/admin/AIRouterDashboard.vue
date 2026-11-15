@@ -41,7 +41,34 @@ const usageData = ref<any>({})
 const isAddCredentialModalOpen = ref(false)
 const isAddModelModalOpen = ref(false)
 const isEditTaskModalOpen = ref(false)
+const isTestConsoleModalOpen = ref(false)
 const testingCredentialId = ref<string | null>(null)
+const isTesting = ref(false)
+const testOutput = ref<any>(null)
+
+const testForm = ref({
+  prompt: 'Provide a concise 2-sentence intelligence briefing on latest developments in AI model routing.',
+  task_type: 'article_summarization',
+  provider_id: '',
+  routing_strategy: 'priority',
+})
+
+const handleRunTest = async () => {
+  isTesting.value = true
+  testOutput.value = null
+  statusMessage.value = ''
+  errorMessage.value = ''
+  try {
+    const res = await adminService.executeAITest(testForm.value)
+    testOutput.value = res.data
+    statusMessage.value = `Execution successful via ${res.data.provider_slug} (${res.data.latency_ms}ms). Cost: $${Number(res.data.estimated_cost_usd).toFixed(6)}`
+    await fetchAll()
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.error?.message || err.response?.data?.message || 'Execution test failed.'
+  } finally {
+    isTesting.value = false
+  }
+}
 
 // Forms
 const credentialForm = ref({
@@ -246,6 +273,15 @@ onMounted(() => {
             class="bg-nexo-accent-gold hover:bg-[#8e6e18]"
           >
             <Plus class="h-4 w-4 mr-1" /> Register Model
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            @click="isTestConsoleModalOpen = true"
+            class="border-nexo-accent-cyan text-nexo-accent-cyan hover:bg-nexo-accent-cyan/10"
+          >
+            <Play class="h-3.5 w-3.5 mr-1 text-nexo-accent-cyan" /> Test Routing
           </Button>
 
           <Button variant="secondary" size="sm" @click="fetchAll">
@@ -691,6 +727,90 @@ onMounted(() => {
           <div class="pt-2 flex justify-end space-x-2">
             <Button variant="ghost" size="sm" type="button" @click="isAddModelModalOpen = false">Cancel</Button>
             <Button variant="primary" size="sm" type="submit" class="bg-nexo-accent-gold hover:bg-[#8e6e18]">Register Model</Button>
+          </div>
+        </form>
+      </Modal>
+      <!-- Test Routing Console Modal -->
+      <Modal :is-open="isTestConsoleModalOpen" title="AI Dynamic Routing Execution Console" max-width="lg" @close="isTestConsoleModalOpen = false">
+        <form @submit.prevent="handleRunTest" class="space-y-4 text-xs text-left">
+          <p class="text-nexo-text-secondary text-[11px]">
+            Test live model dispatch, multi-credential load balancing, fallback progression, and token cost calculation.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="font-mono text-[10px] uppercase text-nexo-text-muted block mb-1">Task Type</label>
+              <select v-model="testForm.task_type" class="w-full p-2 border border-nexo-border rounded text-xs bg-white text-nexo-text-primary">
+                <option value="article_summarization">Article Summarization</option>
+                <option value="multi_source_synthesis">Multi-Source Synthesis</option>
+                <option value="headline_generation">Headline Generation</option>
+                <option value="fact_extraction">Fact Extraction</option>
+                <option value="story_classification">Story Classification</option>
+                <option value="premium_intelligence">10-Dimension Assessment</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="font-mono text-[10px] uppercase text-nexo-text-muted block mb-1">Provider Override</label>
+              <select v-model="testForm.provider_id" class="w-full p-2 border border-nexo-border rounded text-xs bg-white text-nexo-text-primary">
+                <option value="">Auto Route (Task Defined)</option>
+                <option v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="font-mono text-[10px] uppercase text-nexo-text-muted block mb-1">Strategy</label>
+              <select v-model="testForm.routing_strategy" class="w-full p-2 border border-nexo-border rounded text-xs bg-white text-nexo-text-primary">
+                <option value="priority">Priority First</option>
+                <option value="round_robin">Round Robin</option>
+                <option value="least_utilized">Least Utilized</option>
+                <option value="lowest_cost">Lowest Cost</option>
+                <option value="health">Health Based</option>
+                <option value="capability">Capability Based</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="font-mono text-[10px] uppercase text-nexo-text-muted block mb-1">Prompt / Input Context</label>
+            <textarea
+              v-model="testForm.prompt"
+              rows="3"
+              required
+              class="w-full p-2.5 border border-nexo-border rounded text-xs bg-white text-nexo-text-primary font-sans"
+              placeholder="Enter prompt or test context..."
+            ></textarea>
+          </div>
+
+          <div v-if="testOutput" class="p-3 bg-nexo-surface/60 border border-nexo-border rounded space-y-2 text-xs">
+            <div class="flex items-center justify-between border-b border-nexo-border/60 pb-1.5 font-mono text-[10px]">
+              <span class="text-emerald-700 font-bold uppercase">Dispatched: {{ testOutput.provider_slug }} / {{ testOutput.model_identifier }}</span>
+              <span class="text-nexo-text-muted">Latency: {{ testOutput.latency_ms }}ms | Total: {{ testOutput.total_tokens }} tokens (${{ Number(testOutput.estimated_cost_usd).toFixed(6) }})</span>
+            </div>
+
+            <div class="text-[11px] font-mono text-nexo-text-secondary whitespace-pre-wrap max-h-48 overflow-y-auto bg-white p-2 border border-nexo-border/40 rounded">
+              {{ testOutput.content }}
+            </div>
+
+            <div class="text-[10px] text-nexo-text-muted font-mono flex items-center justify-between">
+              <span>Fingerprint: {{ testOutput.credential_fingerprint ? testOutput.credential_fingerprint.substring(0, 16) + '...' : 'system' }}</span>
+              <span>Finish: {{ testOutput.finish_reason }}</span>
+            </div>
+          </div>
+
+          <div class="pt-2 flex justify-end space-x-2">
+            <Button variant="ghost" size="sm" type="button" @click="isTestConsoleModalOpen = false">Close</Button>
+            <Button
+              variant="primary"
+              size="sm"
+              type="submit"
+              :disabled="isTesting"
+              class="bg-nexo-accent-gold hover:bg-[#8e6e18]"
+            >
+              <RefreshCw v-if="isTesting" class="h-3.5 w-3.5 mr-1 animate-spin" />
+              <Play v-else class="h-3.5 w-3.5 mr-1" />
+              {{ isTesting ? 'Routing...' : 'Execute Test Request' }}
+            </Button>
           </div>
         </form>
       </Modal>

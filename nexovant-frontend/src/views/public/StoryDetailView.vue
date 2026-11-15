@@ -107,9 +107,9 @@ onMounted(() => {
 
       <!-- Navigation & Action Bar -->
       <div class="flex items-center justify-between pb-4 border-b border-nexo-border/80 text-xs">
-        <RouterLink to="/" class="inline-flex items-center gap-1.5 font-medium text-nexo-accent-cyan hover:text-nexo-accent-cyan-hover transition-colors">
+        <RouterLink to="/feed" class="inline-flex items-center gap-1.5 font-medium text-nexo-accent-cyan hover:text-nexo-accent-cyan-hover transition-colors">
           <ArrowLeft class="h-4 w-4" />
-          <span>Back to Global Feed</span>
+          <span>Back to Personalized Feed</span>
         </RouterLink>
 
         <div class="flex items-center gap-2">

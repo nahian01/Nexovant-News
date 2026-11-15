@@ -36,6 +36,11 @@ class KnowledgeChunk extends Model
         return $this->belongsTo(KnowledgeDocument::class, 'document_id');
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class, 'tenant_id');
+    }
+
     public function embeddings(): HasMany
     {
         return $this->hasMany(KnowledgeEmbedding::class, 'chunk_id');

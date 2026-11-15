@@ -7,7 +7,9 @@ namespace App\Http\Controllers\Api\V1;
 use App\Models\Article;
 use App\Models\Company;
 use App\Models\Executive;
+use App\Models\Publication;
 use App\Models\SocialTrend;
+use App\Models\Technology;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,6 +28,8 @@ class SearchController
                     'articles' => [],
                     'companies' => [],
                     'executives' => [],
+                    'technologies' => [],
+                    'reports' => [],
                     'trends' => [],
                 ],
             ]);
@@ -57,6 +61,23 @@ class SearchController
             ->limit(5)
             ->get();
 
+        $technologies = Technology::query()
+            ->where(function ($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                  ->orWhere('description', 'like', "%{$query}%");
+            })
+            ->limit(5)
+            ->get();
+
+        $reports = Publication::query()
+            ->where('status', 'published')
+            ->where(function ($q) use ($query) {
+                $q->where('title', 'like', "%{$query}%")
+                  ->orWhere('subtitle', 'like', "%{$query}%");
+            })
+            ->limit(4)
+            ->get(['id', 'title', 'subtitle', 'edition_number', 'publication_date']);
+
         $trends = SocialTrend::query()
             ->where('title', 'like', "%{$query}%")
             ->limit(5)
@@ -69,6 +90,8 @@ class SearchController
                 'articles' => $articles,
                 'companies' => $companies,
                 'executives' => $executives,
+                'technologies' => $technologies,
+                'reports' => $reports,
                 'trends' => $trends,
             ],
         ]);

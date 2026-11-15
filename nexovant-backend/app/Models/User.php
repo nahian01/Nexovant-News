@@ -81,6 +81,87 @@ class User extends Authenticatable
         return $this->hasMany(Notification::class);
     }
 
+    public function watchlists(): HasMany
+    {
+        return $this->hasMany(SubscriberWatchlist::class);
+    }
+
+    public function monitors(): HasMany
+    {
+        return $this->hasMany(SubscriberMonitor::class);
+    }
+
+    public function libraryItems(): HasMany
+    {
+        return $this->hasMany(SubscriberLibraryItem::class);
+    }
+
+    public function collections(): HasMany
+    {
+        return $this->hasMany(SubscriberCollection::class);
+    }
+
+    public function interactions(): HasMany
+    {
+        return $this->hasMany(SubscriberInteraction::class);
+    }
+
+    public function notificationPreference(): HasOne
+    {
+        return $this->hasOne(SubscriberNotificationPreference::class);
+    }
+
+    public function entitlementOverrides(): HasMany
+    {
+        return $this->hasMany(SubscriptionEntitlementOverride::class);
+    }
+
+    public function paymentCustomers(): HasMany
+    {
+        return $this->hasMany(PaymentCustomer::class);
+    }
+
+    public function couponRedemptions(): HasMany
+    {
+        return $this->hasMany(CouponRedemption::class);
+    }
+
+    public function organizationMemberships(): HasMany
+    {
+        return $this->hasMany(OrganizationMember::class);
+    }
+
+    public function organizations(): BelongsToMany
+    {
+        return $this->belongsToMany(Organization::class, 'organization_members')
+            ->withPivot('role')
+            ->withTimestamps();
+    }
+
+    public function activeOrganization(): ?Organization
+    {
+        $membership = $this->organizationMemberships()
+            ->with('organization')
+            ->whereHas('organization', fn ($q) => $q->where('is_active', true))
+            ->first();
+
+        return $membership?->organization;
+    }
+
+    public function organizationRole(?Organization $org = null): ?string
+    {
+        $orgId = $org?->id ?? $this->activeOrganization()?->id;
+        if (! $orgId) {
+            return null;
+        }
+
+        $membership = $this->organizationMemberships()
+            ->where('organization_id', $orgId)
+            ->first();
+
+        return $membership?->role;
+    }
+
     public function hasRole(string|array $roles): bool
     {
         // Platform admin account_type check backward compatibility

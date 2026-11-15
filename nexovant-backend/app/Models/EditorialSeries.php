@@ -31,7 +31,7 @@ class EditorialSeries extends Model
 
     public function articles(): BelongsToMany
     {
-        return $this->belongsToMany(Article::class, 'article_series')
+        return $this->belongsToMany(Article::class, 'article_series', 'series_id', 'article_id')
             ->withPivot('order_in_series')
             ->orderBy('order_in_series');
     }

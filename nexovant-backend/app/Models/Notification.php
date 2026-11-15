@@ -45,6 +45,11 @@ class Notification extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function deliveryLogs(): HasMany
+    {
+        return $this->hasMany(NotificationDeliveryLog::class);
+    }
+
     public function scopeUnread(Builder $query): Builder
     {
         return $query->where('is_read', false);

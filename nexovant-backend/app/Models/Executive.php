@@ -35,4 +35,9 @@ class Executive extends Model
             ->withPivot(['title', 'is_current', 'appointed_date', 'resigned_date'])
             ->withTimestamps();
     }
+
+    public function intelligenceEntity(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    {
+        return $this->morphOne(IntelligenceEntity::class, 'entityable');
+    }
 }

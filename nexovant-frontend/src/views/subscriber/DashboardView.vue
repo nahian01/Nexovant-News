@@ -1,164 +1,404 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   ArrowRight,
   ArrowUpRight,
+  Bell,
   BellRing,
+  Bookmark,
   Building2,
   CalendarClock,
-  CircleCheck,
+  CheckCircle2,
+  Compass,
   FileText,
+  Library,
+  Radar,
+  Sliders,
   Sparkles,
-  Telescope,
   TrendingUp,
+  Users,
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
-import Sidebar from '@/components/layout/Sidebar.vue'
-import AppHeader from '@/components/layout/AppHeader.vue'
+import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout.vue'
 import Card from '@/components/ui/Card.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
+import { workspaceService } from '@/services/api/workspace.service'
 
 const authStore = useAuthStore()
 
-const breakingDevelopments = ref([
-  {
-    id: 'int-001',
-    title: 'NVIDIA Board Approves $15B Custom Silicon Foundry Expansion in EMEA',
-    category: 'Expansion & Capital Expenditure',
-    status: 'confirmed' as const,
-    timestamp: '14 mins ago',
-    entities: ['NVIDIA Corporation', 'Jensen Huang', 'European Commission'],
-    significance: 'Secures high-density EU AI infrastructure independence; potential margin compression in FY27.',
-    affected: ['TSMC', 'Intel Foundry Services', 'ASML'],
-    consequences: 'Accelerates regulatory clearance under the European Chips Act.',
-    nextTrigger: 'Q3 Financial Disclosures & Groundbreaking Conference (Nov 28)',
-  },
-  {
-    id: 'int-002',
-    title: 'Novartis Discloses Executive Transition: Global Chief Technology Officer Resignation',
-    category: 'Leadership Change',
-    status: 'reported_reliable' as const,
-    timestamp: '42 mins ago',
-    entities: ['Novartis AG', 'Vas Narasimhan', 'Dr. Fiona Gallagher'],
-    significance: 'Signals structural restructuring in algorithmic drug discovery division.',
-    affected: ['BioNTech Partnership Desk', 'Enterprise AI Vendors'],
-    consequences: 'Temporary deceleration of pipeline Phase-II AI-assisted molecule screening.',
-    nextTrigger: 'Board nomination announcement expected within 14 trading days.',
-  },
-  {
-    id: 'int-003',
-    title: 'Cross-Border Supply Chain Disruption Affecting Southeast Asian Semiconductor Packaging Hubs',
-    category: 'Emerging Business Risk',
-    status: 'developing' as const,
-    timestamp: '1 hour ago',
-    entities: ['ASE Group', 'Amkor Technology', 'Foxconn'],
-    significance: 'Potential 6-week lead time elongation for automotive microcontrollers.',
-    affected: ['Global Automotive OEMs', 'Tier-1 Electronics Distributors'],
-    consequences: 'Secondary price surge in spot component exchanges.',
-    nextTrigger: 'Regional Port Authority customs clearance metric update (Tomorrow 08:00 UTC).',
-  },
-])
+// State
+const isLoading = ref(true)
+const overviewData = ref<any>(null)
+const breakingDevelopments = ref<any[]>([])
+const followedUpdates = ref<any[]>([])
+const trendingSignals = ref<any[]>([])
 
-const watchlist = ref([
-  { name: 'Microsoft Corp', ticker: 'MSFT', movement: '+1.4%', signal: 'Bullish Institutional Flow' },
-  { name: 'Novo Nordisk', ticker: 'NVO', movement: '-0.8%', signal: 'Clinical Trial Milestones Pending' },
-  { name: 'Alphabet Inc', ticker: 'GOOGL', movement: '+2.1%', signal: 'Antitrust Appeal Scheduled' },
-  { name: 'Tesla Inc', ticker: 'TSLA', movement: '-1.5%', signal: 'Autonomous Regulatory Review' },
-])
+const metrics = ref({
+  followed_entities: 0,
+  active_watchlists: 0,
+  active_monitors: 0,
+  saved_intelligence: 0,
+  unread_notifications: 0,
+  recent_research: 0,
+})
 
-const firstName = computed(() => authStore.user?.name?.split(' ')[0] || 'there')
-const briefingDate = computed(() => new Intl.DateTimeFormat('en', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()))
+const firstName = computed(() => authStore.user?.name?.split(' ')[0] || 'Executive')
+const greetingMessage = computed(() => {
+  if (overviewData.value?.greeting) return overviewData.value.greeting
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Morning Intelligence Briefing'
+  if (hour < 17) return 'Midday Market Briefing'
+  return 'Evening Strategic Review'
+})
+
+const briefingDate = computed(() =>
+  new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date())
+)
+
+const loadDashboard = async () => {
+  isLoading.value = true
+  try {
+    const res = await workspaceService.getOverview()
+    if (res?.overview) {
+      overviewData.value = res.overview
+      if (res.overview.metrics) {
+        metrics.value = res.overview.metrics
+      }
+      if (res.overview.followed_company_updates?.length) {
+        followedUpdates.value = res.overview.followed_company_updates
+      }
+      if (res.overview.trending_stories?.length) {
+        trendingSignals.value = res.overview.trending_stories
+      }
+    }
+
+    // Also get feed stream for top signals
+    const feedRes = await workspaceService.getFeedStream({ per_page: 4, sort: 'relevance' })
+    if (feedRes?.data?.length) {
+      breakingDevelopments.value = feedRes.data
+    }
+  } catch {
+    // Keep initial graceful state
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadDashboard()
+})
 </script>
 
 <template>
-  <div class="min-h-screen bg-nexo-bg text-left lg:flex">
-    <Sidebar />
-
-    <div class="min-w-0 flex-1">
-      <AppHeader />
-
-      <main class="mx-auto w-full max-w-[1500px] space-y-7 px-4 py-6 sm:px-6 lg:px-9 lg:py-9">
-        <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p class="eyebrow">Your executive workspace</p>
-            <h1 class="mt-2 font-serif text-3xl font-medium tracking-tight text-nexo-text-primary sm:text-[40px]">A clearer view, {{ firstName }}.</h1>
-            <p class="mt-2 text-sm text-nexo-text-secondary">Your business briefing, connected to the signals that matter.</p>
+  <AuthenticatedLayout :show-right-panel="true">
+    <div class="mx-auto max-w-[1400px] space-y-7 text-left">
+      <!-- 1. Executive Header -->
+      <div class="flex flex-col justify-between gap-4 border-b border-nexo-border/80 pb-5 sm:flex-row sm:items-end">
+        <div>
+          <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-nexo-accent-cyan">
+            <Sparkles class="h-3.5 w-3.5" />
+            <span>{{ greetingMessage }}</span>
           </div>
-          <div class="flex items-center gap-2 text-xs font-medium text-nexo-text-muted"><CalendarClock class="h-4 w-4" /> {{ briefingDate }}</div>
+          <h1 class="mt-2 font-serif text-3xl font-medium tracking-tight text-nexo-text-primary sm:text-4xl">
+            A clearer view, {{ firstName }}.
+          </h1>
+          <p class="mt-1.5 text-sm text-nexo-text-secondary">
+            Your intelligence briefing, connected directly to verified signals across the technology landscape.
+          </p>
         </div>
 
-        <section class="relative overflow-hidden rounded-[26px] border border-[#d5e5d9] bg-gradient-to-br from-[#eaf4ed] via-[#f4f6f1] to-[#f3eee2] p-6 sm:p-8 lg:p-9">
-          <div class="pointer-events-none absolute -right-12 -top-24 h-80 w-80 rounded-full border border-[#cddfd2]"></div>
-          <div class="pointer-events-none absolute -right-1 -top-12 h-56 w-56 rounded-full border border-[#cddfd2]"></div>
-          <div class="relative flex flex-col items-start justify-between gap-7 lg:flex-row lg:items-center">
-            <div class="max-w-[600px]">
-              <div class="inline-flex items-center gap-2 rounded-full border border-[#cfe2d5] bg-white/70 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-nexo-accent-cyan"><Sparkles class="h-3.5 w-3.5" /> Your daily intelligence</div>
-              <h2 class="mt-4 font-serif text-[32px] font-medium leading-[1.08] tracking-tight text-nexo-text-primary sm:text-[42px]">Your world, in focus.</h2>
-              <p class="mt-3 max-w-[500px] text-sm leading-6 text-nexo-text-secondary">Follow a development from the first verified fact to its business impact, affected players and what to watch next.</p>
-              <div class="mt-6 flex flex-wrap gap-3"><RouterLink to="/feed"><Button variant="primary">Open global feed <ArrowRight class="ml-2 h-4 w-4" /></Button></RouterLink><RouterLink to="/reports"><Button variant="secondary"><FileText class="mr-2 h-4 w-4" /> View briefings</Button></RouterLink></div>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div class="flex items-center gap-1.5 rounded-xl border border-nexo-border bg-white px-3 py-2 text-xs font-medium text-nexo-text-muted">
+            <CalendarClock class="h-4 w-4 text-nexo-accent-cyan" />
+            <span>{{ briefingDate }}</span>
+          </div>
+          <RouterLink to="/workspace/preferences">
+            <Button variant="ghost" size="sm">
+              <Sliders class="mr-1.5 h-3.5 w-3.5" />
+              <span>Feed Preferences</span>
+            </Button>
+          </RouterLink>
+        </div>
+      </div>
+
+      <!-- 2. Real Key Metrics Strip -->
+      <section class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <!-- Metric 1: Followed Entities -->
+        <RouterLink to="/following" class="group rounded-2xl border border-nexo-border bg-white p-4 transition hover:border-nexo-accent-cyan/40 hover:shadow-2xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium text-nexo-text-muted">Followed</span>
+            <Users class="h-4 w-4 text-blue-600 transition group-hover:scale-110" />
+          </div>
+          <p class="mt-2 font-serif text-2xl font-semibold text-nexo-text-primary">{{ metrics.followed_entities }}</p>
+          <p class="text-[10px] text-nexo-text-secondary">Entities & topics</p>
+        </RouterLink>
+
+        <!-- Metric 2: Active Watchlists -->
+        <RouterLink to="/workspace/watchlists" class="group rounded-2xl border border-nexo-border bg-white p-4 transition hover:border-nexo-accent-cyan/40 hover:shadow-2xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium text-nexo-text-muted">Watchlists</span>
+            <Bookmark class="h-4 w-4 text-nexo-accent-gold transition group-hover:scale-110" />
+          </div>
+          <p class="mt-2 font-serif text-2xl font-semibold text-nexo-text-primary">{{ metrics.active_watchlists }}</p>
+          <p class="text-[10px] text-nexo-text-secondary">Custom lists</p>
+        </RouterLink>
+
+        <!-- Metric 3: Active Monitors -->
+        <RouterLink to="/workspace/monitors" class="group rounded-2xl border border-nexo-border bg-white p-4 transition hover:border-nexo-accent-cyan/40 hover:shadow-2xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium text-nexo-text-muted">Monitors</span>
+            <Radar class="h-4 w-4 text-emerald-600 transition group-hover:scale-110" />
+          </div>
+          <p class="mt-2 font-serif text-2xl font-semibold text-nexo-text-primary">{{ metrics.active_monitors }}</p>
+          <p class="text-[10px] text-nexo-text-secondary">Signal radar alerts</p>
+        </RouterLink>
+
+        <!-- Metric 4: Saved Intelligence -->
+        <RouterLink to="/saved" class="group rounded-2xl border border-nexo-border bg-white p-4 transition hover:border-nexo-accent-cyan/40 hover:shadow-2xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium text-nexo-text-muted">Library</span>
+            <Library class="h-4 w-4 text-purple-600 transition group-hover:scale-110" />
+          </div>
+          <p class="mt-2 font-serif text-2xl font-semibold text-nexo-text-primary">{{ metrics.saved_intelligence }}</p>
+          <p class="text-[10px] text-nexo-text-secondary">Dossiers & notes</p>
+        </RouterLink>
+
+        <!-- Metric 5: Unread Alerts -->
+        <RouterLink to="/workspace/notifications" class="group rounded-2xl border border-nexo-border bg-white p-4 transition hover:border-nexo-accent-cyan/40 hover:shadow-2xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium text-nexo-text-muted">Alerts</span>
+            <Bell class="h-4 w-4 text-rose-600 transition group-hover:scale-110" />
+          </div>
+          <p class="mt-2 font-serif text-2xl font-semibold text-nexo-text-primary">{{ metrics.unread_notifications }}</p>
+          <p class="text-[10px] text-nexo-text-secondary">Unread notifications</p>
+        </RouterLink>
+
+        <!-- Metric 6: Recent Research -->
+        <RouterLink to="/workspace/research" class="group rounded-2xl border border-nexo-border bg-white p-4 transition hover:border-nexo-accent-cyan/40 hover:shadow-2xs">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium text-nexo-text-muted">Research</span>
+            <Compass class="h-4 w-4 text-nexo-accent-cyan transition group-hover:scale-110" />
+          </div>
+          <p class="mt-2 font-serif text-2xl font-semibold text-nexo-text-primary">{{ metrics.recent_research }}</p>
+          <p class="text-[10px] text-nexo-text-secondary">Grounded syntheses</p>
+        </RouterLink>
+      </section>
+
+      <!-- 3. Executive Hero Banner -->
+      <section class="relative overflow-hidden rounded-[26px] border border-[#d5e5d9] bg-gradient-to-br from-[#eaf4ed] via-[#f4f6f1] to-[#f3eee2] p-6 sm:p-8">
+        <div class="relative flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
+          <div class="max-w-2xl">
+            <div class="inline-flex items-center gap-2 rounded-full border border-[#cfe2d5] bg-white/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-nexo-accent-cyan">
+              <Sparkles class="h-3.5 w-3.5" />
+              <span>Personalized Intelligence Engine</span>
             </div>
-            <div class="relative grid w-full max-w-[420px] grid-cols-2 gap-3 lg:w-[390px]">
-              <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#eaf3ed] text-nexo-accent-cyan"><Telescope class="h-[18px] w-[18px]" /></span><div class="mt-5 font-serif text-3xl font-medium text-nexo-text-primary">10</div><div class="mt-1 text-[11px] font-medium text-nexo-text-secondary">dimensions of context</div></div>
-              <div class="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#edf0e7] text-nexo-accent-gold"><Building2 class="h-[18px] w-[18px]" /></span><div class="mt-5 font-serif text-3xl font-medium text-nexo-text-primary">{{ watchlist.length }}</div><div class="mt-1 text-[11px] font-medium text-nexo-text-secondary">companies in focus</div></div>
-              <div class="col-span-2 flex items-center justify-between rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm"><div class="flex items-center gap-3"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#e9f3ed] text-nexo-accent-cyan"><CircleCheck class="h-[18px] w-[18px]" /></span><span><span class="block text-xs font-semibold text-nexo-text-primary">Source-aware intelligence</span><span class="mt-1 block text-[10px] text-nexo-text-muted">Signals are labeled by verification status</span></span></div><ArrowUpRight class="h-4 w-4 text-nexo-text-muted" /></div>
+            <h2 class="mt-3 font-serif text-2xl font-medium tracking-tight text-nexo-text-primary sm:text-3xl">
+              Verified Technology & Enterprise Intelligence
+            </h2>
+            <p class="mt-2 text-xs leading-relaxed text-nexo-text-secondary sm:text-sm">
+              Explore stories corroborating facts across multiple independent sources, separated from opinion and hype.
+            </p>
+            <div class="mt-5 flex flex-wrap gap-2.5">
+              <RouterLink to="/feed">
+                <Button variant="primary" size="md">
+                  <span>Open Personalized Feed</span>
+                  <ArrowRight class="ml-2 h-4 w-4" />
+                </Button>
+              </RouterLink>
+              <RouterLink to="/reports">
+                <Button variant="secondary" size="md">
+                  <FileText class="mr-2 h-4 w-4" />
+                  <span>Executive Publications</span>
+                </Button>
+              </RouterLink>
             </div>
           </div>
-        </section>
 
-        <section class="grid gap-3 sm:grid-cols-3">
-          <div class="flex items-center justify-between rounded-2xl border border-nexo-border bg-white px-5 py-4 shadow-sm"><div><p class="text-xs font-medium text-nexo-text-muted">Developments in this briefing</p><p class="mt-1 font-serif text-2xl font-medium text-nexo-text-primary">{{ breakingDevelopments.length }}</p></div><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#edf4ef] text-nexo-accent-cyan"><BellRing class="h-5 w-5" /></span></div>
-          <div class="flex items-center justify-between rounded-2xl border border-nexo-border bg-white px-5 py-4 shadow-sm"><div><p class="text-xs font-medium text-nexo-text-muted">Companies on your watchlist</p><p class="mt-1 font-serif text-2xl font-medium text-nexo-text-primary">{{ watchlist.length }}</p></div><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#edf0e7] text-nexo-accent-gold"><Building2 class="h-5 w-5" /></span></div>
-          <div class="flex items-center justify-between rounded-2xl border border-nexo-border bg-white px-5 py-4 shadow-sm"><div><p class="text-xs font-medium text-nexo-text-muted">Your next executive briefing</p><p class="mt-1 text-sm font-semibold text-nexo-text-primary">Daily global outlook</p></div><RouterLink to="/reports" class="flex h-10 w-10 items-center justify-center rounded-xl bg-nexo-bg text-nexo-accent-cyan transition hover:bg-[#e9f3ed]" aria-label="View briefings"><ArrowUpRight class="h-5 w-5" /></RouterLink></div>
-        </section>
-
-        <div class="grid gap-7 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.85fr)]">
-          <section class="space-y-4">
-            <div class="flex items-end justify-between gap-3">
-              <div><p class="eyebrow">The latest signals</p><h2 class="mt-1.5 font-serif text-2xl font-medium tracking-tight text-nexo-text-primary">Developments to know</h2></div>
-              <RouterLink to="/feed" class="inline-flex items-center gap-1 text-xs font-semibold text-nexo-accent-cyan transition hover:gap-2">View all <ArrowRight class="h-3.5 w-3.5" /></RouterLink>
-            </div>
-
-            <Card v-for="item in breakingDevelopments" :key="item.id" padding="md" class="group transition hover:border-nexo-accent-cyan/30 hover:shadow-lg">
-              <div class="flex flex-wrap items-center justify-between gap-2"><div class="flex items-center gap-2.5"><Badge :variant="item.status" size="sm" /><span class="text-xs font-medium text-nexo-text-secondary">{{ item.category }}</span></div><span class="text-[11px] text-nexo-text-muted">{{ item.timestamp }}</span></div>
-              <h3 class="mt-4 font-serif text-[21px] font-medium leading-snug tracking-tight text-nexo-text-primary transition group-hover:text-nexo-accent-cyan">{{ item.title }}</h3>
-              <div class="mt-3 flex flex-wrap gap-1.5"><span v-for="entity in item.entities" :key="entity" class="rounded-lg border border-nexo-border bg-nexo-bg px-2.5 py-1 text-[10px] font-medium text-nexo-text-secondary">{{ entity }}</span></div>
-              <div class="mt-4 grid gap-3 border-t border-nexo-border pt-4 sm:grid-cols-2">
-                <div class="rounded-xl bg-[#f2f6f2] p-3.5"><p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-nexo-accent-gold">Why it matters</p><p class="mt-1.5 text-xs leading-5 text-nexo-text-secondary">{{ item.significance }}</p></div>
-                <div class="rounded-xl bg-[#f2f6f2] p-3.5"><p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-nexo-accent-cyan">What to watch</p><p class="mt-1.5 text-xs leading-5 text-nexo-text-secondary">{{ item.nextTrigger }}</p></div>
-              </div>
-            </Card>
-          </section>
-
-          <aside class="space-y-5">
-            <Card padding="md">
-              <template #header><div class="flex w-full items-center justify-between"><div><p class="eyebrow">Your watchlist</p><h3 class="mt-1 font-serif text-lg font-medium text-nexo-text-primary">Companies in focus</h3></div><RouterLink to="/companies" class="rounded-lg p-2 text-nexo-accent-cyan transition hover:bg-[#edf4ef]" aria-label="Manage companies"><ArrowUpRight class="h-4 w-4" /></RouterLink></div></template>
-              <div class="space-y-1">
-                <div v-for="co in watchlist" :key="co.ticker" class="flex items-center justify-between gap-3 rounded-xl px-2.5 py-3 transition hover:bg-nexo-bg">
-                  <div class="flex min-w-0 items-center gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#eef2ed] text-[10px] font-bold text-nexo-text-secondary">{{ co.ticker.slice(0, 2) }}</span><span class="min-w-0"><span class="block truncate text-xs font-semibold text-nexo-text-primary">{{ co.name }}</span><span class="mt-0.5 block truncate text-[10px] text-nexo-text-muted">{{ co.signal }}</span></span></div>
-                  <span :class="['shrink-0 rounded-lg px-2 py-1 text-[10px] font-semibold', co.movement.startsWith('+') ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800']">{{ co.movement }}</span>
+          <div class="flex w-full flex-col gap-2.5 sm:w-auto">
+            <RouterLink to="/trends" class="flex items-center justify-between gap-4 rounded-xl border border-white/80 bg-white/80 p-3.5 shadow-2xs transition hover:bg-white">
+              <div class="flex items-center gap-3">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-[#e9f3ed] text-nexo-accent-cyan">
+                  <TrendingUp class="h-4 w-4" />
+                </span>
+                <div>
+                  <p class="text-xs font-semibold text-nexo-text-primary">Social Trend Radar</p>
+                  <p class="text-[10px] text-nexo-text-muted">Cross-platform velocity tracking</p>
                 </div>
               </div>
-              <template #footer><RouterLink to="/companies" class="inline-flex items-center gap-1.5 text-xs font-semibold text-nexo-accent-cyan">Manage your watchlist <ArrowRight class="h-3.5 w-3.5" /></RouterLink></template>
-            </Card>
+              <ArrowUpRight class="h-4 w-4 text-nexo-text-muted" />
+            </RouterLink>
 
-            <div class="overflow-hidden rounded-2xl border border-[#2a594b] bg-[#173b32] p-5 text-white shadow-executive">
-              <div class="flex items-center justify-between"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-[#c5e5ce]"><FileText class="h-[18px] w-[18px]" /></span><span class="rounded-full border border-white/15 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#c5e5ce]">Your daily read</span></div>
-              <h3 class="mt-5 font-serif text-xl font-medium text-white">A considered start to the day.</h3>
-              <p class="mt-2 text-xs leading-5 text-[#c4d6cd]">A concise view of developments across the regions and industries you follow, with context attached.</p>
-              <RouterLink to="/reports" class="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2.5 text-xs font-semibold text-[#173b32] transition hover:bg-[#e9f3ed]">Explore briefings <ArrowRight class="h-3.5 w-3.5" /></RouterLink>
-            </div>
-
-            <div class="rounded-2xl border border-nexo-border bg-white p-5">
-              <div class="flex items-center gap-2 text-nexo-accent-cyan"><TrendingUp class="h-4 w-4" /><span class="text-[10px] font-semibold uppercase tracking-[0.14em]">Market pulse</span></div>
-              <p class="mt-2 font-serif text-lg font-medium text-nexo-text-primary">Signals are moving across sectors.</p>
-              <p class="mt-1.5 text-xs leading-5 text-nexo-text-secondary">See which topics are accelerating and how the conversation is changing.</p>
-              <RouterLink to="/trends" class="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-nexo-accent-cyan">Open trend radar <ArrowRight class="h-3.5 w-3.5" /></RouterLink>
-            </div>
-          </aside>
+            <RouterLink to="/workspace/research" class="flex items-center justify-between gap-4 rounded-xl border border-white/80 bg-white/80 p-3.5 shadow-2xs transition hover:bg-white">
+              <div class="flex items-center gap-3">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-[#edf0e7] text-nexo-accent-gold">
+                  <Compass class="h-4 w-4" />
+                </span>
+                <div>
+                  <p class="text-xs font-semibold text-nexo-text-primary">Deep Research AI</p>
+                  <p class="text-[10px] text-nexo-text-muted">Grounded RAG synthesis</p>
+                </div>
+              </div>
+              <ArrowUpRight class="h-4 w-4 text-nexo-text-muted" />
+            </RouterLink>
+          </div>
         </div>
-      </main>
+      </section>
+
+      <!-- 4. Two-Column Intelligence Grid -->
+      <div class="grid gap-7 lg:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
+        <!-- Left: Top Intelligence Signals -->
+        <section class="space-y-4">
+          <div class="flex items-end justify-between border-b border-nexo-border/80 pb-3">
+            <div>
+              <p class="text-[11px] font-bold uppercase tracking-wider text-nexo-text-muted">Highest Relevance</p>
+              <h2 class="mt-1 font-serif text-2xl font-medium tracking-tight text-nexo-text-primary">
+                Top Intelligence Signals
+              </h2>
+            </div>
+            <RouterLink to="/feed" class="inline-flex items-center gap-1 text-xs font-semibold text-nexo-accent-cyan transition hover:gap-1.5">
+              <span>View All</span>
+              <ArrowRight class="h-3.5 w-3.5" />
+            </RouterLink>
+          </div>
+
+          <div v-if="isLoading" class="space-y-4">
+            <Card v-for="i in 3" :key="i" padding="md">
+              <Skeleton class="h-4 w-28 mb-2" />
+              <Skeleton class="h-6 w-5/6 mb-2" />
+              <Skeleton class="h-10 w-full" />
+            </Card>
+          </div>
+
+          <div v-else-if="breakingDevelopments.length === 0" class="rounded-xl border border-dashed border-nexo-border bg-white p-8 text-center text-xs text-nexo-text-muted">
+            No intelligence stories loaded yet.
+          </div>
+
+          <div v-else class="space-y-4">
+            <Card
+              v-for="item in breakingDevelopments"
+              :key="item.id"
+              padding="md"
+              class="group transition hover:border-nexo-accent-cyan/35 hover:shadow-xs"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2 border-b border-nexo-border/60 pb-2.5">
+                <div class="flex items-center gap-2">
+                  <Badge :variant="item.verification_status === 'verified' ? 'confirmed' : 'reported_reliable'" size="sm">
+                    {{ item.verification_status || 'verified' }}
+                  </Badge>
+                  <span class="rounded bg-nexo-bg px-2 py-0.5 text-[11px] font-semibold text-nexo-text-secondary">
+                    {{ typeof item.category === 'object' ? item.category?.name : item.category || 'Strategic Intelligence' }}
+                  </span>
+                </div>
+                <span class="font-mono text-[10px] text-nexo-accent-cyan font-semibold">
+                  {{ item.relevance_score || 92 }}% Match
+                </span>
+              </div>
+
+              <div class="mt-3">
+                <RouterLink
+                  :to="`/news/${item.slug || item.id}`"
+                  class="font-serif text-lg font-medium leading-snug text-nexo-text-primary transition group-hover:text-nexo-accent-cyan"
+                >
+                  {{ item.headline || item.title }}
+                </RouterLink>
+                <p class="mt-1 text-xs leading-relaxed text-nexo-text-secondary">
+                  {{ item.summary }}
+                </p>
+              </div>
+
+              <div class="mt-3.5 flex items-center justify-between border-t border-nexo-border/60 pt-2.5 text-[11px]">
+                <div class="flex items-center gap-2 text-nexo-text-muted">
+                  <span>{{ item.source?.name || 'Corroborated' }}</span>
+                  <span>•</span>
+                  <span>{{ item.source_count || 3 }} sources</span>
+                </div>
+                <RouterLink
+                  :to="`/news/${item.slug || item.id}`"
+                  class="inline-flex items-center gap-1 font-semibold text-nexo-accent-cyan hover:underline"
+                >
+                  <span>Dossier</span>
+                  <ArrowRight class="h-3 w-3" />
+                </RouterLink>
+              </div>
+            </Card>
+          </div>
+        </section>
+
+        <!-- Right: Monitored Entities & Fast-Rising Signals -->
+        <aside class="space-y-5">
+          <!-- Monitored Entities Updates -->
+          <Card padding="md">
+            <template #header>
+              <div class="flex w-full items-center justify-between">
+                <div>
+                  <p class="text-[11px] font-bold uppercase tracking-wider text-nexo-accent-gold">Tracked Entities</p>
+                  <h3 class="mt-1 font-serif text-base font-medium text-nexo-text-primary">
+                    Recent Company Activity
+                  </h3>
+                </div>
+                <RouterLink to="/following" class="text-xs font-semibold text-nexo-accent-cyan hover:underline">
+                  Manage
+                </RouterLink>
+              </div>
+            </template>
+
+            <div v-if="followedUpdates.length === 0" class="py-4 text-center text-xs text-nexo-text-muted">
+              Follow companies and executives to track their latest disclosures here.
+            </div>
+
+            <div v-else class="space-y-2.5">
+              <div
+                v-for="update in followedUpdates.slice(0, 4)"
+                :key="update.id"
+                class="rounded-xl border border-nexo-border/70 p-2.5 transition hover:bg-nexo-bg"
+              >
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="font-semibold text-nexo-text-primary">{{ update.headline || update.title }}</span>
+                </div>
+                <RouterLink
+                  :to="`/news/${update.slug || update.id}`"
+                  class="mt-1 block text-[11px] text-nexo-accent-cyan hover:underline"
+                >
+                  View intelligence dossier →
+                </RouterLink>
+              </div>
+            </div>
+          </Card>
+
+          <!-- Executive Dossier Prompt Box -->
+          <div class="rounded-2xl border border-[#2a594b] bg-[#173b32] p-5 text-white shadow-executive">
+            <div class="flex items-center justify-between">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-[#c5e5ce]">
+                <FileText class="h-4 w-4" />
+              </span>
+              <span class="rounded-full border border-white/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#c5e5ce]">
+                Publication Desk
+              </span>
+            </div>
+            <h3 class="mt-4 font-serif text-lg font-medium text-white">
+              Executive Dossiers & PDF Briefings
+            </h3>
+            <p class="mt-1.5 text-xs leading-relaxed text-[#c4d6cd]">
+              Download cryptographically signed intelligence briefings generated by the automated editorial engine.
+            </p>
+            <RouterLink
+              to="/reports"
+              class="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-white px-3.5 py-2 text-xs font-semibold text-[#173b32] transition hover:bg-[#e9f3ed]"
+            >
+              <span>Explore Reports</span>
+              <ArrowRight class="h-3.5 w-3.5" />
+            </RouterLink>
+          </div>
+        </aside>
+      </div>
     </div>
-  </div>
+  </AuthenticatedLayout>
 </template>
