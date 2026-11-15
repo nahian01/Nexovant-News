@@ -185,6 +185,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::match(['get', 'post', 'put'], '/user/preferences', [UserInteractionController::class, 'preferences'])->name('api.user.preferences');
     Route::get('/user/notifications', [UserInteractionController::class, 'notifications'])->name('api.user.notifications');
 
+    // Centralized Subscriber Notifications & Communication Engine (Stage 11)
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('api.notifications.index');
+        Route::post('/{id}/read', [NotificationController::class, 'markRead'])->name('api.notifications.read');
+        Route::patch('/{id}/read', [NotificationController::class, 'markRead'])->name('api.notifications.patch-read');
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllRead'])->name('api.notifications.mark-all-read');
+        Route::delete('/{id}', [NotificationController::class, 'destroy'])->name('api.notifications.destroy');
+        Route::match(['get', 'post', 'put'], '/preferences', [NotificationController::class, 'preferences'])->name('api.notifications.preferences');
+        Route::get('/push/vapid-key', [NotificationController::class, 'getVapidKey'])->name('api.notifications.vapid-key');
+        Route::post('/push/subscribe', [NotificationController::class, 'subscribePush'])->name('api.notifications.push.subscribe');
+        Route::post('/push/unsubscribe', [NotificationController::class, 'unsubscribePush'])->name('api.notifications.push.unsubscribe');
+        Route::post('/telegram/link-token', [NotificationController::class, 'generateTelegramToken'])->name('api.notifications.telegram.token');
+        Route::post('/telegram/verify', [NotificationController::class, 'verifyTelegram'])->name('api.notifications.telegram.verify');
+        Route::post('/telegram/disconnect', [NotificationController::class, 'disconnectTelegram'])->name('api.notifications.telegram.disconnect');
+        Route::post('/telegram/test', [NotificationController::class, 'testTelegram'])->name('api.notifications.telegram.test');
+        Route::get('/whatsapp/status', [NotificationController::class, 'whatsappStatus'])->name('api.notifications.whatsapp.status');
+    });
+
     // Subscriber Workspace & Personalized Intelligence (Phase 7C)
     Route::prefix('workspace')->group(function () {
         Route::get('/overview', [WorkspaceController::class, 'overview'])->name('api.workspace.overview');
@@ -233,10 +251,21 @@ Route::middleware('auth:sanctum')->group(function () {
         // Notifications
         Route::get('/notifications', [NotificationController::class, 'index'])->name('api.workspace.notifications.index');
         Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('api.workspace.notifications.read');
+        Route::patch('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('api.workspace.notifications.patch-read');
         Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('api.workspace.notifications.mark-all-read');
         Route::post('/notifications/{id}/archive', [NotificationController::class, 'archive'])->name('api.workspace.notifications.archive');
         Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('api.workspace.notifications.destroy');
         Route::match(['get', 'post', 'put'], '/notifications/preferences', [NotificationController::class, 'preferences'])->name('api.workspace.notifications.preferences');
+
+        // Stage 11 Multi-Channel Integration Endpoints
+        Route::get('/notifications/push/vapid-key', [NotificationController::class, 'getVapidKey'])->name('api.workspace.notifications.vapid-key');
+        Route::post('/notifications/push/subscribe', [NotificationController::class, 'subscribePush'])->name('api.workspace.notifications.push.subscribe');
+        Route::post('/notifications/push/unsubscribe', [NotificationController::class, 'unsubscribePush'])->name('api.workspace.notifications.push.unsubscribe');
+        Route::post('/notifications/telegram/link-token', [NotificationController::class, 'generateTelegramToken'])->name('api.workspace.notifications.telegram.token');
+        Route::post('/notifications/telegram/verify', [NotificationController::class, 'verifyTelegram'])->name('api.workspace.notifications.telegram.verify');
+        Route::post('/notifications/telegram/disconnect', [NotificationController::class, 'disconnectTelegram'])->name('api.workspace.notifications.telegram.disconnect');
+        Route::post('/notifications/telegram/test', [NotificationController::class, 'testTelegram'])->name('api.workspace.notifications.telegram.test');
+        Route::get('/notifications/whatsapp/status', [NotificationController::class, 'whatsappStatus'])->name('api.workspace.notifications.whatsapp.status');
 
         // Personalized Research
         Route::post('/research/query', [SubscriberResearchController::class, 'query'])->name('api.workspace.research.query');
@@ -439,7 +468,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/payments/methods', [PaymentAdminController::class, 'methods'])->name('api.admin.payments.methods');
         Route::put('/payments/methods/{id}', [PaymentAdminController::class, 'updateMethod'])->name('api.admin.payments.methods.update');
 
-        // 11. Notifications & Dispatch
+        // 11. Notifications & Central Dispatch (Stage 11)
+        Route::get('/notifications/metrics', [NotificationAdminController::class, 'metrics'])->name('api.admin.notifications.metrics');
+        Route::get('/notifications/logs', [NotificationAdminController::class, 'logs'])->name('api.admin.notifications.logs');
+        Route::get('/notifications/rules', [NotificationAdminController::class, 'rules'])->name('api.admin.notifications.rules');
+        Route::put('/notifications/rules/{id}', [NotificationAdminController::class, 'updateRule'])->name('api.admin.notifications.rules.update');
+        Route::post('/notifications/broadcast', [NotificationAdminController::class, 'store'])->name('api.admin.notifications.broadcast');
         Route::get('/notifications', [NotificationAdminController::class, 'index'])->name('api.admin.notifications.index');
         Route::post('/notifications', [NotificationAdminController::class, 'store'])->name('api.admin.notifications.store');
         Route::post('/notifications/{id}/retry', [NotificationAdminController::class, 'retry'])->name('api.admin.notifications.retry');

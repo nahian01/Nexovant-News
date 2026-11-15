@@ -345,9 +345,34 @@ export const adminService = {
     return res.data
   },
 
-  // 10. Notifications & Dispatch Delivery
+  // 10. Notifications & Dispatch Delivery (Stage 11)
   async getNotifications(params?: Record<string, any>) {
     const res = await apiClient.get('/admin/notifications', { params })
+    return res.data
+  },
+
+  async getNotificationMetrics() {
+    const res = await apiClient.get('/admin/notifications/metrics')
+    return res.data
+  },
+
+  async getNotificationLogs(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/notifications/logs', { params })
+    return res.data
+  },
+
+  async broadcastAnnouncement(data: Record<string, any>) {
+    const res = await apiClient.post('/admin/notifications/broadcast', data)
+    return res.data
+  },
+
+  async getNotificationRules() {
+    const res = await apiClient.get('/admin/notifications/rules')
+    return res.data
+  },
+
+  async updateNotificationRule(id: string, data: Record<string, any>) {
+    const res = await apiClient.put(`/admin/notifications/rules/${id}`, data)
     return res.data
   },
 

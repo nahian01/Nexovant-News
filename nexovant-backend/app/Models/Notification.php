@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Notification extends Model
@@ -29,6 +30,11 @@ class Notification extends Model
         'error_message',
         'is_read',
         'read_at',
+        'priority',
+        'source_module',
+        'organization_id',
+        'idempotency_key',
+        'metadata',
     ];
 
     protected function casts(): array
@@ -37,12 +43,18 @@ class Notification extends Model
             'is_read' => 'boolean',
             'read_at' => 'datetime',
             'retry_count' => 'integer',
+            'metadata' => 'array',
         ];
     }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     public function deliveryLogs(): HasMany
@@ -53,5 +65,15 @@ class Notification extends Model
     public function scopeUnread(Builder $query): Builder
     {
         return $query->where('is_read', false);
+    }
+
+    public function scopePriority(Builder $query, string $priority): Builder
+    {
+        return $query->where('priority', $priority);
+    }
+
+    public function scopeCategory(Builder $query, string $category): Builder
+    {
+        return $query->where('category', $category);
     }
 }

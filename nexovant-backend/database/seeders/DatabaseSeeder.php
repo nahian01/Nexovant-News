@@ -826,5 +826,106 @@ class DatabaseSeeder extends Seeder
                 'valid_until' => now()->addYear(),
             ]
         );
+
+        // 12. Seed Default Notification Rules (Stage 11)
+        $rulesData = [
+            [
+                'name' => 'Breaking Intelligence Alerts',
+                'event_type' => 'intelligence.breaking_news',
+                'source_module' => 'intelligence',
+                'priority' => 'urgent',
+                'channels' => ['in_app', 'email', 'web_push', 'telegram'],
+                'template_name' => 'breaking_alert',
+                'frequency' => 'realtime',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Watchlist & Entity Monitoring',
+                'event_type' => 'watchlist.entity_alert',
+                'source_module' => 'workspace',
+                'priority' => 'high',
+                'channels' => ['in_app', 'email', 'web_push'],
+                'template_name' => 'watchlist_alert',
+                'frequency' => 'realtime',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Research Dossier Completion',
+                'event_type' => 'research.completed',
+                'source_module' => 'research',
+                'priority' => 'high',
+                'channels' => ['in_app', 'email', 'web_push'],
+                'template_name' => 'research_completed',
+                'frequency' => 'realtime',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Billing Payment Confirmed',
+                'event_type' => 'billing.payment_confirmed',
+                'source_module' => 'billing',
+                'priority' => 'high',
+                'channels' => ['in_app', 'email'],
+                'template_name' => 'payment_receipt',
+                'frequency' => 'realtime',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Billing Payment Failed / Grace Period',
+                'event_type' => 'billing.payment_failed',
+                'source_module' => 'billing',
+                'priority' => 'urgent',
+                'channels' => ['in_app', 'email'],
+                'template_name' => 'payment_failed',
+                'frequency' => 'realtime',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Subscription Trial Expiring',
+                'event_type' => 'subscription.trial_expiring',
+                'source_module' => 'subscription',
+                'priority' => 'medium',
+                'channels' => ['in_app', 'email'],
+                'template_name' => 'trial_expiring',
+                'frequency' => 'realtime',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Organization Team Invitation',
+                'event_type' => 'organization.member_invited',
+                'source_module' => 'organization',
+                'priority' => 'medium',
+                'channels' => ['in_app', 'email'],
+                'template_name' => 'org_invitation',
+                'frequency' => 'realtime',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Platform System Announcement',
+                'event_type' => 'system.announcement',
+                'source_module' => 'system',
+                'priority' => 'high',
+                'channels' => ['in_app', 'email', 'web_push'],
+                'template_name' => 'system_announcement',
+                'frequency' => 'realtime',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Daily Executive Intelligence Summary',
+                'event_type' => 'digest.daily_intelligence',
+                'source_module' => 'intelligence',
+                'priority' => 'low',
+                'channels' => ['in_app', 'email'],
+                'template_name' => 'daily_digest',
+                'frequency' => 'daily_digest',
+                'is_active' => true,
+            ],
+        ];
+
+        foreach ($rulesData as $rule) {
+            \App\Models\NotificationRule::updateOrCreate(
+                ['event_type' => $rule['event_type']],
+                $rule
+            );
+        }
     }
 }

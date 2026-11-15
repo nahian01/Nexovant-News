@@ -22,6 +22,9 @@ class SubscriberNotificationPreference extends Model
         'digest_frequency',
         'quiet_hours_start',
         'quiet_hours_end',
+        'telegram_chat_id',
+        'whatsapp_phone',
+        'timezone',
     ];
 
     protected function casts(): array

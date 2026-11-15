@@ -253,6 +253,49 @@ export const workspaceService = {
     return res.data
   },
 
+  // Web Push (VAPID)
+  async getVapidKey() {
+    const res = await apiClient.get('/workspace/notifications/push/vapid-key')
+    return res.data
+  },
+
+  async subscribeWebPush(subscription: any) {
+    const res = await apiClient.post('/workspace/notifications/push/subscribe', subscription)
+    return res.data
+  },
+
+  async unsubscribeWebPush(endpoint: string) {
+    const res = await apiClient.post('/workspace/notifications/push/unsubscribe', { endpoint })
+    return res.data
+  },
+
+  // Telegram Integration
+  async getTelegramLinkToken() {
+    const res = await apiClient.post('/workspace/notifications/telegram/link-token')
+    return res.data
+  },
+
+  async verifyTelegram(token: string, chatId: string) {
+    const res = await apiClient.post('/workspace/notifications/telegram/verify', { token, chat_id: chatId })
+    return res.data
+  },
+
+  async disconnectTelegram() {
+    const res = await apiClient.post('/workspace/notifications/telegram/disconnect')
+    return res.data
+  },
+
+  async testTelegram() {
+    const res = await apiClient.post('/workspace/notifications/telegram/test')
+    return res.data
+  },
+
+  // WhatsApp Status
+  async getWhatsAppStatus() {
+    const res = await apiClient.get('/workspace/notifications/whatsapp/status')
+    return res.data
+  },
+
   // 6. Grounded Personalized Research
   async askResearchQuestion(query: string, watchlistId?: string) {
     const res = await apiClient.post('/workspace/research/query', {

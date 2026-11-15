@@ -19,6 +19,7 @@ import {
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import GlobalSearchModal from '@/components/layout/GlobalSearchModal.vue'
+import NotificationDrawer from '@/components/layout/NotificationDrawer.vue'
 import { workspaceService } from '@/services/api/workspace.service'
 
 const emit = defineEmits<{
@@ -29,7 +30,19 @@ const authStore = useAuthStore()
 const router = useRouter()
 const isSearchOpen = ref(false)
 const isProfileDropdownOpen = ref(false)
+const isNotificationDrawerOpen = ref(false)
 const unreadNotificationCount = ref(0)
+
+const fetchUnreadCount = async () => {
+  try {
+    const res = await workspaceService.getNotifications({ per_page: 1 })
+    if (res?.unread_count !== undefined) {
+      unreadNotificationCount.value = res.unread_count
+    }
+  } catch {
+    //
+  }
+}
 
 const handleLogout = async () => {
   isProfileDropdownOpen.value = false
@@ -53,14 +66,10 @@ const planTierLabel = computed(() => {
 })
 
 onMounted(async () => {
-  try {
-    const res = await workspaceService.getOverview()
-    if (res?.overview?.metrics?.unread_notifications !== undefined) {
-      unreadNotificationCount.value = res.overview.metrics.unread_notifications
-    }
-  } catch {
-    //
-  }
+  await fetchUnreadCount()
+  // 15-second polling interval for real-time unread updates
+  const interval = setInterval(fetchUnreadCount, 15000)
+  window.addEventListener('beforeunload', () => clearInterval(interval))
 })
 </script>
 
@@ -117,20 +126,29 @@ onMounted(async () => {
         <kbd class="hidden rounded border border-nexo-border bg-white px-1.5 py-0.5 text-[10px] font-mono text-nexo-text-muted sm:inline-block">⌘K</kbd>
       </button>
 
-      <!-- Notification Bell -->
-      <RouterLink
-        to="/workspace/notifications"
-        class="relative flex h-9 w-9 items-center justify-center rounded-xl border border-nexo-border text-nexo-text-secondary transition hover:border-nexo-accent-cyan/40 hover:bg-nexo-bg hover:text-nexo-text-primary"
-        aria-label="View notifications"
-      >
-        <Bell class="h-4 w-4" />
-        <span
-          v-if="unreadNotificationCount > 0"
-          class="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-600 px-1 font-mono text-[9px] font-bold text-white shadow-xs"
+      <!-- Notification Bell with Slide Drawer -->
+      <div class="relative">
+        <button
+          type="button"
+          @click="isNotificationDrawerOpen = !isNotificationDrawerOpen"
+          class="relative flex h-9 w-9 items-center justify-center rounded-xl border border-nexo-border text-nexo-text-secondary transition hover:border-nexo-accent-cyan/40 hover:bg-nexo-bg hover:text-nexo-text-primary"
+          aria-label="View notifications"
         >
-          {{ unreadNotificationCount > 9 ? '9+' : unreadNotificationCount }}
-        </span>
-      </RouterLink>
+          <Bell class="h-4 w-4" />
+          <span
+            v-if="unreadNotificationCount > 0"
+            class="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-600 px-1 font-mono text-[9px] font-bold text-white shadow-xs"
+          >
+            {{ unreadNotificationCount > 9 ? '9+' : unreadNotificationCount }}
+          </span>
+        </button>
+
+        <NotificationDrawer
+          :is-open="isNotificationDrawerOpen"
+          @close="isNotificationDrawerOpen = false"
+          @update-unread="(cnt) => unreadNotificationCount = cnt"
+        />
+      </div>
 
       <!-- User Account Dropdown -->
       <div v-if="authStore.user" class="relative">

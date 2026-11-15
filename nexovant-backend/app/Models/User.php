@@ -111,6 +111,16 @@ class User extends Authenticatable
         return $this->hasOne(SubscriberNotificationPreference::class);
     }
 
+    public function webPushSubscriptions(): HasMany
+    {
+        return $this->hasMany(WebPushSubscription::class);
+    }
+
+    public function telegramLinkTokens(): HasMany
+    {
+        return $this->hasMany(TelegramLinkToken::class);
+    }
+
     public function entitlementOverrides(): HasMany
     {
         return $this->hasMany(SubscriptionEntitlementOverride::class);
