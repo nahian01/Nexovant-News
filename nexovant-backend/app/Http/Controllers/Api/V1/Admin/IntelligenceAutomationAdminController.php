@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Models\AnalystReview;
 use App\Models\AnomalyObservation;
+use App\Models\AutomationExecutionLog;
 use App\Models\EarlyWarning;
 use App\Models\IntelligenceDetectionRule;
 use App\Models\IntelligenceSignal;
@@ -49,6 +50,63 @@ class IntelligenceAutomationAdminController
                 'false_positive_rate' => $falsePositiveRate,
                 'queue_status' => 'healthy',
                 'active_detection_rules' => IntelligenceDetectionRule::where('is_active', true)->count(),
+            ],
+        ]);
+    }
+
+    /**
+     * Operational Telemetry: Scheduler health, execution history, queue health, latencies.
+     */
+    public function telemetry(Request $request): JsonResponse
+    {
+        $lastMonitorRun = AutomationExecutionLog::where('command_name', 'intelligence:evaluate-monitors')
+            ->latest('started_at')
+            ->first();
+
+        $lastSearchRun = AutomationExecutionLog::where('command_name', 'discovery:evaluate-saved-searches')
+            ->latest('started_at')
+            ->first();
+
+        $logs = AutomationExecutionLog::latest('started_at')->limit(25)->get();
+
+        $pendingJobs = 0;
+        $failedJobs = 0;
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('jobs')) {
+                $pendingJobs = \Illuminate\Support\Facades\DB::table('jobs')->count();
+            }
+            if (\Illuminate\Support\Facades\Schema::hasTable('failed_jobs')) {
+                $failedJobs = \Illuminate\Support\Facades\DB::table('failed_jobs')->count();
+            }
+        } catch (\Throwable $e) {}
+
+        $executions24h = AutomationExecutionLog::where('started_at', '>=', now()->subHours(24))->count();
+        $failures24h = AutomationExecutionLog::where('started_at', '>=', now()->subHours(24))->where('status', 'failed')->count();
+        $avgDuration = (int) round((float) (AutomationExecutionLog::whereNotNull('duration_ms')->avg('duration_ms') ?? 0));
+
+        $heartbeatStatus = 'healthy';
+        if ($lastMonitorRun && $lastMonitorRun->started_at->lt(now()->subHours(2))) {
+            $heartbeatStatus = 'delayed';
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'heartbeat' => [
+                    'status' => $heartbeatStatus,
+                    'last_monitor_eval_at' => $lastMonitorRun?->started_at?->toIso8601String(),
+                    'last_saved_search_eval_at' => $lastSearchRun?->started_at?->toIso8601String(),
+                    'last_duration_ms' => $lastMonitorRun?->duration_ms,
+                ],
+                'queue' => [
+                    'status' => $failedJobs > 5 ? 'degraded' : 'healthy',
+                    'pending_jobs' => $pendingJobs,
+                    'failed_jobs' => $failedJobs,
+                    'executions_24h' => $executions24h,
+                    'failures_24h' => $failures24h,
+                    'avg_duration_ms' => $avgDuration,
+                ],
+                'recent_executions' => $logs,
             ],
         ]);
     }

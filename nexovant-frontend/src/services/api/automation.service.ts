@@ -262,6 +262,11 @@ export const automationService = {
   },
 
   // Admin Control Room
+  async getTelemetry() {
+    const res = await apiClient.get('/admin/automation-control/telemetry')
+    return res.data
+  },
+
   async getAdminRules() {
     const res = await apiClient.get('/admin/automation-control/rules')
     return res.data

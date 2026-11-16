@@ -89,7 +89,19 @@ class TrendForecastController
      */
     public function show(Request $request, string $id): JsonResponse
     {
+        $user = $request->user();
+        $tenantId = null;
+
+        if ($user) {
+            $membership = OrganizationMember::where('user_id', $user->id)->first();
+            $tenantId = $membership?->organization_id ?? $user->organization_id;
+        }
+
         $forecast = TrendForecast::findOrFail($id);
+
+        if ($forecast->organization_id !== null && $forecast->organization_id !== $tenantId) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access to organization trend forecast.'], 403);
+        }
 
         return response()->json([
             'success' => true,

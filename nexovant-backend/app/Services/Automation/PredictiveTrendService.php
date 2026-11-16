@@ -13,9 +13,10 @@ use Illuminate\Support\Collection;
 class PredictiveTrendService
 {
     public const MIN_HISTORICAL_POINTS = 5;
+    public const MIN_HOLDOUT_SAMPLE_SIZE = 8;
 
     /**
-     * Generate or update a predictive forecast for a topic or technology trend.
+     * Generate or update a predictive forecast for a topic or technology trend with walk-forward backtesting.
      *
      * @param string $subject Topic or technology name
      * @param string $category technology_adoption, capex_expansion, supply_chain_velocity, regulatory_timeline
@@ -36,6 +37,7 @@ class PredictiveTrendService
         $historicalPoints = $this->collectWeeklyDataPoints($subject, $windowDays);
         $activePeriods = count(array_filter($historicalPoints, fn($p) => $p['value'] > 0));
         $totalObservations = array_sum(array_column($historicalPoints, 'value'));
+        $n = count($historicalPoints);
 
         // 2. Insufficient Data Guardrail: Never fabricate predictive trajectories without sufficient samples
         if ($activePeriods < self::MIN_HISTORICAL_POINTS || $totalObservations < 5) {
@@ -56,12 +58,20 @@ class PredictiveTrendService
                 'is_supported' => false,
                 'data_sufficiency_status' => 'insufficient_sample_size',
                 'evaluation_metrics' => null,
+                'backtesting_metrics' => null,
+                'holdout_evaluation' => [
+                    'status' => 'rejected_insufficient_data',
+                    'sample_size' => $n,
+                    'min_required' => self::MIN_HISTORICAL_POINTS,
+                ],
                 'organization_id' => $tenantId,
             ]);
         }
 
-        // 3. Compute Linear Trend Parameters (Slope & Intercept via Ordinary Least Squares)
-        $n = count($historicalPoints);
+        // 3. Walk-Forward Holdout Backtesting (Separating Training vs Test Observations)
+        $holdoutEvaluation = $this->performWalkForwardBacktest($historicalPoints);
+
+        // 4. Compute Full-Sample Linear Trend Parameters (OLS)
         $xVals = range(0, $n - 1);
         $yVals = array_column($historicalPoints, 'value');
 
@@ -78,19 +88,19 @@ class PredictiveTrendService
         $slope = $denominator > 0 ? ($numerator / $denominator) : 0.0;
         $intercept = $yMean - ($slope * $xMean);
 
-        // Backtesting error metrics (In-sample MAE & RMSE)
-        $residuals = [];
+        // In-sample error metrics
+        $inSampleResiduals = [];
         for ($i = 0; $i < $n; $i++) {
             $predicted = $intercept + ($slope * $xVals[$i]);
-            $residuals[] = abs($yVals[$i] - $predicted);
+            $inSampleResiduals[] = abs($yVals[$i] - $predicted);
         }
-        $mae = round(array_sum($residuals) / $n, 2);
-        $rmse = round(sqrt(array_sum(array_map(fn($r) => pow($r, 2), $residuals)) / $n), 2);
+        $mae = round(array_sum($inSampleResiduals) / $n, 2);
+        $rmse = round(sqrt(array_sum(array_map(fn($r) => pow($r, 2), $inSampleResiduals)) / $n), 2);
+        $inSampleRSquared = $denominator > 0 ? round(pow($numerator, 2) / ($denominator * max(1.0, array_sum(array_map(fn($y) => pow($y - $yMean, 2), $yVals)))), 3) : 0.0;
 
-        // Standard error of estimate
         $stdError = max(1.0, $rmse);
 
-        // 4. Generate Projected Steps into Horizon
+        // 5. Generate Forward Projected Steps into Horizon
         $steps = match ($horizon) {
             '30d' => 4,
             '90d' => 12,
@@ -133,7 +143,7 @@ class PredictiveTrendService
             'forecast_category' => $category,
             'forecast_horizon' => $horizon,
             'historical_window_days' => $windowDays,
-            'methodology' => 'linear_trend_extrapolation_with_ols',
+            'methodology' => 'linear_trend_extrapolation_with_ols_and_walk_forward_backtest',
             'historical_data_points' => $historicalPoints,
             'forecasted_values' => $forecastedValues,
             'prediction_intervals' => $predictionIntervals,
@@ -142,16 +152,145 @@ class PredictiveTrendService
                 'constant_source_coverage' => true,
                 'no_black_swan_regulatory_embargo' => true,
             ],
-            'limitations' => "Projections represent statistical trend extrapolation based on empirical multi-week reporting volume. External non-linear policy shifts or unforeseen structural bottlenecks may cause actual outcomes to diverge from projected mean.",
+            'limitations' => "Projections represent statistical trend extrapolation based on empirical multi-week reporting volume. Holdout evaluations separate historical training from validation observations to guard against overconfidence.",
             'is_supported' => true,
             'data_sufficiency_status' => 'sufficient',
             'evaluation_metrics' => [
                 'mae' => $mae,
                 'rmse' => $rmse,
-                'in_sample_r_squared' => $denominator > 0 ? round(pow($numerator, 2) / ($denominator * max(1.0, array_sum(array_map(fn($y) => pow($y - $yMean, 2), $yVals)))), 3) : 0.0,
+                'in_sample_mae' => $mae,
+                'in_sample_rmse' => $rmse,
+                'in_sample_r_squared' => $inSampleRSquared,
             ],
+            'backtesting_metrics' => $holdoutEvaluation['metrics'] ?? null,
+            'holdout_evaluation' => $holdoutEvaluation,
             'organization_id' => $tenantId,
         ]);
+    }
+
+    /**
+     * Perform walk-forward train/test split backtesting.
+     */
+    protected function performWalkForwardBacktest(array $historicalPoints): array
+    {
+        $n = count($historicalPoints);
+        $activeCount = count(array_filter($historicalPoints, fn($p) => (float) $p['value'] > 0.0));
+
+        // Guardrail: Enforce explicit refusal when active sample size < 8 for holdout splits
+        if ($activeCount < self::MIN_HOLDOUT_SAMPLE_SIZE) {
+            return [
+                'status' => 'insufficient_sample_for_holdout',
+                'sample_size' => $activeCount,
+                'min_required' => self::MIN_HOLDOUT_SAMPLE_SIZE,
+                'message' => "Sample size of {$activeCount} historical active periods is insufficient for robust walk-forward holdout validation (minimum " . self::MIN_HOLDOUT_SAMPLE_SIZE . " required). Reporting in-sample metrics only.",
+                'metrics' => null,
+            ];
+        }
+
+        // Split: Last 4 points for test/holdout, previous points for train
+        $testSize = 4;
+        $trainSize = $n - $testSize;
+
+        $trainPoints = array_slice($historicalPoints, 0, $trainSize);
+        $testPoints = array_slice($historicalPoints, $trainSize);
+
+        // Fit linear regression on training slice
+        $xTrain = range(0, $trainSize - 1);
+        $yTrain = array_column($trainPoints, 'value');
+
+        $xMean = array_sum($xTrain) / $trainSize;
+        $yMean = array_sum($yTrain) / $trainSize;
+
+        $num = 0.0;
+        $den = 0.0;
+        for ($i = 0; $i < $trainSize; $i++) {
+            $num += ($xTrain[$i] - $xMean) * ($yTrain[$i] - $yMean);
+            $den += pow($xTrain[$i] - $xMean, 2);
+        }
+
+        $slopeTrain = $den > 0 ? ($num / $den) : 0.0;
+        $interceptTrain = $yMean - ($slopeTrain * $xMean);
+
+        // Standard error of training model
+        $trainResiduals = [];
+        for ($i = 0; $i < $trainSize; $i++) {
+            $pred = $interceptTrain + ($slopeTrain * $xTrain[$i]);
+            $trainResiduals[] = abs($yTrain[$i] - $pred);
+        }
+        $rmseTrain = sqrt(array_sum(array_map(fn($r) => pow($r, 2), $trainResiduals)) / $trainSize);
+        $stdErrorTrain = max(1.0, $rmseTrain);
+
+        // Naive baseline persistence: predict y_{t} for all future steps
+        $naiveBaselineValue = (float) end($trainPoints)['value'];
+
+        // Evaluate out-of-sample on holdout test set
+        $absErrors = [];
+        $sqErrors = [];
+        $pctErrors = [];
+        $naiveAbsErrors = [];
+        $coveredCount = 0;
+
+        $yTestMean = array_sum(array_column($testPoints, 'value')) / $testSize;
+        $totalTestSumSquares = 0.0;
+
+        foreach ($testPoints as $j => $point) {
+            $actual = (float) $point['value'];
+            $xTarget = $trainSize + $j;
+            $predicted = max(0.0, round($interceptTrain + ($slopeTrain * $xTarget), 2));
+
+            // 95% confidence interval for holdout point
+            $margin = 1.96 * $stdErrorTrain * sqrt(1 + (1.0 / $trainSize) + (pow($xTarget - $xMean, 2) / max(1.0, $den)));
+            $lower = max(0.0, $predicted - $margin);
+            $upper = $predicted + $margin;
+
+            if ($actual >= $lower && $actual <= $upper) {
+                $coveredCount++;
+            }
+
+            $e = $actual - $predicted;
+            $absErrors[] = abs($e);
+            $sqErrors[] = pow($e, 2);
+            $pctErrors[] = abs($e) / max(1.0, $actual);
+
+            // Naive error
+            $naiveE = $actual - $naiveBaselineValue;
+            $naiveAbsErrors[] = abs($naiveE);
+
+            $totalTestSumSquares += pow($actual - $yTestMean, 2);
+        }
+
+        $outSampleMae = round(array_sum($absErrors) / $testSize, 2);
+        $outSampleRmse = round(sqrt(array_sum($sqErrors) / $testSize), 2);
+        $outSampleMape = round((array_sum($pctErrors) / $testSize) * 100.0, 1);
+        $naiveMae = round(array_sum($naiveAbsErrors) / $testSize, 2);
+
+        $outSampleRSquared = $totalTestSumSquares > 0
+            ? round(1.0 - (array_sum($sqErrors) / $totalTestSumSquares), 3)
+            : 0.0;
+
+        $intervalCoveragePct = round(($coveredCount / (float) $testSize) * 100.0, 1);
+        $maeImprovementOverNaivePct = $naiveMae > 0
+            ? round((($naiveMae - $outSampleMae) / $naiveMae) * 100.0, 1)
+            : 0.0;
+
+        $metrics = [
+            'out_of_sample_mae' => $outSampleMae,
+            'out_of_sample_rmse' => $outSampleRmse,
+            'out_of_sample_mape_pct' => $outSampleMape,
+            'out_of_sample_r_squared' => $outSampleRSquared,
+            'prediction_interval_coverage_pct' => $intervalCoveragePct,
+            'naive_baseline_mae' => $naiveMae,
+            'mae_improvement_over_naive_pct' => $maeImprovementOverNaivePct,
+            'train_sample_size' => $trainSize,
+            'holdout_sample_size' => $testSize,
+        ];
+
+        return [
+            'status' => 'validated',
+            'train_sample_size' => $trainSize,
+            'holdout_sample_size' => $testSize,
+            'metrics' => $metrics,
+        ];
     }
 
     /**

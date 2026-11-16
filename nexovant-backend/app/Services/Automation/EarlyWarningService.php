@@ -12,6 +12,10 @@ use Illuminate\Support\Str;
 
 class EarlyWarningService
 {
+    public function __construct(
+        protected IntelligenceAlertService $alertService
+    ) {}
+
     /**
      * Evaluate whether an intelligence signal warrants an early warning, and generate or update it.
      */
@@ -33,6 +37,7 @@ class EarlyWarningService
         if ($existing) {
             // Update warning level if escalated
             if ($existing->warning_level !== $warningLevel) {
+                $previousLevel = $existing->warning_level;
                 $this->transitionStatus(
                     warning: $existing,
                     newStatus: $warningLevel === 'critical' ? 'escalated' : $existing->status,
@@ -41,6 +46,9 @@ class EarlyWarningService
                 );
                 $existing->warning_level = $warningLevel;
                 $existing->save();
+
+                // Dispatch warning escalation alert
+                $this->alertService->dispatchWarningEscalatedAlert($existing, $previousLevel);
             }
             return $existing;
         }
@@ -97,22 +105,10 @@ class EarlyWarningService
     }
 
     /**
-     * Transition warning status with audit logging.
+     * Transition warning status with audit logging and lifecycle alert dispatches.
      */
     public function transitionStatus(EarlyWarning $warning, string $newStatus, ?User $user = null, ?string $reason = null): EarlyWarning
     {
-        $allowedTransitions = [
-            'newly_detected' => ['under_analysis', 'dismissed', 'confirmed'],
-            'under_analysis' => ['awaiting_analyst_review', 'confirmed', 'dismissed'],
-            'awaiting_analyst_review' => ['confirmed', 'escalated', 'dismissed'],
-            'confirmed' => ['escalated', 'monitoring', 'resolved'],
-            'escalated' => ['monitoring', 'resolved', 'dismissed'],
-            'monitoring' => ['resolved', 'escalated', 'reopened'],
-            'resolved' => ['reopened'],
-            'dismissed' => ['reopened'],
-            'reopened' => ['under_analysis', 'confirmed'],
-        ];
-
         $currentStatus = $warning->status;
         $fromStatus = $currentStatus;
 
@@ -129,6 +125,23 @@ class EarlyWarningService
             'changes' => ['status' => $newStatus],
         ]);
 
+        // Lifecycle Alert Dispatches
+        if ($newStatus === 'escalated') {
+            $this->alertService->dispatchWarningEscalatedAlert($warning, $warning->warning_level);
+        } elseif ($newStatus === 'resolved') {
+            $this->alertService->dispatchWarningResolvedAlert($warning, $reason);
+        } elseif ($newStatus === 'reopened') {
+            $this->alertService->dispatchWarningReopenedAlert($warning, $reason);
+        }
+
         return $warning;
+    }
+
+    /**
+     * Notify subscribers and organizations of material or contradictory evidence updates.
+     */
+    public function recordEvidenceUpdate(EarlyWarning $warning, string $evidenceType, string $summary): void
+    {
+        $this->alertService->dispatchWarningEvidenceUpdateAlert($warning, $evidenceType, $summary);
     }
 }

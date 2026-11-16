@@ -30,6 +30,8 @@ class TrendForecast extends Model
         'is_supported',
         'data_sufficiency_status',
         'evaluation_metrics',
+        'backtesting_metrics',
+        'holdout_evaluation',
         'organization_id',
     ];
 
@@ -43,6 +45,8 @@ class TrendForecast extends Model
             'assumptions' => 'array',
             'is_supported' => 'boolean',
             'evaluation_metrics' => 'array',
+            'backtesting_metrics' => 'array',
+            'holdout_evaluation' => 'array',
         ];
     }
 

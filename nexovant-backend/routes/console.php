@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Schedule;
 
 // Scheduled Ingestion & Automation Pipeline
 Schedule::command('nexovant:ingest-feeds')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('intelligence:evaluate-monitors')->everyFifteenMinutes()->withoutOverlapping(30)->onOneServer();
+Schedule::command('discovery:evaluate-saved-searches')->hourly()->withoutOverlapping(60)->onOneServer();
 
 // System housekeeping & security token pruning
 Schedule::command('queue:prune-batches --hours=48')->daily();

@@ -604,6 +604,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // 17. Intelligence Automation & Early Warning Administration (Stage 13)
         Route::prefix('automation-control')->group(function () {
             Route::get('/overview', [IntelligenceAutomationAdminController::class, 'overview'])->name('api.admin.automation-control.overview');
+            Route::get('/telemetry', [IntelligenceAutomationAdminController::class, 'telemetry'])->name('api.admin.automation-control.telemetry');
             Route::get('/rules', [IntelligenceAutomationAdminController::class, 'rules'])->name('api.admin.automation-control.rules');
             Route::post('/rules', [IntelligenceAutomationAdminController::class, 'storeRule'])->name('api.admin.automation-control.rules.store');
             Route::match(['put', 'patch'], '/rules/{id}', [IntelligenceAutomationAdminController::class, 'updateRule'])->name('api.admin.automation-control.rules.update');

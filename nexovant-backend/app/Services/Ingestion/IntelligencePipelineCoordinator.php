@@ -220,6 +220,13 @@ class IntelligencePipelineCoordinator
             ]);
         }
 
+        // Trigger real automated intelligence monitoring & early-warning pipeline
+        try {
+            \App\Jobs\ProcessIngestedArticleIntelligenceJob::dispatch($article->id);
+        } catch (\Throwable $e) {
+            Log::warning("Failed to queue ProcessIngestedArticleIntelligenceJob for article [{$article->id}]: " . $e->getMessage());
+        }
+
         return $article;
     }
 

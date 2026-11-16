@@ -24,6 +24,7 @@ class AnomalyDetectionService
      * @param int $baselineDays
      * @param int $observationDays
      * @param IntelligenceSignal|null $signal
+     * @param float $sensitivityZScoreConfigurable
      * @return AnomalyObservation
      */
     public function detectReportingFrequencyAnomaly(
@@ -32,7 +33,8 @@ class AnomalyDetectionService
         ?string $subjectId = null,
         int $baselineDays = 30,
         int $observationDays = 7,
-        ?IntelligenceSignal $signal = null
+        ?IntelligenceSignal $signal = null,
+        float $sensitivityZScore = 2.0
     ): AnomalyObservation {
         $now = now();
         $obsStart = $now->copy()->subDays($observationDays);
@@ -59,6 +61,26 @@ class AnomalyDetectionService
         $dailyBaselineRate = $baselineDays > 0 ? ($baselineArticles / (float) $baselineDays) : 0.0;
         $expectedObserved = round($dailyBaselineRate * $observationDays, 2);
 
+        // Duplicate suppression check: check if an observation for this subject was recorded in last 12 hours
+        $recentDuplicate = AnomalyObservation::where('subject_type', $subjectType)
+            ->where('subject_name', $subjectName)
+            ->where('indicator_name', 'reporting_frequency')
+            ->where('detected_at', '>=', now()->subHours(12))
+            ->first();
+
+        $isSuppressed = $recentDuplicate !== null;
+
+        // Determine Media Coverage Surge vs Real-World Underlying Event Cluster
+        $coverageVsRealityType = 'media_coverage_surge';
+        if ($signal) {
+            $isCorroborated = in_array($signal->verification_status, ['corroborated', 'verified', 'reported_reliable'], true);
+            if ($signal->independent_sources_count >= 3 && $isCorroborated) {
+                $coverageVsRealityType = 'underlying_event_cluster';
+            } elseif ($signal->independent_sources_count === 1 || $signal->verification_status === 'unverified') {
+                $coverageVsRealityType = 'media_coverage_surge';
+            }
+        }
+
         // Guardrail: Minimum sample size requirement to avoid false precision on trivial fluctuations
         if ($totalSamples < self::MIN_SAMPLE_THRESHOLD) {
             return AnomalyObservation::create([
@@ -72,6 +94,8 @@ class AnomalyDetectionService
                 'observed_value' => (float) $observedArticles,
                 'expected_value' => (float) $expectedObserved,
                 'deviation_score' => 0.0,
+                'coverage_vs_reality_type' => $coverageVsRealityType,
+                'is_suppressed' => $isSuppressed,
                 'detection_method' => 'moving_average_zscore',
                 'data_sufficiency' => 'insufficient',
                 'sample_count' => $totalSamples,
@@ -81,11 +105,18 @@ class AnomalyDetectionService
             ]);
         }
 
-        // Calculate Poisson / Normal approximation deviation (z-score)
-        $stdDev = max(1.0, sqrt($expectedObserved));
+        // Zero-Variance Baseline Protection:
+        // Use a safe floor max($stdDev, 0.5) so that zero-variance baseline does not cause division by zero or infinite z-scores.
+        $stdDev = max(0.5, sqrt(max(0.25, (float) $expectedObserved)));
         $deviationScore = round(($observedArticles - $expectedObserved) / $stdDev, 2);
 
         $sufficiency = $totalSamples >= 20 ? 'robust' : 'sufficient';
+
+        $limitations = match (true) {
+            $deviationScore > 3.0 => "Statistically significant surge (>3 sigma) over rolling baseline. Verified as [{$coverageVsRealityType}].",
+            $deviationScore >= $sensitivityZScore => "Elevated volume exceeding configurable threshold (z >= {$sensitivityZScore}). Classified as [{$coverageVsRealityType}].",
+            default => 'Normal variation within expected statistical bounds.'
+        };
 
         return AnomalyObservation::create([
             'signal_id' => $signal?->id,
@@ -98,11 +129,13 @@ class AnomalyDetectionService
             'observed_value' => (float) $observedArticles,
             'expected_value' => (float) $expectedObserved,
             'deviation_score' => (float) $deviationScore,
+            'coverage_vs_reality_type' => $coverageVsRealityType,
+            'is_suppressed' => $isSuppressed,
             'detection_method' => 'moving_average_zscore',
             'data_sufficiency' => $sufficiency,
             'sample_count' => $totalSamples,
             'min_sample_threshold' => self::MIN_SAMPLE_THRESHOLD,
-            'limitations' => $deviationScore > 3.0 ? 'Statistically significant surge (>3 sigma) over rolling baseline.' : 'Normal variation within expected statistical bounds.',
+            'limitations' => $limitations,
             'detected_at' => now(),
         ]);
     }
@@ -122,6 +155,12 @@ class AnomalyDetectionService
         $isInsufficient = $totalClaimsCount < self::MIN_SAMPLE_THRESHOLD;
         $deviation = $isInsufficient ? 0.0 : round($ratio - $expectedRatio, 2);
 
+        $recentDuplicate = AnomalyObservation::where('subject_type', 'topic')
+            ->where('subject_name', $topicName)
+            ->where('indicator_name', 'contradiction_frequency')
+            ->where('detected_at', '>=', now()->subHours(12))
+            ->first();
+
         return AnomalyObservation::create([
             'signal_id' => $signal?->id,
             'subject_type' => 'topic',
@@ -132,6 +171,8 @@ class AnomalyDetectionService
             'observed_value' => (float) $ratio,
             'expected_value' => (float) $expectedRatio,
             'deviation_score' => (float) $deviation,
+            'coverage_vs_reality_type' => 'contested_reporting_anomaly',
+            'is_suppressed' => $recentDuplicate !== null,
             'detection_method' => 'ratio_surge',
             'data_sufficiency' => $isInsufficient ? 'insufficient' : 'sufficient',
             'sample_count' => $totalClaimsCount,

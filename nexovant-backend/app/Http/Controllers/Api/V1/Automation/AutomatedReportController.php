@@ -63,9 +63,21 @@ class AutomatedReportController
      */
     public function show(Request $request, string $slugOrId): JsonResponse
     {
+        $user = $request->user();
+        $tenantId = null;
+
+        if ($user) {
+            $membership = OrganizationMember::where('user_id', $user->id)->first();
+            $tenantId = $membership?->organization_id ?? $user->organization_id;
+        }
+
         $report = AutomatedIntelligenceReport::where('id', $slugOrId)
             ->orWhere('slug', $slugOrId)
             ->firstOrFail();
+
+        if ($report->organization_id !== null && $report->organization_id !== $tenantId) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access to organization report.'], 403);
+        }
 
         return response()->json([
             'success' => true,
@@ -116,7 +128,20 @@ class AutomatedReportController
      */
     public function export(Request $request, string $id): Response
     {
+        $user = $request->user();
+        $tenantId = null;
+
+        if ($user) {
+            $membership = OrganizationMember::where('user_id', $user->id)->first();
+            $tenantId = $membership?->organization_id ?? $user->organization_id;
+        }
+
         $report = AutomatedIntelligenceReport::findOrFail($id);
+
+        if ($report->organization_id !== null && $report->organization_id !== $tenantId) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access to organization report.'], 403);
+        }
+
         $format = $request->input('format', 'markdown');
 
         if ($format === 'json') {

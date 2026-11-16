@@ -25,10 +25,12 @@ import {
   X,
   FileCheck,
   Activity,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Server,
+  Clock
 } from 'lucide-vue-next'
 
-const activeTab = ref<'pipeline' | 'rules' | 'anomalies' | 'reviews'>('pipeline')
+const activeTab = ref<'pipeline' | 'rules' | 'anomalies' | 'reviews' | 'telemetry'>('pipeline')
 
 // 1. Pipeline Jobs State
 const jobs = ref<any[]>([])
@@ -192,11 +194,30 @@ const handleSubmitReview = async () => {
   }
 }
 
+// 5. Scheduler & Queue Telemetry State
+const telemetryData = ref<any | null>(null)
+const isLoadingTelemetry = ref(false)
+
+const fetchTelemetry = async () => {
+  isLoadingTelemetry.value = true
+  try {
+    const res = await automationService.getTelemetry()
+    if (res.success) {
+      telemetryData.value = res.data
+    }
+  } catch (err: any) {
+    console.error('Failed to load telemetry', err)
+  } finally {
+    isLoadingTelemetry.value = false
+  }
+}
+
 onMounted(() => {
   fetchJobs()
   fetchRules()
   fetchAnomalies()
   fetchReviews()
+  fetchTelemetry()
 })
 </script>
 
@@ -265,6 +286,14 @@ onMounted(() => {
         >
           <FileCheck class="w-4 h-4" />
           Analyst Review Queue ({{ reviews.length }})
+        </button>
+        <button
+          @click="activeTab = 'telemetry'"
+          class="pb-3 border-b-2 transition-colors flex items-center gap-2"
+          :class="activeTab === 'telemetry' ? 'border-indigo-600 text-indigo-600 font-semibold' : 'border-transparent text-nexo-text-secondary hover:text-nexo-text-primary'"
+        >
+          <Server class="w-4 h-4" />
+          Scheduler & Queue Telemetry
         </button>
       </div>
 
@@ -462,7 +491,7 @@ onMounted(() => {
       </div>
 
       <!-- TAB 4: ANALYST REVIEW QUEUE -->
-      <div v-else class="space-y-4">
+      <div v-else-if="activeTab === 'reviews'" class="space-y-4">
         <div class="flex items-center justify-between">
           <div class="text-xs text-slate-500 font-mono">
             Human-in-the-loop analyst feedback queue for verifying alerts and tuning detection thresholds.
@@ -498,6 +527,160 @@ onMounted(() => {
             <Button variant="primary" size="xs" @click="openReviewModal(item)">
               Review Signal
             </Button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: SCHEDULER & QUEUE TELEMETRY -->
+      <div v-if="activeTab === 'telemetry'" class="space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="font-serif font-bold text-base text-nexo-text-primary">
+              Surveillance Scheduler & Queue Reliability Engine
+            </h3>
+            <p class="text-xs text-nexo-text-secondary mt-0.5">
+              Live telemetry tracking automated command schedules, lock status, worker latencies, and execution logs.
+            </p>
+          </div>
+          <Button variant="secondary" size="xs" @click="fetchTelemetry" :disabled="isLoadingTelemetry">
+            <RefreshCw class="w-3.5 h-3.5 mr-1" :class="{ 'animate-spin': isLoadingTelemetry }" /> Refresh Telemetry
+          </Button>
+        </div>
+
+        <!-- Telemetry KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Card 1: Scheduler Heartbeat -->
+          <div class="p-4 bg-white border border-nexo-border rounded-lg shadow-xs space-y-2">
+            <div class="flex items-center justify-between text-xs font-mono uppercase text-slate-500">
+              <span>Scheduler Heartbeat</span>
+              <span
+                class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                :class="telemetryData?.heartbeat?.status === 'healthy' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'"
+              >
+                {{ telemetryData?.heartbeat?.status || 'HEALTHY' }}
+              </span>
+            </div>
+            <div class="text-xs text-slate-700 space-y-1">
+              <div class="flex justify-between">
+                <span class="text-slate-500">intelligence:evaluate-monitors:</span>
+                <span class="font-mono font-medium">{{ telemetryData?.heartbeat?.last_monitor_eval_at ? new Date(telemetryData.heartbeat.last_monitor_eval_at).toLocaleTimeString() : 'Active' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-500">discovery:evaluate-saved-searches:</span>
+                <span class="font-mono font-medium">{{ telemetryData?.heartbeat?.last_saved_search_eval_at ? new Date(telemetryData.heartbeat.last_saved_search_eval_at).toLocaleTimeString() : 'Active' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-500">Overlapping Protection:</span>
+                <span class="font-mono font-medium text-emerald-700">withoutOverlapping(30)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Queue Health -->
+          <div class="p-4 bg-white border border-nexo-border rounded-lg shadow-xs space-y-2">
+            <div class="flex items-center justify-between text-xs font-mono uppercase text-slate-500">
+              <span>Queue & Workers</span>
+              <span
+                class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                :class="telemetryData?.queue?.status === 'healthy' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'"
+              >
+                {{ telemetryData?.queue?.status || 'HEALTHY' }}
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <div class="bg-slate-50 p-2 rounded text-center">
+                <div class="text-lg font-bold text-slate-800">{{ telemetryData?.queue?.pending_jobs ?? 0 }}</div>
+                <div class="text-[10px] font-mono text-slate-500 uppercase">Pending Jobs</div>
+              </div>
+              <div class="bg-slate-50 p-2 rounded text-center">
+                <div class="text-lg font-bold" :class="(telemetryData?.queue?.failed_jobs ?? 0) > 0 ? 'text-rose-600' : 'text-slate-800'">
+                  {{ telemetryData?.queue?.failed_jobs ?? 0 }}
+                </div>
+                <div class="text-[10px] font-mono text-slate-500 uppercase">Failed Jobs</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Execution Velocity -->
+          <div class="p-4 bg-white border border-nexo-border rounded-lg shadow-xs space-y-2">
+            <div class="flex items-center justify-between text-xs font-mono uppercase text-slate-500">
+              <span>Execution Velocity (24h)</span>
+              <Clock class="w-3.5 h-3.5 text-slate-400" />
+            </div>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <div class="bg-slate-50 p-2 rounded text-center">
+                <div class="text-lg font-bold text-slate-800">{{ telemetryData?.queue?.executions_24h ?? 0 }}</div>
+                <div class="text-[10px] font-mono text-slate-500 uppercase">Total Runs</div>
+              </div>
+              <div class="bg-slate-50 p-2 rounded text-center">
+                <div class="text-lg font-bold text-indigo-700">{{ telemetryData?.queue?.avg_duration_ms ?? 0 }}ms</div>
+                <div class="text-[10px] font-mono text-slate-500 uppercase">Avg Duration</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Execution History Table -->
+        <div class="bg-white border border-nexo-border rounded-lg shadow-xs overflow-hidden">
+          <div class="px-4 py-3 border-b border-nexo-border bg-slate-50/50 flex items-center justify-between">
+            <h4 class="text-xs font-mono font-bold uppercase tracking-wider text-slate-700">
+              Recent Automated Execution Logs ({{ telemetryData?.recent_executions?.length || 0 }})
+            </h4>
+            <span class="text-[11px] text-slate-500">Logged to automation_execution_logs</span>
+          </div>
+
+          <div v-if="!telemetryData?.recent_executions || telemetryData.recent_executions.length === 0" class="p-8 text-center text-xs text-slate-500">
+            No execution logs recorded yet. Run scheduled commands to view history.
+          </div>
+
+          <div v-else class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 border-b border-nexo-border font-mono text-[10px] uppercase text-slate-500">
+                <tr>
+                  <th class="p-3">Command</th>
+                  <th class="p-3">Cadence</th>
+                  <th class="p-3">Status</th>
+                  <th class="p-3">Started</th>
+                  <th class="p-3">Duration</th>
+                  <th class="p-3">Processed</th>
+                  <th class="p-3">Host</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-nexo-border/60">
+                <tr
+                  v-for="log in telemetryData.recent_executions"
+                  :key="log.id"
+                  class="hover:bg-slate-50/50 transition-colors"
+                >
+                  <td class="p-3 font-mono font-medium text-slate-800">{{ log.command_name }}</td>
+                  <td class="p-3 font-mono text-slate-500">{{ log.frequency }}</td>
+                  <td class="p-3">
+                    <span
+                      class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold"
+                      :class="{
+                        'bg-emerald-100 text-emerald-800': log.status === 'success',
+                        'bg-rose-100 text-rose-800': log.status === 'failed',
+                        'bg-blue-100 text-blue-800': log.status === 'running'
+                      }"
+                    >
+                      {{ log.status }}
+                    </span>
+                  </td>
+                  <td class="p-3 text-slate-600 font-mono text-[11px]">
+                    {{ new Date(log.started_at).toLocaleTimeString() }}
+                  </td>
+                  <td class="p-3 font-mono text-slate-600">
+                    {{ log.duration_ms !== null ? `${log.duration_ms}ms` : '—' }}
+                  </td>
+                  <td class="p-3 font-mono text-slate-800">
+                    {{ log.processed_count }} items
+                  </td>
+                  <td class="p-3 font-mono text-slate-500 text-[11px]">
+                    {{ log.hostname || 'worker-node' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
