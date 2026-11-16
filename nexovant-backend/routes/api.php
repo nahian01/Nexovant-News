@@ -49,6 +49,12 @@ use App\Http\Controllers\Api\V1\SourceComparisonController;
 use App\Http\Controllers\Api\V1\Subscriber\SavedSearchController;
 use App\Http\Controllers\Api\V1\Subscriber\ResearchBriefController;
 use App\Http\Controllers\Api\V1\Admin\SearchAnalyticsAdminController;
+use App\Http\Controllers\Api\V1\Automation\SignalController;
+use App\Http\Controllers\Api\V1\Automation\EarlyWarningController;
+use App\Http\Controllers\Api\V1\Automation\TrendForecastController;
+use App\Http\Controllers\Api\V1\Automation\AutomatedReportController;
+use App\Http\Controllers\Api\V1\Admin\AnalystReviewAdminController;
+use App\Http\Controllers\Api\V1\Admin\IntelligenceAutomationAdminController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -117,6 +123,24 @@ Route::prefix('intelligence')->group(function () {
     Route::get('/timeline', [PublicIntelligenceController::class, 'listTimeline'])->name('api.public.intelligence.timeline');
     Route::get('/reports', [PublicIntelligenceController::class, 'listReports'])->name('api.public.intelligence.reports');
     Route::get('/reports/{slug}', [PublicIntelligenceController::class, 'showReport'])->name('api.public.intelligence.report');
+});
+
+// Stage 13: Intelligence Automation, Predictive Monitoring & Early Warnings
+Route::prefix('automation')->group(function () {
+    Route::get('/signals', [SignalController::class, 'index'])->name('api.automation.signals.index');
+    Route::get('/signals/{slugOrId}', [SignalController::class, 'show'])->name('api.automation.signals.show');
+    Route::get('/early-warnings', [EarlyWarningController::class, 'index'])->name('api.automation.early-warnings.index');
+    Route::get('/early-warnings/{slugOrId}', [EarlyWarningController::class, 'show'])->name('api.automation.early-warnings.show');
+    Route::match(['patch', 'post'], '/early-warnings/{id}/status', [EarlyWarningController::class, 'updateStatus'])->middleware('auth:sanctum')->name('api.automation.early-warnings.status');
+    Route::get('/forecasts', [TrendForecastController::class, 'index'])->name('api.automation.forecasts.index');
+    Route::get('/forecasts/{id}', [TrendForecastController::class, 'show'])->name('api.automation.forecasts.show');
+    Route::post('/forecasts', [TrendForecastController::class, 'generate'])->middleware('auth:sanctum')->name('api.automation.forecasts.create');
+    Route::post('/forecasts/generate', [TrendForecastController::class, 'generate'])->middleware('auth:sanctum')->name('api.automation.forecasts.generate');
+    Route::get('/reports', [AutomatedReportController::class, 'index'])->name('api.automation.reports.index');
+    Route::get('/reports/{slugOrId}', [AutomatedReportController::class, 'show'])->name('api.automation.reports.show');
+    Route::post('/reports', [AutomatedReportController::class, 'generate'])->middleware('auth:sanctum')->name('api.automation.reports.create');
+    Route::post('/reports/generate', [AutomatedReportController::class, 'generate'])->middleware('auth:sanctum')->name('api.automation.reports.generate');
+    Route::get('/reports/{id}/export', [AutomatedReportController::class, 'export'])->name('api.automation.reports.export');
 });
 
 // Authentication Routes
@@ -301,6 +325,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/research-briefs/generate', [ResearchBriefController::class, 'generate'])->name('api.workspace.research-briefs.generate');
         Route::get('/research-briefs/{id}', [ResearchBriefController::class, 'show'])->name('api.workspace.research-briefs.show');
         Route::get('/research-briefs/{id}/export', [ResearchBriefController::class, 'export'])->name('api.workspace.research-briefs.export');
+
+        // Stage 13 Early Warning Status Updates
+        Route::post('/early-warnings/{id}/status', [EarlyWarningController::class, 'updateStatus'])->name('api.workspace.early-warnings.status');
     });
 
     // Administrative Console Endpoints (Guarded by admin middleware)
@@ -572,6 +599,22 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/logs', [SearchAnalyticsAdminController::class, 'logs'])->name('api.admin.search-analytics.logs');
             Route::get('/unanswered', [SearchAnalyticsAdminController::class, 'unanswered'])->name('api.admin.search-analytics.unanswered');
             Route::get('/feedback', [SearchAnalyticsAdminController::class, 'feedback'])->name('api.admin.search-analytics.feedback');
+        });
+
+        // 17. Intelligence Automation & Early Warning Administration (Stage 13)
+        Route::prefix('automation-control')->group(function () {
+            Route::get('/overview', [IntelligenceAutomationAdminController::class, 'overview'])->name('api.admin.automation-control.overview');
+            Route::get('/rules', [IntelligenceAutomationAdminController::class, 'rules'])->name('api.admin.automation-control.rules');
+            Route::post('/rules', [IntelligenceAutomationAdminController::class, 'storeRule'])->name('api.admin.automation-control.rules.store');
+            Route::match(['put', 'patch'], '/rules/{id}', [IntelligenceAutomationAdminController::class, 'updateRule'])->name('api.admin.automation-control.rules.update');
+            Route::post('/rules/{id}/toggle', [IntelligenceAutomationAdminController::class, 'toggleRule'])->name('api.admin.automation-control.rules.toggle');
+            Route::post('/trigger-scan', [IntelligenceAutomationAdminController::class, 'triggerScan'])->name('api.admin.automation-control.trigger-scan');
+            Route::post('/scan', [IntelligenceAutomationAdminController::class, 'triggerScan']);
+            Route::get('/anomalies', [IntelligenceAutomationAdminController::class, 'overview']);
+            Route::get('/reviews', [AnalystReviewAdminController::class, 'index'])->name('api.admin.automation-control.reviews.index');
+            Route::post('/reviews/{signalId}', [AnalystReviewAdminController::class, 'submitReview'])->name('api.admin.automation-control.reviews.submit');
+            Route::post('/reviews', [AnalystReviewAdminController::class, 'submitReview']);
+            Route::get('/reviews/stats', [AnalystReviewAdminController::class, 'stats'])->name('api.admin.automation-control.reviews.stats');
         });
     });
 });

@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 interface Props {
   variant?: 'primary' | 'secondary' | 'gold' | 'outline' | 'ghost' | 'danger'
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   disabled?: boolean
   loading?: boolean
   type?: 'button' | 'submit' | 'reset'
@@ -50,6 +50,8 @@ const variantClasses = computed(() => {
 
 const sizeClasses = computed(() => {
   switch (props.size) {
+    case 'xs':
+      return 'px-2 py-0.5 text-[11px]'
     case 'sm':
       return 'px-3 py-1.5 text-xs'
     case 'lg':
