@@ -497,6 +497,15 @@ watch(
                 <span>{{ item.verification_status.replace('_', ' ') }}</span>
               </span>
 
+              <!-- Machine Translation Label (Stage 14.1 Requirement 7 & 16) -->
+              <span
+                v-if="item.original_language && item.original_language !== 'en'"
+                class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center gap-1"
+                title="Machine translated from original source text"
+              >
+                <span>Translated ({{ item.original_language.toUpperCase() }} &rarr; EN)</span>
+              </span>
+
               <span v-if="item.source" class="text-[11px] text-neutral-400">
                 {{ item.source.name }}
                 <span v-if="item.source.credibility_score" class="text-primary-400 font-mono">

@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Article extends Model
 {
@@ -69,10 +70,14 @@ class Article extends Model
     protected static function booted(): void
     {
         static::creating(function (Article $article): void {
-            if (empty($article->content_raw) && !empty($article->content)) {
-                $article->content_raw = $article->content;
+            if (empty($article->slug)) {
+                $baseSlug = Str::slug($article->title ?? '');
+                $article->slug = ($baseSlug !== '' ? $baseSlug : 'art') . '-' . Str::random(8);
             }
-            if (empty($article->content_normalized) && !empty($article->content_raw)) {
+            if (empty($article->content_raw)) {
+                $article->content_raw = !empty($article->content) ? $article->content : ($article->summary ?: ($article->title ?? ''));
+            }
+            if (empty($article->content_normalized)) {
                 $article->content_normalized = $article->content_raw;
             }
             if (empty($article->content_hash)) {
@@ -80,6 +85,9 @@ class Article extends Model
             }
             if (empty($article->canonical_url)) {
                 $article->canonical_url = 'https://news.nexovant.test/articles/' . ($article->slug ?: Str::random(8));
+            }
+            if (empty($article->published_at)) {
+                $article->published_at = now();
             }
         });
     }

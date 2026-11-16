@@ -78,7 +78,7 @@ class UnifiedSearchService
 
         // 2. Multi-Entity Retrieval based on Content Type
         if ($contentType === 'all' || $contentType === 'article') {
-            $items = array_merge($items, $this->searchArticles($queryText, $filters, $queryDto->sortBy, $semanticChunkIds));
+            $items = array_merge($items, $this->searchArticles($queryText, $filters, $queryDto->sortBy, $semanticChunkIds, $tenantId));
         }
 
         if ($contentType === 'all' || $contentType === 'story') {
@@ -102,7 +102,7 @@ class UnifiedSearchService
         }
 
         if ($contentType === 'all' || $contentType === 'source') {
-            $items = array_merge($items, $this->searchSources($queryText, $filters));
+            $items = array_merge($items, $this->searchSources($queryText, $filters, $tenantId));
         }
 
         if ($contentType === 'all' || $contentType === 'collection') {
@@ -169,9 +169,22 @@ class UnifiedSearchService
      *
      * @return array<int, SearchResultItemDTO>
      */
-    protected function searchArticles(string $query, array $filters, string $sortBy, array $semanticChunkIds): array
+    protected function searchArticles(string $query, array $filters, string $sortBy, array $semanticChunkIds, ?string $tenantId = null): array
     {
         $qb = Article::query()->with(['source', 'categories', 'companies', 'translations']);
+
+        // Multi-tenant boundary: only return articles from public sources OR the requesting tenant's private sources
+        $qb->where(function (Builder $aq) use ($tenantId) {
+            $aq->whereDoesntHave('source')
+               ->orWhereHas('source', function (Builder $sq) use ($tenantId) {
+                   if ($tenantId) {
+                       $sq->whereNull('organization_id')
+                          ->orWhere('organization_id', $tenantId);
+                   } else {
+                       $sq->whereNull('organization_id');
+                   }
+               });
+        });
 
         // Apply filters
         $this->filterService->applyDateFilter($qb, $filters, 'published_at');
@@ -524,10 +537,18 @@ class UnifiedSearchService
      *
      * @return array<int, SearchResultItemDTO>
      */
-    protected function searchSources(string $query, array $filters): array
+    protected function searchSources(string $query, array $filters, ?string $tenantId = null): array
     {
         $qb = NewsSource::query()
             ->where('is_active', true)
+            ->where(function (Builder $sq) use ($tenantId) {
+                if ($tenantId) {
+                    $sq->whereNull('organization_id')
+                       ->orWhere('organization_id', $tenantId);
+                } else {
+                    $sq->whereNull('organization_id');
+                }
+            })
             ->where(function (Builder $q) use ($query) {
                 $q->where('name', 'like', "%{$query}%")
                   ->orWhere('publisher_name', 'like', "%{$query}%")

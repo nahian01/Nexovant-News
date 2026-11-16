@@ -129,11 +129,13 @@ const fetchHealthOverview = async () => {
   }
 }
 
+const selectedCoverageWindow = ref<'all_time' | '90d' | '30d' | '7d' | '24h'>('all_time')
+
 const fetchCoverage = async () => {
   try {
     const [cov, gaps] = await Promise.all([
-      adminService.getCoverageAnalytics(),
-      adminService.getCoverageGaps(),
+      adminService.getCoverageAnalytics(selectedCoverageWindow.value),
+      adminService.getCoverageGaps(selectedCoverageWindow.value),
     ])
     coverageData.value = cov
     coverageGaps.value = gaps
@@ -704,8 +706,28 @@ onMounted(() => {
 
       <!-- TAB 4: COVERAGE & GAPS -->
       <div v-if="activeTab === 'coverage'" class="space-y-6">
+        <!-- Freshness Window Controls -->
+        <div class="flex items-center justify-between p-3 bg-white border border-nexo-border rounded-lg text-xs font-mono">
+          <div class="flex items-center gap-2 text-nexo-text-primary">
+            <Activity class="h-4 w-4 text-emerald-600" />
+            <span class="font-bold">Freshness Measurement Window:</span>
+            <span class="text-nexo-text-muted">Calculates active source validity and recent ingestion evidence</span>
+          </div>
+          <select
+            v-model="selectedCoverageWindow"
+            @change="fetchCoverage"
+            class="border border-nexo-border rounded px-2.5 py-1 text-xs font-mono bg-slate-50 focus:outline-none focus:border-nexo-accent-gold"
+          >
+            <option value="all_time">All Time (Historical)</option>
+            <option value="90d">Last 90 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="24h">Last 24 Hours</option>
+          </select>
+        </div>
+
         <!-- Coverage Metrics -->
-        <div v-if="coverageData" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div v-if="coverageData" class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card class="p-4">
             <div class="text-[10px] font-mono uppercase text-nexo-text-muted">Continents Represented</div>
             <div class="editorial-title text-2xl font-bold text-nexo-text-primary mt-1">
@@ -715,19 +737,27 @@ onMounted(() => {
           </Card>
 
           <Card class="p-4">
-            <div class="text-[10px] font-mono uppercase text-nexo-text-muted">Countries Covered</div>
+            <div class="text-[10px] font-mono uppercase text-nexo-text-muted">Countries (Sources / Events)</div>
             <div class="editorial-title text-2xl font-bold text-emerald-700 mt-1">
-              {{ coverageData.total_countries_covered }}
+              {{ coverageData.total_countries_covered }} / {{ coverageData.metrics?.countries_represented_by_events || coverageData.global_summary?.countries_represented_by_events || 0 }}
             </div>
-            <div class="text-[10px] text-nexo-text-muted mt-1">Active sovereign jurisdictions</div>
+            <div class="text-[10px] text-nexo-text-muted mt-1">Publisher jurisdiction vs event location</div>
           </Card>
 
           <Card class="p-4">
-            <div class="text-[10px] font-mono uppercase text-nexo-text-muted">Total Indexed Articles</div>
-            <div class="editorial-title text-2xl font-bold text-nexo-accent-gold mt-1">
-              {{ coverageData.global_summary.total_articles }}
+            <div class="text-[10px] font-mono uppercase text-nexo-text-muted">Active Ingested Feeds</div>
+            <div class="editorial-title text-2xl font-bold text-nexo-accent-cyan mt-1">
+              {{ coverageData.metrics?.sources_with_recent_ingestion ?? coverageData.global_summary?.sources_with_recent_ingestion ?? coverageData.global_summary?.active_sources }}
             </div>
-            <div class="text-[10px] text-nexo-text-muted mt-1">Across all regions and languages</div>
+            <div class="text-[10px] text-nexo-text-muted mt-1">Verified ingestion in selected window</div>
+          </Card>
+
+          <Card class="p-4">
+            <div class="text-[10px] font-mono uppercase text-nexo-text-muted">Independent Publishers</div>
+            <div class="editorial-title text-2xl font-bold text-nexo-accent-gold mt-1">
+              {{ coverageData.metrics?.independent_reporting_organizations || coverageData.total_countries_covered }}
+            </div>
+            <div class="text-[10px] text-nexo-text-muted mt-1">Unique parent reporting domains</div>
           </Card>
         </div>
 
@@ -746,21 +776,36 @@ onMounted(() => {
               class="p-4 bg-white border border-nexo-border rounded-lg space-y-2 text-xs"
             >
               <div class="flex items-center justify-between">
-                <span
-                  :class="[
-                    'px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase',
-                    gap.severity === 'critical' ? 'bg-red-100 text-red-800' :
-                    gap.severity === 'high' ? 'bg-amber-100 text-amber-800' :
-                    'bg-blue-100 text-blue-800'
-                  ]"
-                >
-                  {{ gap.severity }} Severity
-                </span>
+                <div class="flex items-center gap-1.5">
+                  <span
+                    :class="[
+                      'px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase',
+                      gap.severity === 'critical' ? 'bg-red-100 text-red-800' :
+                      gap.severity === 'high' ? 'bg-amber-100 text-amber-800' :
+                      'bg-blue-100 text-blue-800'
+                    ]"
+                  >
+                    {{ gap.severity }}
+                  </span>
+                  <span
+                    v-if="gap.root_cause"
+                    :class="[
+                      'px-2 py-0.5 rounded text-[10px] font-mono font-bold',
+                      gap.root_cause === 'ingestion_failure' ? 'bg-rose-100 text-rose-800' : 'bg-purple-100 text-purple-800'
+                    ]"
+                  >
+                    {{ gap.root_cause === 'ingestion_failure' ? 'Ingestion Failure' : 'Missing Sources' }}
+                  </span>
+                </div>
                 <span class="text-[10px] font-mono text-nexo-text-muted">{{ gap.category }}</span>
               </div>
 
               <div class="font-bold text-nexo-text-primary text-sm">{{ gap.title }}</div>
               <div class="text-nexo-text-secondary text-xs">{{ gap.description }}</div>
+
+              <div v-if="gap.calculation_method" class="text-[10px] font-mono text-slate-500 bg-slate-50 p-1.5 rounded">
+                Methodology: {{ gap.calculation_method }}
+              </div>
 
               <div class="pt-2 border-t border-nexo-border text-[11px] text-emerald-800 font-mono flex items-start gap-1.5">
                 <Compass class="h-3.5 w-3.5 mt-0.5 shrink-0 text-emerald-700" />
@@ -1036,11 +1081,28 @@ onMounted(() => {
       <!-- MODAL: RELIABILITY PROFILE -->
       <Modal :is-open="isReliabilityModalOpen" :title="`Reliability Profile: ${activeSource?.name}`" max-width="md" @close="isReliabilityModalOpen = false">
         <div v-if="activeSource?.reliability_profile" class="space-y-4 text-xs text-left">
+          <!-- Insufficient Evidence / Uncertainty Disclosure -->
+          <div
+            v-if="activeSource.reliability_profile.has_sufficient_evidence === false"
+            class="p-3 bg-amber-50 border border-amber-300 rounded text-amber-900 space-y-1 text-xs"
+          >
+            <div class="flex items-center gap-1.5 font-bold uppercase text-[10px] tracking-wider text-amber-800">
+              <AlertTriangle class="h-3.5 w-3.5 text-amber-600" />
+              <span>Provisional Assessment — Insufficient Evidence</span>
+            </div>
+            <div class="text-[11px]">
+              Evaluated sample size is <strong>{{ activeSource.reliability_profile.sample_size }}</strong> publications (minimum calibration threshold: {{ activeSource.reliability_profile.min_sample_size }}).
+            </div>
+            <div class="text-[10px] text-amber-700 italic">
+              {{ activeSource.reliability_profile.uncertainty_indicator }}
+            </div>
+          </div>
+
           <div class="grid grid-cols-2 gap-3">
             <div class="p-3 bg-slate-50 border border-slate-200 rounded">
-              <div class="text-[10px] font-mono uppercase text-nexo-text-muted">Overall Score</div>
-              <div class="text-xl font-bold text-nexo-accent-gold mt-0.5">
-                {{ activeSource.reliability_profile.overall_score }}%
+              <div class="text-[10px] font-mono uppercase text-nexo-text-muted">Calculated Status / Tier</div>
+              <div class="text-lg font-bold text-nexo-accent-gold mt-0.5">
+                {{ activeSource.reliability_profile.has_sufficient_evidence ? `${activeSource.reliability_profile.overall_score}%` : 'Unrated (Provisional)' }}
               </div>
               <div class="text-[10px] font-mono text-emerald-800 font-bold mt-0.5">
                 {{ activeSource.reliability_profile.tier }}
@@ -1048,11 +1110,13 @@ onMounted(() => {
             </div>
 
             <div class="p-3 bg-slate-50 border border-slate-200 rounded">
-              <div class="text-[10px] font-mono uppercase text-nexo-text-muted">Primary Source Ratio</div>
-              <div class="text-xl font-bold text-nexo-text-primary mt-0.5">
-                {{ Math.round((activeSource.reliability_profile.primary_source_ratio || 0.6) * 100) }}%
+              <div class="text-[10px] font-mono uppercase text-nexo-text-muted">Sample Size & Window</div>
+              <div class="text-lg font-bold text-nexo-text-primary mt-0.5">
+                {{ activeSource.reliability_profile.sample_size }} articles
               </div>
-              <div class="text-[10px] text-nexo-text-muted mt-0.5">Original reporting / disclosures</div>
+              <div class="text-[10px] text-nexo-text-muted mt-0.5">
+                Period: {{ activeSource.reliability_profile.evaluation_period || 'last_90_days' }}
+              </div>
             </div>
           </div>
 
@@ -1062,6 +1126,10 @@ onMounted(() => {
               <span class="font-bold text-emerald-700">{{ activeSource.reliability_profile.factual_accuracy_score }}%</span>
             </div>
             <div class="flex justify-between py-1 border-b border-nexo-border">
+              <span>Primary Source Ratio:</span>
+              <span class="font-bold text-nexo-text-primary">{{ Math.round((activeSource.reliability_profile.primary_source_ratio || 0.6) * 100) }}%</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-nexo-border">
               <span>Transparency & Attribution:</span>
               <span class="font-bold text-nexo-text-primary">{{ activeSource.reliability_profile.transparency_score }}%</span>
             </div>
@@ -1069,10 +1137,20 @@ onMounted(() => {
               <span>Peer Corroboration Rate:</span>
               <span class="font-bold text-nexo-accent-cyan">{{ activeSource.reliability_profile.corroboration_rate }}%</span>
             </div>
+            <div class="flex justify-between py-1 border-b border-nexo-border">
+              <span>Verified Claims / Disputed:</span>
+              <span class="font-bold text-nexo-text-primary">
+                {{ activeSource.reliability_profile.verified_claims_count || 0 }} / {{ activeSource.reliability_profile.disputed_claims_count || 0 }}
+              </span>
+            </div>
             <div class="flex justify-between py-1">
               <span>Corrections Issued:</span>
               <span class="font-bold text-amber-700">{{ activeSource.reliability_profile.corrections_count || 0 }}</span>
             </div>
+          </div>
+
+          <div class="p-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono text-slate-600">
+            <span class="font-bold text-slate-700">Methodology:</span> {{ activeSource.reliability_profile.scoring_methodology || 'Evidence-weighted Bayesian credibility' }}
           </div>
 
           <div class="text-[10px] text-nexo-text-muted">

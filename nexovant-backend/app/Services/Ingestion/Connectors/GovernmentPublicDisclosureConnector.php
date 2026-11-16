@@ -77,7 +77,12 @@ class GovernmentPublicDisclosureConnector implements SourceConnectorInterface
         $targetUrl = $source->api_endpoint ?: $source->feed_url ?: $source->url;
 
         // Route between XML (RSS/Atom) and JSON disclosure formats
-        if (str_contains(strtolower($targetUrl), '.json') || $source->auth_type !== 'none') {
+        $isFeed = (!empty($source->feed_url) && empty($source->api_endpoint))
+            || str_ends_with(strtolower($targetUrl), '.xml')
+            || str_contains(strtolower($targetUrl), '/rss')
+            || str_contains(strtolower($targetUrl), '/feed');
+
+        if (!$isFeed && (!empty($source->api_endpoint) || str_contains(strtolower($targetUrl), '.json') || (!empty($source->auth_type) && $source->auth_type !== 'none'))) {
             $res = $this->restApiConnector->fetch($source, $options);
         } else {
             $res = $this->feedCollector->fetchSourceFeed($source);
@@ -92,7 +97,7 @@ class GovernmentPublicDisclosureConnector implements SourceConnectorInterface
             $meta['attribution_notice'] = $source->attribution_requirements ?: "Official public disclosure via {$source->publisher_name}";
 
             // Extract potential docket / gazette numbers
-            if (preg_match('/(?:docket|file|gazette|case|release)\s*no\.?\s*:?\s*([a-z0-9\-\/]+)/i', $item->title . ' ' . ($item->summary ?? ''), $matches)) {
+            if (preg_match('/(?:[A-Za-z0-9\-_]+\s+)?(?:docket|file|gazette|case|release|circular|notice)\s*no\.?\s*:?\s*([a-z0-9\-\/]+)/i', $item->title . ' ' . ($item->summary ?? ''), $matches)) {
                 $meta['legal_citation'] = trim($matches[0]);
                 $meta['docket_number'] = trim($matches[1]);
             } else {

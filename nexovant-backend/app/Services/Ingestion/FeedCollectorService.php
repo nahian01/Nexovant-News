@@ -351,11 +351,49 @@ class FeedCollectorService
             throw new Exception("Prohibited URL scheme '{$scheme}'. Only HTTP and HTTPS are permitted.");
         }
 
+        // Reject non-standard ports to protect internal services (SSH, SMTP, DB, Redis)
+        if (isset($parts['port'])) {
+            $allowedPorts = [80, 443, 8080, 8443];
+            if (!in_array((int) $parts['port'], $allowedPorts, true)) {
+                throw new Exception("SSRF Protection: Port '{$parts['port']}' is not permitted. Only standard web ports (80, 443, 8080, 8443) are allowed.");
+            }
+        }
+
         $host = strtolower($parts['host']);
 
-        // Block localhost and numeric loopback names
+        // Block localhost and internal domain suffixes
         if ($host === 'localhost' || str_ends_with($host, '.localhost') || str_ends_with($host, '.local') || str_ends_with($host, '.internal')) {
             throw new Exception("SSRF Protection: Access to local/internal hostnames ('{$host}') is forbidden.");
+        }
+
+        // Detect decimal integer representation of IP (e.g., 2130706433 for 127.0.0.1)
+        if (preg_match('/^\d+$/', $host)) {
+            $longVal = (float) $host;
+            if ($longVal >= 0 && $longVal <= 4294967295) {
+                $convertedIp = long2ip((int) $longVal);
+                $this->validateIpAddress($convertedIp);
+                return;
+            }
+        }
+
+        // Detect hex representation of IP (e.g., 0x7f000001)
+        if (preg_match('/^0x[0-9a-f]+$/i', $host)) {
+            $hexVal = hexdec($host);
+            if ($hexVal >= 0 && $hexVal <= 4294967295) {
+                $convertedIp = long2ip((int) $hexVal);
+                $this->validateIpAddress($convertedIp);
+                return;
+            }
+        }
+
+        // Detect octal representation of IP (e.g., 0177.0.0.1)
+        if (preg_match('/^[0-9]+(?:\.[0-9]+){3}$/', $host)) {
+            $octets = explode('.', $host);
+            foreach ($octets as $oct) {
+                if (strlen($oct) > 1 && str_starts_with($oct, '0')) {
+                    throw new Exception("SSRF Protection: Octal IP representation '{$host}' rejected.");
+                }
+            }
         }
 
         // If host is a direct IP
@@ -425,6 +463,14 @@ class FeedCollectorService
             $lower = strtolower($ip);
             if ($lower === '::1' || str_starts_with($lower, 'fe80:') || str_starts_with($lower, 'fc') || str_starts_with($lower, 'fd')) {
                 throw new Exception("SSRF Protection: Private/link-local IPv6 '{$ip}' rejected.");
+            }
+            // IPv4-mapped IPv6 (e.g., ::ffff:127.0.0.1)
+            if (str_contains($lower, '::ffff:')) {
+                $mappedIpv4 = substr($lower, strrpos($lower, ':') + 1);
+                if (filter_var($mappedIpv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                    $this->validateIpAddress($mappedIpv4);
+                    return;
+                }
             }
         }
     }

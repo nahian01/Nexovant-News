@@ -33,6 +33,9 @@ export interface SearchResultItem {
   corroboration_count: number
   url: string
   tenant_id?: string
+  original_language?: string
+  detected_language?: string
+  translations?: Array<{ target_language: string; translated_title: string; translated_summary?: string }>
   information_classification: string
 }
 

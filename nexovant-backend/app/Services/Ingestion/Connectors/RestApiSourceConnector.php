@@ -93,7 +93,7 @@ class RestApiSourceConnector implements SourceConnectorInterface
         // Apply Authentication
         $credentials = $source->getDecryptedCredentials();
         if ($credentials) {
-            if ($source->auth_type === 'bearer_token' && !empty($credentials['token'])) {
+            if (in_array($source->auth_type, ['bearer', 'bearer_token'], true) && !empty($credentials['token'])) {
                 $headers['Authorization'] = 'Bearer ' . $credentials['token'];
             } elseif ($source->auth_type === 'api_key' && !empty($credentials['key'])) {
                 $headerName = $credentials['header_name'] ?? 'X-API-Key';
@@ -104,7 +104,7 @@ class RestApiSourceConnector implements SourceConnectorInterface
         $timeout = $source->timeout_seconds ?: 15;
         $http = Http::timeout($timeout)->withHeaders($headers);
 
-        if ($source->auth_type === 'basic_auth' && !empty($credentials['username'])) {
+        if (in_array($source->auth_type, ['basic', 'basic_auth'], true) && !empty($credentials['username'])) {
             $http = $http->withBasicAuth((string) $credentials['username'], (string) ($credentials['password'] ?? ''));
         }
 
@@ -213,13 +213,59 @@ class RestApiSourceConnector implements SourceConnectorInterface
     }
 
     /**
-     * SSRF defense check against private and cloud metadata addresses.
+     * SSRF defense check against private and cloud metadata addresses, unexpected ports, and obfuscated IPs.
      */
     protected function assertSafeFromSSRF(string $url): void
     {
-        $host = parse_url($url, PHP_URL_HOST);
+        $parts = parse_url($url);
+        $host = $parts['host'] ?? null;
         if (!$host) {
             throw new Exception("Invalid host in endpoint URL.");
+        }
+
+        // Validate permitted web ports
+        if (isset($parts['port'])) {
+            $allowedPorts = [80, 443, 8080, 8443];
+            if (!in_array((int) $parts['port'], $allowedPorts, true)) {
+                throw new Exception("SSRF Protection: Port '{$parts['port']}' is not permitted. Only standard web ports (80, 443, 8080, 8443) are allowed.");
+            }
+        }
+
+        $hostLower = strtolower($host);
+
+        // Block localhost and internal domain suffixes
+        if ($hostLower === 'localhost' || str_ends_with($hostLower, '.localhost') || str_ends_with($hostLower, '.local') || str_ends_with($hostLower, '.internal')) {
+            throw new Exception("SSRF Protection: Access to local/internal hostnames ('{$host}') is forbidden.");
+        }
+
+        // Detect decimal integer representation of IP
+        if (preg_match('/^\d+$/', $hostLower)) {
+            $longVal = (float) $hostLower;
+            if ($longVal >= 0 && $longVal <= 4294967295) {
+                $convertedIp = long2ip((int) $longVal);
+                $this->validateIp($convertedIp);
+                return;
+            }
+        }
+
+        // Detect hex representation of IP
+        if (preg_match('/^0x[0-9a-f]+$/i', $hostLower)) {
+            $hexVal = hexdec($hostLower);
+            if ($hexVal >= 0 && $hexVal <= 4294967295) {
+                $convertedIp = long2ip((int) $hexVal);
+                $this->validateIp($convertedIp);
+                return;
+            }
+        }
+
+        // Detect octal representation of IP (e.g., 0177.0.0.1)
+        if (preg_match('/^[0-9]+(?:\.[0-9]+){3}$/', $hostLower)) {
+            $octets = explode('.', $hostLower);
+            foreach ($octets as $oct) {
+                if (strlen($oct) > 1 && str_starts_with($oct, '0')) {
+                    throw new Exception("SSRF Protection: Octal IP representation '{$host}' rejected.");
+                }
+            }
         }
 
         if (app()->environment('testing') && (str_contains($host, 'example.com') || str_contains($host, 'test.com'))) {
@@ -237,13 +283,17 @@ class RestApiSourceConnector implements SourceConnectorInterface
         foreach ($ips as $record) {
             $ip = $record['ip'] ?? $record['ipv6'] ?? null;
             if (!$ip) continue;
+            $this->validateIp($ip);
+        }
+    }
 
-            if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-                throw new Exception("SSRF Protection: Endpoint IP '{$ip}' belongs to a private or reserved network range.");
-            }
-            if (str_starts_with($ip, '127.') || str_starts_with($ip, '169.254.') || $ip === '0.0.0.0') {
-                throw new Exception("SSRF Protection: Prohibited loopback or link-local IP.");
-            }
+    protected function validateIp(string $ip): void
+    {
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            throw new Exception("SSRF Protection: Endpoint IP '{$ip}' belongs to a private or reserved network range.");
+        }
+        if (str_starts_with($ip, '127.') || str_starts_with($ip, '169.254.') || $ip === '0.0.0.0' || $ip === '::1') {
+            throw new Exception("SSRF Protection: Prohibited loopback or link-local IP.");
         }
     }
 }

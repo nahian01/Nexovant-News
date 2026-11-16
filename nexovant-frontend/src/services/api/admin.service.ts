@@ -123,13 +123,13 @@ export const adminService = {
     return res.data
   },
 
-  async getCoverageAnalytics() {
-    const res = await apiClient.get('/admin/sources/coverage-analytics')
+  async getCoverageAnalytics(window: string = 'all_time') {
+    const res = await apiClient.get('/admin/sources/coverage-analytics', { params: { window } })
     return res.data.data
   },
 
-  async getCoverageGaps() {
-    const res = await apiClient.get('/admin/sources/coverage-gaps')
+  async getCoverageGaps(window: string = 'all_time') {
+    const res = await apiClient.get('/admin/sources/coverage-gaps', { params: { window } })
     return res.data.data
   },
 
@@ -138,8 +138,8 @@ export const adminService = {
     return res.data.data
   },
 
-  async getReliabilityProfile(id: string | number) {
-    const res = await apiClient.get(`/admin/sources/${id}/reliability-profile`)
+  async getReliabilityProfile(id: string | number, period: string = 'last_90_days') {
+    const res = await apiClient.get(`/admin/sources/${id}/reliability-profile`, { params: { period } })
     return res.data
   },
 

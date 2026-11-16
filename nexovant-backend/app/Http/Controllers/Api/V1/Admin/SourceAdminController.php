@@ -319,7 +319,8 @@ class SourceAdminController
      */
     public function coverageAnalytics(Request $request): JsonResponse
     {
-        $breakdown = $this->coverageService->getCoverageBreakdown();
+        $window = (string) $request->input('window', 'all_time');
+        $breakdown = $this->coverageService->getCoverageBreakdown($window);
         return response()->json([
             'success' => true,
             'data' => $breakdown,
@@ -358,7 +359,8 @@ class SourceAdminController
         $source = NewsSource::findOrFail($id);
         $this->authorizeSourceAccess($request->user(), $source);
 
-        $profile = $this->reliabilityService->calculateReliabilityProfile($source);
+        $period = (string) $request->input('period', 'last_90_days');
+        $profile = $this->reliabilityService->calculateReliabilityProfile($source, $period);
 
         return response()->json([
             'success' => true,

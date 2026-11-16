@@ -36,8 +36,9 @@ class TranslationService
 
         // 2. Identify source language
         $sourceLanguage = $article->original_language ?: $article->detected_language;
+        $rawText = $article->content ?? $article->content_raw ?? '';
         if (!$sourceLanguage) {
-            $detection = $this->languageDetector->detect($article->title . ' ' . ($article->summary ?? ''));
+            $detection = $this->languageDetector->detect($article->title . ' ' . $rawText);
             $sourceLanguage = $detection['language'];
             $article->update([
                 'detected_language' => $sourceLanguage,
@@ -53,8 +54,8 @@ class TranslationService
                 'detected_language' => $sourceLanguage,
                 'target_language' => strtolower($targetLanguage),
                 'translated_title' => $article->title,
-                'translated_summary' => $article->summary,
-                'translated_content' => $article->content,
+                'translated_summary' => null,
+                'translated_content' => $article->content ?? $article->content_raw,
                 'translation_provider' => 'system',
                 'translation_model' => 'native-passthrough',
                 'quality_confidence_score' => 1.0,
@@ -65,8 +66,9 @@ class TranslationService
 
         // 3. Perform translation
         $translatedTitle = $this->translateText($article->title, $targetLanguage, $sourceLanguage);
-        $translatedSummary = $article->summary ? $this->translateText($article->summary, $targetLanguage, $sourceLanguage) : null;
-        $translatedContent = $article->content ? $this->translateText(substr($article->content, 0, 4000), $targetLanguage, $sourceLanguage) : null;
+        $contentToTranslate = $article->content ?? $article->content_raw;
+        $translatedContent = $contentToTranslate ? $this->translateText(substr($contentToTranslate, 0, 4000), $targetLanguage, $sourceLanguage) : null;
+        $translatedSummary = $translatedContent ? substr($translatedContent['translated_text'], 0, 300) : null;
 
         $provider = $translatedTitle['provider'];
         $model = $translatedTitle['model'];
@@ -78,7 +80,7 @@ class TranslationService
             'detected_language' => $article->detected_language ?: $sourceLanguage,
             'target_language' => strtolower($targetLanguage),
             'translated_title' => $translatedTitle['translated_text'],
-            'translated_summary' => $translatedSummary ? $translatedSummary['translated_text'] : null,
+            'translated_summary' => $translatedSummary,
             'translated_content' => $translatedContent ? $translatedContent['translated_text'] : null,
             'translation_provider' => $provider,
             'translation_model' => $model,
@@ -195,6 +197,87 @@ class TranslationService
             'provider' => 'heuristic_engine',
             'model' => 'lexical_preservation_v1',
             'confidence' => 0.82,
+        ];
+    }
+
+    /**
+     * Evaluate translation quality against a structured benchmark dataset.
+     * Evaluates named entity preservation, numerical accuracy, date preservation, and attribution.
+     *
+     * @param array<int, array{source_text: string, source_lang: string, target_lang: string, expected_entities: array<int, string>, expected_numbers: array<int, string>}> $dataset
+     * @return array{
+     *     total_samples: int,
+     *     entity_preservation_rate: float,
+     *     numerical_accuracy_rate: float,
+     *     overall_quality_score: float,
+     *     evaluation_results: array<int, mixed>
+     * }
+     */
+    public function evaluateTranslations(array $dataset): array
+    {
+        $total = count($dataset);
+        if ($total === 0) {
+            return [
+                'total_samples' => 0,
+                'entity_preservation_rate' => 1.0,
+                'numerical_accuracy_rate' => 1.0,
+                'overall_quality_score' => 1.0,
+                'evaluation_results' => [],
+            ];
+        }
+
+        $entitiesPreservedCount = 0;
+        $totalEntities = 0;
+        $numbersPreservedCount = 0;
+        $totalNumbers = 0;
+        $results = [];
+
+        foreach ($dataset as $item) {
+            $translated = $this->translateText($item['source_text'], $item['target_lang'], $item['source_lang']);
+            $text = $translated['translated_text'];
+
+            // Evaluate entities
+            $entityPass = true;
+            foreach ($item['expected_entities'] ?? [] as $entity) {
+                $totalEntities++;
+                if (stripos($text, $entity) !== false) {
+                    $entitiesPreservedCount++;
+                } else {
+                    $entityPass = false;
+                }
+            }
+
+            // Evaluate numbers
+            $numberPass = true;
+            foreach ($item['expected_numbers'] ?? [] as $number) {
+                $totalNumbers++;
+                if (str_contains($text, (string) $number)) {
+                    $numbersPreservedCount++;
+                } else {
+                    $numberPass = false;
+                }
+            }
+
+            $results[] = [
+                'source_text' => $item['source_text'],
+                'translated_text' => $text,
+                'provider' => $translated['provider'],
+                'entity_pass' => $entityPass,
+                'number_pass' => $numberPass,
+                'confidence' => $translated['confidence'],
+            ];
+        }
+
+        $entityRate = $totalEntities > 0 ? round($entitiesPreservedCount / $totalEntities, 3) : 1.0;
+        $numberRate = $totalNumbers > 0 ? round($numbersPreservedCount / $totalNumbers, 3) : 1.0;
+        $overallQuality = round(($entityRate * 0.5) + ($numberRate * 0.5), 3);
+
+        return [
+            'total_samples' => $total,
+            'entity_preservation_rate' => $entityRate,
+            'numerical_accuracy_rate' => $numberRate,
+            'overall_quality_score' => $overallQuality,
+            'evaluation_results' => $results,
         ];
     }
 
