@@ -209,6 +209,16 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/workspace/saved-searches',
+    name: 'workspace-saved-searches',
+    component: () => import('@/views/subscriber/SavedSearchesView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/saved-searches',
+    redirect: '/workspace/saved-searches',
+  },
+  {
     path: '/workspace/preferences',
     name: 'workspace-preferences',
     component: SubscriberPreferencesView,
@@ -367,6 +377,12 @@ const routes = [
     path: '/admin/subscriber-intelligence',
     name: 'admin-subscriber-intelligence',
     component: AdminSubscriberIntelligenceView,
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/search-analytics',
+    name: 'admin-search-analytics',
+    component: () => import('@/views/admin/AdminSearchAnalyticsView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
 

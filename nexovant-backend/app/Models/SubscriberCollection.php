@@ -18,9 +18,11 @@ class SubscriberCollection extends Model
 
     protected $fillable = [
         'user_id',
+        'organization_id',
         'name',
         'description',
         'color',
+        'visibility', // private, organization, shared
     ];
 
     public function user(): BelongsTo
@@ -28,8 +30,18 @@ class SubscriberCollection extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(SubscriberLibraryItem::class, 'collection_id');
+    }
+
+    public function briefs(): HasMany
+    {
+        return $this->hasMany(ResearchBrief::class, 'collection_id');
     }
 }

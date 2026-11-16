@@ -31,6 +31,7 @@ const workspaceItems = [
   { name: 'Trending Intelligence', path: '/trends', icon: ChartNoAxesCombined },
   { name: 'Watchlists', path: '/workspace/watchlists', icon: Bookmark },
   { name: 'Custom Monitors', path: '/workspace/monitors', icon: Radar },
+  { name: 'Saved Searches', path: '/workspace/saved-searches', icon: Bookmark },
   { name: 'Saved Intelligence', path: '/saved', icon: Library },
   { name: 'Deep Research', path: '/workspace/research', icon: Compass },
   { name: 'Intelligence Reports', path: '/reports', icon: FileText },
@@ -48,6 +49,7 @@ const adminItems = [
   { name: 'Intelligence Control', path: '/admin/intelligence', icon: Activity },
   { name: 'AI Gateway', path: '/admin/ai-router', icon: Activity },
   { name: 'Payment Review', path: '/admin/payments', icon: CreditCard },
+  { name: 'Search Analytics', path: '/admin/search-analytics', icon: Activity },
 ]
 
 const isActive = (path: string) => {

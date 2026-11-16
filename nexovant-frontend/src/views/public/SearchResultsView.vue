@@ -1,442 +1,627 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { useRoute, RouterLink } from 'vue-router'
+import { ref, onMounted, watch, computed } from 'vue'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import {
   Building2,
-  Check,
   CheckCircle2,
   Cpu,
-  Download,
   ExternalLink,
   FileText,
   Layers,
-  Plus,
   Search,
   Sparkles,
   TrendingUp,
   Users,
+  ShieldCheck,
+  Bookmark,
+  SlidersHorizontal,
+  ThumbsUp,
+  X,
+  Clock,
+  Globe,
+  Filter,
+  Check,
+  ArrowRight,
+  AlertTriangle,
 } from 'lucide-vue-next'
 import ThreeColumnLayout from '@/components/layout/ThreeColumnLayout.vue'
 import Input from '@/components/ui/Input.vue'
-import Tabs from '@/components/ui/Tabs.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Card from '@/components/ui/Card.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import Button from '@/components/ui/Button.vue'
-import { searchService } from '@/services/api/search.service'
+import SourceComparisonModal from '@/components/discovery/SourceComparisonModal.vue'
+import SaveSearchModal from '@/components/discovery/SaveSearchModal.vue'
+import RelevanceFeedbackModal from '@/components/discovery/RelevanceFeedbackModal.vue'
+import {
+  searchService,
+  type SearchResultItem,
+  type SearchFilters,
+} from '@/services/api/search.service'
 import { workspaceService } from '@/services/api/workspace.service'
 
 const route = useRoute()
-const searchQuery = ref((route.query.q as string) || '')
-const activeTab = ref((route.query.tab as string) || 'all')
-const isLoading = ref(false)
-const isLoadingRag = ref(false)
+const router = useRouter()
 
-const results = ref<any>({
-  articles: [],
-  companies: [],
-  executives: [],
-  technologies: [],
-  reports: [],
-  trends: [],
+const searchQuery = ref((route.query.q as string) || '')
+const activeContentType = ref((route.query.type as string) || 'all')
+const isHybrid = ref(true)
+const sortBy = ref((route.query.sort as string) || 'relevance')
+const currentPage = ref(Number(route.query.page) || 1)
+const perPage = ref(15)
+
+// Filters State
+const showFilters = ref(false)
+const filters = ref<SearchFilters>({
+  date_preset: (route.query.date as string) || '',
+  verification_status: (route.query.verification as string) || '',
+  min_credibility: route.query.credibility ? Number(route.query.credibility) : undefined,
+  region: (route.query.region as string) || '',
 })
 
-const ragResult = ref<{
-  response: string
-  source_citations: any[]
-  cache_hit: boolean
-  meta: any
-} | null>(null)
+// Autocomplete State
+const suggestions = ref<any[]>([])
+const showSuggestions = ref(false)
+let debounceTimeout: any = null
 
-const followedState = ref<Record<string, boolean>>({})
+// Results State
+const isLoading = ref(false)
+const results = ref<SearchResultItem[]>([])
+const totalResults = ref(0)
+const totalPages = ref(1)
+const searchMeta = ref<any>({})
 
-const tabs = [
-  { key: 'all', label: 'All Results' },
-  { key: 'rag', label: 'Executive AI Synthesis' },
-  { key: 'articles', label: 'Articles & Stories' },
-  { key: 'companies', label: 'Companies' },
-  { key: 'technologies', label: 'Technologies' },
-  { key: 'executives', label: 'Executives' },
-  { key: 'reports', label: 'Publications' },
-  { key: 'trends', label: 'Trend Signals' },
+// Modals State
+const showCorroborationModal = ref(false)
+const selectedItemId = ref<string>('')
+const selectedItemTitle = ref<string>('')
+const selectedItemType = ref<string>('article')
+
+const showSaveSearchModal = ref(false)
+
+const showFeedbackModal = ref(false)
+const feedbackItemId = ref<string>('')
+const feedbackItemTitle = ref<string>('')
+const feedbackItemType = ref<string>('article')
+
+const contentTypeTabs = [
+  { key: 'all', label: 'All Intelligence' },
+  { key: 'article', label: 'Articles' },
+  { key: 'story', label: 'Story Clusters' },
+  { key: 'report', label: 'Research Reports' },
+  { key: 'publication', label: 'Publications' },
+  { key: 'entity', label: 'Entities' },
+  { key: 'event', label: 'Timeline Events' },
+  { key: 'source', label: 'Publishers' },
+  { key: 'collection', label: 'Collections' },
 ]
+
+const activeFilterCount = computed(() => {
+  let count = 0
+  if (filters.value.date_preset) count++
+  if (filters.value.verification_status) count++
+  if (filters.value.min_credibility) count++
+  if (filters.value.region) count++
+  if (sortBy.value !== 'relevance') count++
+  return count
+})
 
 const executeSearch = async () => {
   if (!searchQuery.value.trim()) return
-  isLoading.value = true
-  try {
-    const res = await searchService.search(searchQuery.value)
-    results.value = {
-      articles: res?.articles || [],
-      companies: res?.companies || [],
-      executives: res?.executives || [],
-      technologies: res?.technologies || [],
-      reports: res?.reports || [],
-      trends: res?.trends || [],
-    }
 
-    // Trigger Grounded RAG alongside
-    triggerRagSynthesis()
-  } catch {
-    results.value = {
-      articles: [],
-      companies: [],
-      executives: [],
-      technologies: [],
-      reports: [],
-      trends: [],
+  isLoading.value = true
+  showSuggestions.value = false
+
+  try {
+    const res = await searchService.search({
+      q: searchQuery.value.trim(),
+      content_type: activeContentType.value !== 'all' ? activeContentType.value : undefined,
+      filters: filters.value,
+      sort_by: sortBy.value,
+      page: currentPage.value,
+      per_page: perPage.value,
+      hybrid: isHybrid.value,
+    })
+
+    if (res?.success) {
+      results.value = res.results || []
+      totalResults.value = res.total || 0
+      totalPages.value = res.total_pages || 1
+      searchMeta.value = res.meta || {}
     }
+  } catch {
+    results.value = []
+    totalResults.value = 0
   } finally {
     isLoading.value = false
   }
 }
 
-const triggerRagSynthesis = async () => {
-  if (!searchQuery.value.trim() || searchQuery.value.trim().length < 3) return
-  isLoadingRag.value = true
-  try {
-    const res = await searchService.queryRag(searchQuery.value)
-    if (res?.success) {
-      ragResult.value = {
-        response: res.response,
-        source_citations: res.source_citations || [],
-        cache_hit: res.cache_hit,
-        meta: res.meta || {},
+const handleInput = () => {
+  clearTimeout(debounceTimeout)
+  if (searchQuery.value.trim().length >= 2) {
+    debounceTimeout = setTimeout(async () => {
+      try {
+        suggestions.value = await searchService.getSuggestions(searchQuery.value)
+        showSuggestions.value = suggestions.value.length > 0
+      } catch {
+        suggestions.value = []
       }
-    }
-  } catch {
-    //
-  } finally {
-    isLoadingRag.value = false
+    }, 250)
+  } else {
+    suggestions.value = []
+    showSuggestions.value = false
   }
 }
 
-const toggleFollowEntity = async (type: string, id: string, name: string) => {
-  const key = `${type}:${id}`
-  followedState.value[key] = !followedState.value[key]
-  try {
-    await workspaceService.toggleFollow(type, id, name)
-  } catch {
-    followedState.value[key] = !followedState.value[key]
-  }
+const selectSuggestion = (item: any) => {
+  searchQuery.value = item.text || item.slug || ''
+  showSuggestions.value = false
+  executeSearch()
 }
 
-watch(
-  () => route.query.q,
-  (newQ) => {
-    if (newQ && newQ !== searchQuery.value) {
-      searchQuery.value = newQ as string
-      executeSearch()
-    }
+const clearFilter = (key: keyof SearchFilters) => {
+  filters.value[key] = undefined
+  executeSearch()
+}
+
+const clearAllFilters = () => {
+  filters.value = {
+    date_preset: '',
+    verification_status: '',
+    min_credibility: undefined,
+    region: '',
   }
-)
+  sortBy.value = 'relevance'
+  executeSearch()
+}
+
+const openCorroboration = (item: SearchResultItem) => {
+  selectedItemId.value = item.id
+  selectedItemTitle.value = item.title
+  selectedItemType.value = item.content_type
+  showCorroborationModal.value = true
+}
+
+const openFeedback = (item: SearchResultItem) => {
+  feedbackItemId.value = item.id
+  feedbackItemTitle.value = item.title
+  feedbackItemType.value = item.content_type
+  showFeedbackModal.value = true
+}
+
+const handleResultClick = (item: SearchResultItem) => {
+  searchService.recordClick({
+    query: searchQuery.value,
+    result_id: item.id,
+    result_type: item.content_type,
+  }).catch(() => {})
+}
 
 onMounted(() => {
-  if (searchQuery.value) {
+  if (searchQuery.value.trim()) {
     executeSearch()
   }
 })
+
+watch(
+  () => [activeContentType.value, sortBy.value],
+  () => {
+    currentPage.value = 1
+    executeSearch()
+  }
+)
 </script>
 
 <template>
   <ThreeColumnLayout>
-    <div class="mx-auto max-w-4xl space-y-6 text-left">
-      <!-- Search Header & Input -->
+    <div class="max-w-5xl mx-auto space-y-6 pb-16">
+      <!-- Search Header & Omnibar -->
       <div class="space-y-4">
-        <div>
-          <span class="text-[10px] font-mono uppercase tracking-wider text-nexo-text-muted">
-            GLOBAL INTELLIGENCE & GROUNDED RAG RETRIEVAL
-          </span>
-          <h1 class="font-serif text-3xl font-medium tracking-tight text-nexo-text-primary">
-            Search Results for "{{ searchQuery }}"
-          </h1>
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-2xl font-serif text-white tracking-tight flex items-center gap-2.5">
+              <span>Intelligence Discovery</span>
+              <span class="text-xs px-2 py-0.5 rounded-full font-sans font-medium bg-primary-500/10 text-primary-400 border border-primary-500/20">
+                Hybrid Retrieval
+              </span>
+            </h1>
+            <p class="text-xs text-neutral-400 mt-1">
+              Cross-entity verified intelligence, story clusters, research reports, and historical events.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <Button
+              v-if="searchQuery.trim()"
+              variant="outline"
+              size="sm"
+              class="gap-1.5 text-xs border-primary-500/30 text-primary-300 hover:bg-primary-500/10"
+              @click="showSaveSearchModal = true"
+            >
+              <Bookmark class="w-3.5 h-3.5" />
+              <span>Save & Monitor</span>
+            </Button>
+          </div>
         </div>
 
-        <div class="flex gap-2">
-          <Input
-            v-model="searchQuery"
-            placeholder="Search companies, leadership, technologies, reports, or ask an executive question..."
-            @keyup.enter="executeSearch"
-          />
-          <button
-            @click="executeSearch"
-            class="whitespace-nowrap rounded-xl bg-nexo-accent-cyan px-5 py-2 text-xs font-semibold text-white transition hover:bg-nexo-accent-cyan/90"
+        <!-- Search Bar with Suggestions Dropdown -->
+        <div class="relative">
+          <div class="relative flex items-center">
+            <Search class="absolute left-3.5 w-4 h-4 text-neutral-400 pointer-events-none" />
+            <input
+              v-model="searchQuery"
+              type="text"
+              class="w-full pl-10 pr-24 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all shadow-lg"
+              placeholder="Search companies, executives, technologies, reports, or research topics..."
+              @input="handleInput"
+              @keydown.enter="executeSearch"
+              @focus="showSuggestions = suggestions.length > 0"
+            />
+            <div class="absolute right-3 flex items-center gap-2">
+              <button
+                type="button"
+                class="px-2 py-1 rounded text-xs transition-colors"
+                :class="isHybrid ? 'bg-primary-500/15 text-primary-300 border border-primary-500/30' : 'bg-neutral-800 text-neutral-400'"
+                :title="isHybrid ? 'Semantic vector + keyword hybrid retrieval enabled' : 'Keyword only'"
+                @click="isHybrid = !isHybrid; executeSearch()"
+              >
+                <span class="flex items-center gap-1 font-mono text-[11px]">
+                  <Sparkles class="w-3 h-3 text-primary-400" />
+                  {{ isHybrid ? 'Hybrid' : 'Keyword' }}
+                </span>
+              </button>
+              <Button size="sm" class="h-8 px-3 text-xs" :loading="isLoading" @click="executeSearch">
+                Search
+              </Button>
+            </div>
+          </div>
+
+          <!-- Live Autocomplete Suggestions Dropdown -->
+          <div
+            v-if="showSuggestions && suggestions.length"
+            class="absolute top-full left-0 right-0 mt-1.5 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-neutral-800/60"
           >
-            Search
+            <div class="p-2 text-[11px] font-mono uppercase tracking-wider text-neutral-500 bg-neutral-950/60">
+              Verified Suggestions
+            </div>
+            <button
+              v-for="(item, idx) in suggestions"
+              :key="idx"
+              type="button"
+              class="w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between hover:bg-neutral-800/70 transition-colors"
+              @click="selectSuggestion(item)"
+            >
+              <div class="flex items-center gap-2.5 text-neutral-200">
+                <Building2 v-if="item.type === 'company'" class="w-3.5 h-3.5 text-primary-400" />
+                <Users v-else-if="item.type === 'executive'" class="w-3.5 h-3.5 text-blue-400" />
+                <FileText v-else-if="item.type === 'article'" class="w-3.5 h-3.5 text-neutral-400" />
+                <Globe v-else-if="item.type === 'source'" class="w-3.5 h-3.5 text-emerald-400" />
+                <TrendingUp v-else class="w-3.5 h-3.5 text-amber-400" />
+                <span>{{ item.text }}</span>
+              </div>
+              <span class="text-[10px] uppercase font-mono text-neutral-500 bg-neutral-800 px-1.5 py-0.5 rounded">
+                {{ item.type }}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Content Type Tabs -->
+        <div class="flex items-center justify-between border-b border-neutral-800 pt-1">
+          <div class="flex overflow-x-auto gap-4 no-scrollbar">
+            <button
+              v-for="tab in contentTypeTabs"
+              :key="tab.key"
+              type="button"
+              class="pb-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-colors"
+              :class="activeContentType === tab.key ? 'border-primary-500 text-primary-400' : 'border-transparent text-neutral-400 hover:text-white'"
+              @click="activeContentType = tab.key"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+
+          <button
+            type="button"
+            class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors mb-2"
+            :class="showFilters || activeFilterCount > 0 ? 'bg-primary-500/10 border-primary-500/30 text-primary-300' : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'"
+            @click="showFilters = !showFilters"
+          >
+            <SlidersHorizontal class="w-3.5 h-3.5" />
+            <span>Filters</span>
+            <span v-if="activeFilterCount > 0" class="w-4 h-4 rounded-full bg-primary-500 text-black text-[10px] font-bold flex items-center justify-center">
+              {{ activeFilterCount }}
+            </span>
           </button>
         </div>
 
-        <Tabs :tabs="tabs" :active-tab="activeTab" @update:active-tab="(k) => (activeTab = k)" />
-      </div>
-
-      <!-- Results Display -->
-      <div v-if="isLoading" class="space-y-4">
-        <Skeleton class="h-20 w-full" />
-        <Skeleton class="h-20 w-full" />
-      </div>
-
-      <div v-else class="space-y-6">
-        <!-- Grounded AI Synthesis Section (Shown in 'all' and 'rag' tabs) -->
-        <div v-if="(activeTab === 'all' || activeTab === 'rag')" class="space-y-3">
-          <div v-if="isLoadingRag" class="space-y-3 rounded-2xl border border-nexo-border bg-white p-6 shadow-sm">
-            <div class="flex items-center gap-2 text-xs font-mono text-nexo-accent-cyan animate-pulse">
-              <Sparkles class="h-4 w-4" />
-              <span>Retrieving grounded vector knowledge & synthesizing executive brief...</span>
+        <!-- Advanced Filters Collapsible Drawer -->
+        <div v-if="showFilters" class="p-4 rounded-xl bg-neutral-900/80 border border-neutral-800 space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+            <!-- Date Preset -->
+            <div>
+              <label class="block text-neutral-400 mb-1 text-[11px]">Time Horizon</label>
+              <select
+                v-model="filters.date_preset"
+                class="w-full rounded-lg bg-neutral-800 border border-neutral-700 text-xs text-white p-2 focus:outline-none"
+                @change="executeSearch"
+              >
+                <option value="">All Time</option>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="1y">Last Year</option>
+              </select>
             </div>
-            <Skeleton class="h-16 w-full" />
+
+            <!-- Verification Status -->
+            <div>
+              <label class="block text-neutral-400 mb-1 text-[11px]">Verification Status</label>
+              <select
+                v-model="filters.verification_status"
+                class="w-full rounded-lg bg-neutral-800 border border-neutral-700 text-xs text-white p-2 focus:outline-none"
+                @change="executeSearch"
+              >
+                <option value="">All Statuses</option>
+                <option value="verified">Verified Facts</option>
+                <option value="reported_reliable">Reported Reliable</option>
+                <option value="disputed">Disputed Claims</option>
+                <option value="unverified">Unverified Reports</option>
+              </select>
+            </div>
+
+            <!-- Min Credibility -->
+            <div>
+              <label class="block text-neutral-400 mb-1 text-[11px]">Source Credibility</label>
+              <select
+                v-model="filters.min_credibility"
+                class="w-full rounded-lg bg-neutral-800 border border-neutral-700 text-xs text-white p-2 focus:outline-none"
+                @change="executeSearch"
+              >
+                <option :value="undefined">Any Reliability</option>
+                <option :value="70">70%+ Trust Score</option>
+                <option :value="80">80%+ Reputable Outlets</option>
+                <option :value="90">90%+ Established Primary</option>
+              </select>
+            </div>
+
+            <!-- Sort By -->
+            <div>
+              <label class="block text-neutral-400 mb-1 text-[11px]">Rank Strategy</label>
+              <select
+                v-model="sortBy"
+                class="w-full rounded-lg bg-neutral-800 border border-neutral-700 text-xs text-white p-2 focus:outline-none"
+                @change="executeSearch"
+              >
+                <option value="relevance">Most Relevant (Hybrid)</option>
+                <option value="recent">Most Recent First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="highest_credibility">Highest Credibility</option>
+                <option value="highest_corroboration">Highest Corroboration</option>
+              </select>
+            </div>
           </div>
+        </div>
 
-          <Card
-            v-else-if="ragResult"
-            padding="lg"
-            class="relative space-y-4 overflow-hidden border-nexo-accent-cyan/40 bg-gradient-to-br from-[#f0f7f3] via-white to-[#f4f8f5]"
+        <!-- Active Filter Chips -->
+        <div v-if="activeFilterCount > 0" class="flex flex-wrap items-center gap-2 pt-1 text-xs">
+          <span class="text-neutral-500 text-[11px]">Active filters:</span>
+
+          <span v-if="filters.date_preset" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-200 border border-neutral-700 text-[11px]">
+            <span>Time: {{ filters.date_preset }}</span>
+            <X class="w-3 h-3 cursor-pointer hover:text-white" @click="clearFilter('date_preset')" />
+          </span>
+
+          <span v-if="filters.verification_status" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-200 border border-neutral-700 text-[11px]">
+            <span>Status: {{ filters.verification_status }}</span>
+            <X class="w-3 h-3 cursor-pointer hover:text-white" @click="clearFilter('verification_status')" />
+          </span>
+
+          <span v-if="filters.min_credibility" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-200 border border-neutral-700 text-[11px]">
+            <span>Credibility: {{ filters.min_credibility }}%+</span>
+            <X class="w-3 h-3 cursor-pointer hover:text-white" @click="clearFilter('min_credibility')" />
+          </span>
+
+          <button
+            type="button"
+            class="text-[11px] text-primary-400 hover:underline ml-1"
+            @click="clearAllFilters"
           >
-            <!-- Header with Metadata Pill -->
-            <div class="flex flex-col gap-2 border-b border-nexo-border/60 pb-3 sm:flex-row sm:items-center sm:justify-between">
-              <div class="flex items-center gap-2">
-                <div class="rounded-lg bg-nexo-accent-cyan/10 p-1.5 text-nexo-accent-cyan">
-                  <Cpu class="h-4 w-4" />
-                </div>
-                <h2 class="font-serif text-base font-semibold text-nexo-text-primary">
-                  Executive AI Intelligence Synthesis (Grounded RAG)
-                </h2>
-              </div>
+            Clear all
+          </button>
+        </div>
+      </div>
 
-              <div class="flex items-center gap-2 text-[10px] font-mono">
-                <span
-                  v-if="ragResult.cache_hit"
-                  class="flex items-center gap-1 rounded bg-emerald-900/30 px-2 py-0.5 text-emerald-700 border border-emerald-500/30"
-                >
-                  <CheckCircle2 class="h-3 w-3" />
-                  Semantic Cache Hit
-                </span>
-                <span
-                  v-else
-                  class="rounded bg-cyan-900/20 px-2 py-0.5 text-cyan-800 border border-cyan-500/30"
-                >
-                  Live Vector Retrieval ({{ ragResult.meta?.latency_ms || 35 }}ms)
-                </span>
-              </div>
-            </div>
+      <!-- Telemetry Meta Bar -->
+      <div v-if="!isLoading && searchQuery.trim()" class="flex items-center justify-between text-xs text-neutral-500 px-1">
+        <div>
+          Found <span class="text-white font-medium">{{ totalResults }}</span> records
+          <span v-if="searchMeta.latency_ms"> ({{ searchMeta.latency_ms }}ms)</span>
+        </div>
+        <div class="flex items-center gap-2 font-mono text-[11px]">
+          <span class="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800">
+            Engine: {{ searchMeta.retrieval_method || 'hybrid_vector' }}
+          </span>
+        </div>
+      </div>
 
-            <!-- Grounded Response Text -->
-            <p class="text-xs sm:text-sm text-nexo-text-primary leading-relaxed font-sans">
-              {{ ragResult.response }}
-            </p>
+      <!-- Loading Skeletons -->
+      <div v-if="isLoading" class="space-y-4">
+        <Skeleton class="h-28 w-full rounded-xl" />
+        <Skeleton class="h-28 w-full rounded-xl" />
+        <Skeleton class="h-28 w-full rounded-xl" />
+      </div>
 
-            <!-- Citations Footnotes -->
-            <div v-if="ragResult.source_citations.length > 0" class="space-y-2 border-t border-nexo-border/50 pt-3">
-              <span class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-nexo-text-muted font-bold">
-                <Layers class="h-3 w-3 text-nexo-accent-cyan" />
-                Verified Citations & Grounding Excerpts ({{ ragResult.source_citations.length }})
+      <!-- Empty State -->
+      <div
+        v-else-if="results.length === 0 && searchQuery.trim()"
+        class="py-16 text-center space-y-3 rounded-xl bg-neutral-900/40 border border-neutral-800/80 p-6"
+      >
+        <Search class="w-10 h-10 text-neutral-600 mx-auto" />
+        <h3 class="text-base font-serif text-white">No intelligence matches found</h3>
+        <p class="text-xs text-neutral-400 max-w-md mx-auto">
+          No verified documents, entities, or reports matched "<span class="text-primary-400">{{ searchQuery }}</span>". Try broadening your search or clearing active filters.
+        </p>
+        <div class="pt-2 flex justify-center gap-2">
+          <Button variant="outline" size="sm" @click="clearAllFilters">
+            Clear Filters
+          </Button>
+          <Button size="sm" class="gap-1.5" @click="showSaveSearchModal = true">
+            <Bookmark class="w-3.5 h-3.5" />
+            <span>Create Automated Monitor</span>
+          </Button>
+        </div>
+      </div>
+
+      <!-- Results List -->
+      <div v-else class="space-y-3">
+        <div
+          v-for="item in results"
+          :key="item.id"
+          class="p-4 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:border-neutral-700 transition-all space-y-3 group"
+        >
+          <!-- Top Row: Type Badge, Verification Status, Score, Date -->
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider font-semibold bg-neutral-800 text-neutral-300 border border-neutral-700">
+                {{ item.content_type }}
               </span>
 
-              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs">
-                <div
-                  v-for="(cite, idx) in ragResult.source_citations"
-                  :key="idx"
-                  class="space-y-1 rounded-xl border border-nexo-border/70 bg-white/70 p-2.5"
-                >
-                  <div class="flex items-center justify-between text-[11px] font-mono">
-                    <span class="max-w-[200px] truncate font-bold text-nexo-text-primary">
-                      [{{ idx + 1 }}] {{ cite.document_title }}
-                    </span>
-                    <span class="text-[10px] uppercase text-nexo-accent-cyan">
-                      {{ (cite.document_type || 'Record').replace('_', ' ') }}
-                    </span>
-                  </div>
-                  <p class="line-clamp-2 text-[11px] leading-normal text-nexo-text-secondary">
-                    {{ cite.excerpt }}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
+              <span
+                class="px-2 py-0.5 rounded text-[10px] uppercase font-mono font-medium flex items-center gap-1"
+                :class="item.verification_status === 'verified' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'"
+              >
+                <CheckCircle2 v-if="item.verification_status === 'verified'" class="w-3 h-3" />
+                <AlertTriangle v-else class="w-3 h-3" />
+                <span>{{ item.verification_status.replace('_', ' ') }}</span>
+              </span>
 
-        <!-- Articles Tab / Section -->
-        <div v-if="(activeTab === 'all' || activeTab === 'articles') && results.articles?.length > 0" class="space-y-3">
-          <h2 class="text-xs font-mono uppercase tracking-wider text-nexo-text-muted font-bold">
-            Intelligence Articles ({{ results.articles.length }})
-          </h2>
-          <Card
-            v-for="a in results.articles"
-            :key="a.id"
-            padding="md"
-            class="space-y-2 border-nexo-border/80 transition hover:border-nexo-accent-cyan/35"
-          >
-            <div class="flex items-center space-x-2 text-xs font-mono">
-              <Badge :variant="a.verification_status || 'verified'" size="sm" />
-              <span class="text-nexo-text-muted">{{ a.source?.name || 'Corroborated Source' }}</span>
-            </div>
-            <h3 class="font-serif text-xl font-semibold text-nexo-text-primary">
-              <RouterLink :to="`/news/${a.slug || a.id}`" class="transition hover:text-nexo-accent-cyan">
-                {{ a.title }}
-              </RouterLink>
-            </h3>
-            <p class="text-xs leading-relaxed text-nexo-text-secondary line-clamp-2">
-              {{ a.content_normalized || a.content_raw || a.summary }}
-            </p>
-          </Card>
-        </div>
-
-        <!-- Companies Tab / Section -->
-        <div v-if="(activeTab === 'all' || activeTab === 'companies') && results.companies?.length > 0" class="space-y-3">
-          <h2 class="text-xs font-mono uppercase tracking-wider text-nexo-text-muted font-bold">
-            Companies ({{ results.companies.length }})
-          </h2>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Card
-              v-for="c in results.companies"
-              :key="c.id"
-              padding="md"
-              class="border-nexo-border/80"
-            >
-              <div class="flex items-center justify-between mb-1.5">
-                <span class="font-serif text-base font-semibold text-nexo-text-primary">{{ c.name }}</span>
-                <span v-if="c.ticker" class="font-mono text-xs text-nexo-accent-cyan">{{ c.ticker }}</span>
-              </div>
-              <p class="text-[11px] text-nexo-text-secondary line-clamp-2">{{ c.summary }}</p>
-              <div class="mt-3 flex items-center justify-between border-t border-nexo-border/60 pt-2.5">
-                <span class="text-[10px] text-nexo-text-muted">{{ c.industry || 'Enterprise' }}</span>
-                <button
-                  type="button"
-                  @click="toggleFollowEntity('company', c.id || c.slug, c.name)"
-                  :class="[
-                    'flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-medium transition',
-                    followedState[`company:${c.id || c.slug}`]
-                      ? 'border-nexo-accent-cyan bg-[#e9f3ed] text-nexo-accent-cyan'
-                      : 'border-nexo-border text-nexo-text-secondary hover:border-nexo-accent-cyan/40'
-                  ]"
-                >
-                  <Check v-if="followedState[`company:${c.id || c.slug}`]" class="h-3 w-3" />
-                  <Plus v-else class="h-3 w-3" />
-                  <span>{{ followedState[`company:${c.id || c.slug}`] ? 'Following' : 'Follow' }}</span>
-                </button>
-              </div>
-            </Card>
-          </div>
-        </div>
-
-        <!-- Technologies Tab / Section -->
-        <div v-if="(activeTab === 'all' || activeTab === 'technologies') && results.technologies?.length > 0" class="space-y-3">
-          <h2 class="text-xs font-mono uppercase tracking-wider text-nexo-text-muted font-bold">
-            Technologies ({{ results.technologies.length }})
-          </h2>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Card
-              v-for="t in results.technologies"
-              :key="t.id"
-              padding="md"
-              class="border-nexo-border/80"
-            >
-              <div class="flex items-center justify-between mb-1.5">
-                <span class="font-serif text-base font-semibold text-nexo-text-primary">{{ t.name }}</span>
-                <span class="rounded bg-emerald-50 px-1.5 py-0.5 font-mono text-[10px] text-emerald-800">{{ t.category || 'Strategic Tech' }}</span>
-              </div>
-              <p class="text-[11px] text-nexo-text-secondary line-clamp-2">{{ t.description || t.summary }}</p>
-              <div class="mt-3 flex items-center justify-end border-t border-nexo-border/60 pt-2.5">
-                <button
-                  type="button"
-                  @click="toggleFollowEntity('technology', t.slug || t.id, t.name)"
-                  :class="[
-                    'flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-medium transition',
-                    followedState[`technology:${t.slug || t.id}`]
-                      ? 'border-nexo-accent-cyan bg-[#e9f3ed] text-nexo-accent-cyan'
-                      : 'border-nexo-border text-nexo-text-secondary hover:border-nexo-accent-cyan/40'
-                  ]"
-                >
-                  <Check v-if="followedState[`technology:${t.slug || t.id}`]" class="h-3 w-3" />
-                  <Plus v-else class="h-3 w-3" />
-                  <span>{{ followedState[`technology:${t.slug || t.id}`] ? 'Following' : 'Follow' }}</span>
-                </button>
-              </div>
-            </Card>
-          </div>
-        </div>
-
-        <!-- Executives Tab / Section -->
-        <div v-if="(activeTab === 'all' || activeTab === 'executives') && results.executives?.length > 0" class="space-y-3">
-          <h2 class="text-xs font-mono uppercase tracking-wider text-nexo-text-muted font-bold">
-            Executives ({{ results.executives.length }})
-          </h2>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Card
-              v-for="e in results.executives"
-              :key="e.id"
-              padding="md"
-              class="border-nexo-border/80"
-            >
-              <div class="flex items-center justify-between mb-1.5">
-                <span class="font-serif text-base font-semibold text-nexo-text-primary">{{ e.full_name || e.name }}</span>
-                <span class="font-mono text-xs text-nexo-accent-cyan">{{ e.current_title || e.title }}</span>
-              </div>
-              <p class="text-[11px] text-nexo-text-secondary line-clamp-2">{{ e.bio }}</p>
-              <div class="mt-3 flex items-center justify-end border-t border-nexo-border/60 pt-2.5">
-                <button
-                  type="button"
-                  @click="toggleFollowEntity('executive', e.id, e.full_name || e.name)"
-                  :class="[
-                    'flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-medium transition',
-                    followedState[`executive:${e.id}`]
-                      ? 'border-nexo-accent-cyan bg-[#e9f3ed] text-nexo-accent-cyan'
-                      : 'border-nexo-border text-nexo-text-secondary hover:border-nexo-accent-cyan/40'
-                  ]"
-                >
-                  <Check v-if="followedState[`executive:${e.id}`]" class="h-3 w-3" />
-                  <Plus v-else class="h-3 w-3" />
-                  <span>{{ followedState[`executive:${e.id}`] ? 'Following' : 'Follow' }}</span>
-                </button>
-              </div>
-            </Card>
-          </div>
-        </div>
-
-        <!-- Reports / Publications Tab / Section -->
-        <div v-if="(activeTab === 'all' || activeTab === 'reports') && results.reports?.length > 0" class="space-y-3">
-          <h2 class="text-xs font-mono uppercase tracking-wider text-nexo-text-muted font-bold">
-            Executive Publications & Dossiers ({{ results.reports.length }})
-          </h2>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Card
-              v-for="rep in results.reports"
-              :key="rep.id"
-              padding="md"
-              class="border-nexo-border/80"
-            >
-              <div class="flex items-center justify-between mb-1.5">
-                <span class="font-serif text-base font-semibold text-nexo-text-primary">{{ rep.title }}</span>
-                <span class="rounded bg-nexo-bg px-2 py-0.5 text-[10px] font-medium uppercase text-nexo-text-secondary">
-                  {{ (rep.publication_type || 'report').replace('_', ' ') }}
+              <span v-if="item.source" class="text-[11px] text-neutral-400">
+                {{ item.source.name }}
+                <span v-if="item.source.credibility_score" class="text-primary-400 font-mono">
+                  ({{ Math.round(item.source.credibility_score) }}%)
                 </span>
-              </div>
-              <p class="text-[11px] text-nexo-text-secondary line-clamp-2">{{ rep.executive_summary || rep.description }}</p>
-              <div class="mt-3 flex items-center justify-between border-t border-nexo-border/60 pt-2.5">
-                <span class="text-[10px] text-nexo-text-muted">{{ rep.published_at ? new Date(rep.published_at).toLocaleDateString() : 'Published' }}</span>
-                <RouterLink
-                  to="/reports"
-                  class="inline-flex items-center gap-1 text-xs font-semibold text-nexo-accent-cyan hover:underline"
-                >
-                  <span>Access PDF</span>
-                  <ExternalLink class="h-3 w-3" />
-                </RouterLink>
-              </div>
-            </Card>
+              </span>
+            </div>
+
+            <div class="flex items-center gap-3 text-neutral-500 text-[11px]">
+              <span v-if="item.corroboration_count > 1" class="text-emerald-400 font-medium">
+                {{ item.corroboration_count }} corroborators
+              </span>
+              <span v-if="item.published_at">{{ new Date(item.published_at).toLocaleDateString() }}</span>
+            </div>
+          </div>
+
+          <!-- Middle Row: Title & Link -->
+          <div>
+            <RouterLink
+              :to="item.url"
+              class="text-base font-serif font-medium text-white group-hover:text-primary-300 transition-colors flex items-center justify-between"
+              @click="handleResultClick(item)"
+            >
+              <span>{{ item.title }}</span>
+              <ArrowRight class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-primary-400 shrink-0" />
+            </RouterLink>
+            <p class="text-xs text-neutral-300 leading-relaxed mt-1">
+              {{ item.excerpt }}
+            </p>
+          </div>
+
+          <!-- Relevance Explanation Pill -->
+          <div v-if="item.relevance_explanation" class="p-2 rounded-lg bg-neutral-950/70 border border-neutral-800/60 text-[11px] text-neutral-400 flex items-center gap-2">
+            <Sparkles class="w-3.5 h-3.5 text-primary-400 shrink-0" />
+            <span>{{ item.relevance_explanation }}</span>
+          </div>
+
+          <!-- Bottom Row: Matched Entity & Topic Chips + Actions -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-neutral-800/50">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span
+                v-for="ent in item.matched_entities"
+                :key="ent.id"
+                class="px-2 py-0.5 rounded text-[10px] bg-primary-500/10 text-primary-300 border border-primary-500/20"
+              >
+                {{ ent.name }}
+              </span>
+              <span
+                v-for="topic in item.matched_topics"
+                :key="topic"
+                class="px-2 py-0.5 rounded text-[10px] bg-neutral-800 text-neutral-400"
+              >
+                {{ topic }}
+              </span>
+            </div>
+
+            <div class="flex items-center gap-2 text-xs">
+              <button
+                type="button"
+                class="px-2 py-1 rounded text-[11px] text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors flex items-center gap-1"
+                @click="openCorroboration(item)"
+              >
+                <ShieldCheck class="w-3.5 h-3.5 text-emerald-400" />
+                <span>Corroboration</span>
+              </button>
+
+              <button
+                type="button"
+                class="px-2 py-1 rounded text-[11px] text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors flex items-center gap-1"
+                @click="openFeedback(item)"
+              >
+                <ThumbsUp class="w-3 h-3" />
+                <span>Feedback</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Empty State -->
-        <div
-          v-if="results.articles?.length === 0 && results.companies?.length === 0 && results.executives?.length === 0 && results.technologies?.length === 0 && results.reports?.length === 0 && !ragResult"
-          class="rounded-2xl border border-nexo-border bg-white p-12 text-center"
-        >
-          <Search class="mx-auto mb-3 h-10 w-10 text-nexo-text-muted" />
-          <h3 class="font-serif text-base font-semibold text-nexo-text-primary">No Results Found for "{{ searchQuery }}"</h3>
-          <p class="mx-auto mt-1 max-w-sm text-xs text-nexo-text-secondary">
-            Check spelling or search for a specific company, executive, ticker, or technology.
-          </p>
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="flex items-center justify-between pt-4 border-t border-neutral-800 text-xs text-neutral-400">
+          <div>
+            Page {{ currentPage }} of {{ totalPages }}
+          </div>
+          <div class="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="currentPage <= 1"
+              @click="currentPage--; executeSearch()"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="currentPage >= totalPages"
+              @click="currentPage++; executeSearch()"
+            >
+              Next
+            </Button>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- Modals -->
+    <SourceComparisonModal
+      v-model="showCorroborationModal"
+      :item-id="selectedItemId"
+      :item-type="selectedItemType"
+      :item-title="selectedItemTitle"
+    />
+
+    <SaveSearchModal
+      v-model="showSaveSearchModal"
+      :query="searchQuery"
+      :filters="filters"
+    />
+
+    <RelevanceFeedbackModal
+      v-model="showFeedbackModal"
+      :query="searchQuery"
+      :result-id="feedbackItemId"
+      :result-title="feedbackItemTitle"
+      :result-type="feedbackItemType"
+    />
   </ThreeColumnLayout>
 </template>

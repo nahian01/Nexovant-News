@@ -44,6 +44,11 @@ use App\Http\Controllers\Api\V1\PublicationController;
 use App\Http\Controllers\Api\V1\RagSearchController;
 use App\Http\Controllers\Api\V1\SocialTrendController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
+use App\Http\Controllers\Api\V1\EntityDiscoveryController;
+use App\Http\Controllers\Api\V1\SourceComparisonController;
+use App\Http\Controllers\Api\V1\Subscriber\SavedSearchController;
+use App\Http\Controllers\Api\V1\Subscriber\ResearchBriefController;
+use App\Http\Controllers\Api\V1\Admin\SearchAnalyticsAdminController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -92,6 +97,17 @@ Route::get('/categories', [CategoryController::class, 'index'])->name('api.categ
 Route::get('/search', [SearchController::class, 'search'])->name('api.search');
 Route::get('/search/suggestions', [SearchController::class, 'suggestions'])->name('api.search.suggestions');
 Route::post('/search/rag', [RagSearchController::class, 'query'])->name('api.search.rag');
+Route::post('/search/feedback', [SearchController::class, 'feedback'])->name('api.search.feedback');
+Route::post('/search/click', [SearchController::class, 'recordClick'])->name('api.search.click');
+
+// Stage 12 Discovery & Source Transparency Endpoints
+Route::prefix('discovery')->group(function () {
+    Route::get('/entities/{slugOrId}', [EntityDiscoveryController::class, 'profile'])->name('api.discovery.entities.profile');
+    Route::get('/entities/{entityId}/graph', [EntityDiscoveryController::class, 'graph'])->name('api.discovery.entities.graph');
+    Route::get('/entities/{entityId}/timeline', [EntityDiscoveryController::class, 'timeline'])->name('api.discovery.entities.timeline');
+    Route::get('/corroboration/{id}', [SourceComparisonController::class, 'corroboration'])->name('api.discovery.corroboration');
+    Route::post('/source-comparison', [SourceComparisonController::class, 'compare'])->name('api.discovery.source-comparison');
+});
 
 // Public Intelligence Profiles & Reports
 Route::prefix('intelligence')->group(function () {
@@ -270,6 +286,21 @@ Route::middleware('auth:sanctum')->group(function () {
         // Personalized Research
         Route::post('/research/query', [SubscriberResearchController::class, 'query'])->name('api.workspace.research.query');
         Route::post('/research/watchlist-brief/{watchlistId}', [SubscriberResearchController::class, 'brief'])->name('api.workspace.research.brief');
+
+        // Stage 12 Saved Searches & Automated Monitoring
+        Route::get('/saved-searches', [SavedSearchController::class, 'index'])->name('api.workspace.saved-searches.index');
+        Route::post('/saved-searches', [SavedSearchController::class, 'store'])->name('api.workspace.saved-searches.store');
+        Route::get('/saved-searches/{id}', [SavedSearchController::class, 'show'])->name('api.workspace.saved-searches.show');
+        Route::put('/saved-searches/{id}', [SavedSearchController::class, 'update'])->name('api.workspace.saved-searches.update');
+        Route::post('/saved-searches/{id}/toggle', [SavedSearchController::class, 'toggle'])->name('api.workspace.saved-searches.toggle');
+        Route::delete('/saved-searches/{id}', [SavedSearchController::class, 'destroy'])->name('api.workspace.saved-searches.destroy');
+        Route::get('/saved-searches/{id}/matches', [SavedSearchController::class, 'matches'])->name('api.workspace.saved-searches.matches');
+
+        // Stage 12 Grounded Research Briefs
+        Route::get('/research-briefs', [ResearchBriefController::class, 'index'])->name('api.workspace.research-briefs.index');
+        Route::post('/research-briefs/generate', [ResearchBriefController::class, 'generate'])->name('api.workspace.research-briefs.generate');
+        Route::get('/research-briefs/{id}', [ResearchBriefController::class, 'show'])->name('api.workspace.research-briefs.show');
+        Route::get('/research-briefs/{id}/export', [ResearchBriefController::class, 'export'])->name('api.workspace.research-briefs.export');
     });
 
     // Administrative Console Endpoints (Guarded by admin middleware)
@@ -533,6 +564,14 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/{id}/seats', [OrganizationAdminController::class, 'updateSeats'])->name('api.admin.organizations.seats');
             Route::put('/{id}/status', [OrganizationAdminController::class, 'toggleStatus'])->name('api.admin.organizations.status');
             Route::delete('/{id}', [OrganizationAdminController::class, 'destroy'])->name('api.admin.organizations.destroy');
+        });
+
+        // 16. Search Analytics & Query Telemetry (Stage 12)
+        Route::prefix('search-analytics')->group(function () {
+            Route::get('/overview', [SearchAnalyticsAdminController::class, 'overview'])->name('api.admin.search-analytics.overview');
+            Route::get('/logs', [SearchAnalyticsAdminController::class, 'logs'])->name('api.admin.search-analytics.logs');
+            Route::get('/unanswered', [SearchAnalyticsAdminController::class, 'unanswered'])->name('api.admin.search-analytics.unanswered');
+            Route::get('/feedback', [SearchAnalyticsAdminController::class, 'feedback'])->name('api.admin.search-analytics.feedback');
         });
     });
 });

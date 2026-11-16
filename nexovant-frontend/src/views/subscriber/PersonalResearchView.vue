@@ -5,6 +5,8 @@ import AppHeader from '@/components/layout/AppHeader.vue'
 import Card from '@/components/ui/Card.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Alert from '@/components/ui/Alert.vue'
+import { searchService, type ResearchBriefData } from '@/services/api/search.service'
 import { workspaceService } from '@/services/api/workspace.service'
 import {
   Sparkles,
@@ -15,7 +17,12 @@ import {
   ExternalLink,
   BookOpen,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Download,
+  Share2,
+  Clock,
+  ShieldCheck,
+  FileText,
 } from 'lucide-vue-next'
 
 interface WatchlistOption {
@@ -23,251 +30,413 @@ interface WatchlistOption {
   name: string
 }
 
-interface CitationItem {
-  title: string
-  source: string
-  type: string
-}
-
-interface ResearchResponse {
-  success: boolean
-  query: string
-  answer: string
-  grounded_citations: CitationItem[]
-  verified_facts?: string[]
-  historical_milestones?: Array<{ date: string; title: string }>
-  conflicting_evidence?: Array<{ claim: string; source: string; stance: string }>
-  evidence_limitations: string
-  generated_at: string
+interface CollectionOption {
+  id: string
+  name: string
 }
 
 const queryText = ref('')
-const selectedWatchlistId = ref('')
-const watchlists = ref<WatchlistOption[]>([])
+const selectedCollectionId = ref('')
+const collections = ref<CollectionOption[]>([])
 const isExecuting = ref(false)
-const researchResult = ref<ResearchResponse | null>(null)
+const briefData = ref<ResearchBriefData | null>(null)
 const statusMessage = ref('')
 const errorMessage = ref('')
+const isSharedWithOrg = ref(false)
 
 const samplePrompts = [
-  'What are the confirmed capital allocation milestones for European semiconductor foundries?',
+  'What are the latest confirmed milestones in European semiconductor manufacturing?',
+  'Which organizations are investing in AI infrastructure in Southeast Asia?',
+  'What events have affected Bangladesh\'s energy sector during the last six months?',
   'Summarize High-NA EUV lithography deployment schedules across pilot lines.',
-  'Analyze supply chain localization risks affecting automotive microcontrollers.',
 ]
 
-const loadWatchlists = async () => {
+const loadCollections = async () => {
   try {
-    const res = await workspaceService.getWatchlists()
-    if (res.success) {
-      watchlists.value = res.watchlists
+    const res = await workspaceService.getCollections()
+    if (res?.success) {
+      collections.value = res.collections || []
     }
   } catch {
     //
   }
 }
 
-const handleExecuteQuery = async (preset?: string) => {
-  const query = preset || queryText.value
-  if (!query.trim()) return
+const handleGenerate = async (preset?: string) => {
+  const q = preset || queryText.value
+  if (!q.trim()) return
 
-  queryText.value = query
+  queryText.value = q
   isExecuting.value = true
   errorMessage.value = ''
   statusMessage.value = ''
-  researchResult.value = null
+  briefData.value = null
 
   try {
-    const res = await workspaceService.askResearchQuestion(query, selectedWatchlistId.value || undefined)
-    if (res.success) {
-      researchResult.value = res
-      statusMessage.value = 'Grounded research synthesis complete.'
+    const res = await searchService.generateResearchBrief({
+      question: q.trim(),
+      collection_id: selectedCollectionId.value || undefined,
+      save: true,
+      is_shared_with_org: isSharedWithOrg.value,
+    })
+
+    if (res?.success && res.brief) {
+      briefData.value = res.brief
+      statusMessage.value = 'Grounded 13-section research brief synthesized and saved.'
     }
   } catch (err: any) {
-    errorMessage.value = err.response?.data?.message || err.response?.data?.errors?.query?.[0] || 'Research synthesis failed.'
+    errorMessage.value = err.response?.data?.message || 'Brief generation failed. Please try again.'
   } finally {
     isExecuting.value = false
   }
 }
 
-const handleGenerateWatchlistBrief = async (watchlistId: string) => {
-  if (!watchlistId) return
-  isExecuting.value = true
-  errorMessage.value = ''
-  statusMessage.value = ''
-  researchResult.value = null
-
+const handleExport = async (format: 'markdown' | 'json') => {
+  if (!briefData.value?.id) return
   try {
-    const res = await workspaceService.generateWatchlistBrief(watchlistId)
-    if (res.success) {
-      researchResult.value = res
-      statusMessage.value = 'Watchlist executive brief synthesized.'
-    }
-  } catch (err: any) {
-    errorMessage.value = err.response?.data?.message || 'Failed to synthesize watchlist brief.'
-  } finally {
-    isExecuting.value = false
+    const content = await searchService.exportResearchBrief(briefData.value.id, format)
+    const blob = new Blob([typeof content === 'string' ? content : JSON.stringify(content, null, 2)], {
+      type: format === 'markdown' ? 'text/markdown' : 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `research-brief-${briefData.value.id.substring(0, 8)}.${format === 'markdown' ? 'md' : 'json'}`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    errorMessage.value = 'Export failed.'
   }
 }
 
 onMounted(() => {
-  loadWatchlists()
+  loadCollections()
 })
 </script>
 
 <template>
-  <div class="min-h-screen bg-nexo-bg flex text-left">
+  <div class="flex h-screen bg-black text-neutral-100 overflow-hidden font-sans">
     <Sidebar />
 
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
       <AppHeader />
 
-      <main class="flex-1 p-6 lg:p-8 space-y-6 overflow-y-auto max-w-7xl">
+      <main class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
         <!-- Header -->
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-nexo-border/60 pb-6">
+        <div class="flex items-center justify-between">
           <div>
-            <div class="flex items-center space-x-2 text-xs font-mono text-nexo-accent-cyan uppercase mb-1">
-              <span>Personal Workspace</span>
-              <span>/</span>
-              <span>Grounded Research & RAG Interface</span>
-            </div>
-            <h1 class="editorial-title text-2xl sm:text-3xl font-serif font-bold text-nexo-text-primary">
-              Personalized Intelligence Research
+            <h1 class="text-2xl font-serif text-white tracking-tight flex items-center gap-2.5">
+              <span>Grounded Research Intelligence</span>
+              <span class="text-xs px-2 py-0.5 rounded-full font-sans font-medium bg-primary-500/10 text-primary-400 border border-primary-500/20">
+                13-Section Briefing
+              </span>
             </h1>
-            <p class="text-xs text-nexo-text-secondary mt-1">
-              Query your monitored entities and watchlists. Syntheses are strictly grounded in verified disclosures with full citations.
+            <p class="text-xs text-neutral-400 mt-1">
+              Natural-language question answering synthesized strictly from verified disclosures, timelines, and knowledge chunks.
             </p>
           </div>
         </div>
 
-        <!-- Alerts -->
-        <div v-if="statusMessage" class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono rounded flex items-center justify-between">
-          <span>✓ {{ statusMessage }}</span>
-          <button @click="statusMessage = ''" class="text-emerald-600 font-bold ml-2">✕</button>
-        </div>
+        <Alert v-if="statusMessage" variant="success">
+          {{ statusMessage }}
+        </Alert>
+        <Alert v-if="errorMessage" variant="danger">
+          {{ errorMessage }}
+        </Alert>
 
-        <div v-if="errorMessage" class="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-mono rounded flex items-center justify-between">
-          <span>✕ {{ errorMessage }}</span>
-          <button @click="errorMessage = ''" class="text-rose-600 font-bold ml-2">✕</button>
-        </div>
-
-        <!-- Query Form Box -->
-        <Card class="p-5 bg-white border border-nexo-border shadow-xs space-y-4">
-          <div class="flex flex-col sm:flex-row gap-3 items-end">
-            <div class="flex-1 space-y-1">
-              <label class="block text-xs font-medium text-nexo-text-primary">Research Objective / Question</label>
+        <!-- Question Formulation Card -->
+        <Card class="p-5 border-neutral-800 bg-neutral-900/60 space-y-4">
+          <div class="space-y-2">
+            <label class="block text-xs font-medium text-neutral-300">
+              Enter Research Question
+            </label>
+            <div class="flex gap-2">
               <Input
                 v-model="queryText"
-                placeholder="Ask an analytical question about monitored technology, capital spending, or corporate moves..."
-                @keyup.enter="handleExecuteQuery()"
+                placeholder="e.g. What are the confirmed capital allocation milestones for European semiconductor foundries?"
+                class="flex-1 text-xs"
+                @keydown.enter="handleGenerate()"
               />
-            </div>
-
-            <div class="w-full sm:w-64 space-y-1">
-              <label class="block text-xs font-medium text-nexo-text-primary">Scope to Watchlist (Optional)</label>
-              <select
-                v-model="selectedWatchlistId"
-                class="w-full text-xs bg-white border border-nexo-border rounded px-3 py-2 text-nexo-text-primary focus:outline-hidden"
+              <Button
+                size="sm"
+                class="gap-1.5 px-4"
+                :loading="isExecuting"
+                @click="handleGenerate()"
               >
-                <option value="">Global Corporate Corpus</option>
-                <option v-for="wl in watchlists" :key="wl.id" :value="wl.id">{{ wl.name }}</option>
+                <Sparkles class="w-3.5 h-3.5 text-primary-300" />
+                <span>Synthesize Brief</span>
+              </Button>
+            </div>
+          </div>
+
+          <!-- Configuration Controls -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
+            <div>
+              <label class="block text-neutral-400 mb-1 text-[11px]">Save to Research Collection</label>
+              <select
+                v-model="selectedCollectionId"
+                class="w-full rounded-lg bg-neutral-800 border border-neutral-700 text-xs text-white p-2 focus:outline-none"
+              >
+                <option value="">No Collection (Standalone Brief)</option>
+                <option v-for="c in collections" :key="c.id" :value="c.id">
+                  {{ c.name }}
+                </option>
               </select>
             </div>
 
-            <div class="flex gap-2">
-              <Button
-                variant="primary"
-                size="sm"
-                :disabled="isExecuting || !queryText.trim()"
-                @click="handleExecuteQuery()"
-              >
-                <Sparkles class="w-3.5 h-3.5 mr-1" />
-                {{ isExecuting ? 'Synthesizing...' : 'Execute Research' }}
-              </Button>
-              <Button
-                v-if="selectedWatchlistId"
-                variant="outline"
-                size="sm"
-                title="Synthesize comprehensive brief for selected watchlist"
-                :disabled="isExecuting"
-                @click="handleGenerateWatchlistBrief(selectedWatchlistId)"
-              >
-                Watchlist Brief
-              </Button>
+            <div class="flex items-end pb-2">
+              <label class="flex items-center gap-2 cursor-pointer text-xs text-neutral-300">
+                <input
+                  v-model="isSharedWithOrg"
+                  type="checkbox"
+                  class="rounded border-neutral-700 bg-neutral-800 text-primary-500 focus:ring-0"
+                />
+                <span>Share with Organization Workspace</span>
+              </label>
             </div>
           </div>
 
-          <!-- Preset Prompts -->
-          <div class="flex flex-wrap items-center gap-1.5 pt-1">
-            <span class="text-[10px] font-mono uppercase text-nexo-text-muted">Suggested:</span>
-            <button
-              v-for="(p, idx) in samplePrompts"
-              :key="idx"
-              @click="handleExecuteQuery(p)"
-              class="px-2.5 py-1 rounded bg-slate-50 border border-slate-200 hover:border-amber-300 text-[11px] text-nexo-text-secondary hover:text-nexo-text-primary transition-colors text-left"
-            >
-              {{ p }}
-            </button>
+          <!-- Sample Query Chips -->
+          <div class="space-y-1.5 pt-1">
+            <div class="text-[11px] text-neutral-500">Sample Inquiries:</div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="(prompt, idx) in samplePrompts"
+                :key="idx"
+                type="button"
+                class="px-2.5 py-1 rounded-full text-[11px] bg-neutral-800/80 border border-neutral-700 text-neutral-300 hover:text-white hover:border-primary-500/50 transition-colors text-left"
+                @click="handleGenerate(prompt)"
+              >
+                {{ prompt }}
+              </button>
+            </div>
           </div>
         </Card>
 
-        <!-- Loading Skeleton -->
-        <div v-if="isExecuting" class="p-12 bg-white rounded-lg border border-nexo-border text-center space-y-3">
-          <Sparkles class="w-8 h-8 text-amber-500 animate-spin mx-auto" />
-          <h3 class="font-serif font-bold text-nexo-text-primary text-base">Retrieving & Grounding Evidence</h3>
-          <p class="text-xs text-nexo-text-secondary max-w-md mx-auto">
-            Cross-referencing RAG knowledge vectors, verified disclosure claims, and historical timelines...
-          </p>
+        <!-- Brief Loading Skeleton -->
+        <div v-if="isExecuting" class="space-y-4 py-8">
+          <div class="text-center space-y-2">
+            <Sparkles class="w-8 h-8 text-primary-400 animate-spin mx-auto" />
+            <div class="text-sm font-serif text-white">Synthesizing Verified Intelligence Brief...</div>
+            <p class="text-xs text-neutral-400 max-w-sm mx-auto">
+              Querying grounded RAG vectors, validating corporate filings, and constructing 13-section brief.
+            </p>
+          </div>
+          <Card class="p-6 border-neutral-800 bg-neutral-900/40 space-y-4">
+            <Skeleton class="h-6 w-3/4" />
+            <Skeleton class="h-20 w-full" />
+            <Skeleton class="h-40 w-full" />
+          </Card>
         </div>
 
-        <!-- Research Result Display -->
-        <div v-if="researchResult" class="space-y-5">
-          <!-- Main Synthesis Card -->
-          <Card class="p-6 bg-white border border-nexo-border shadow-xs space-y-4">
-            <div class="flex items-start justify-between border-b border-nexo-border/80 pb-3">
-              <div>
-                <span class="text-[10px] font-mono text-emerald-800 uppercase font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  Grounded Analytical Synthesis
+        <!-- Synthesized 13-Section Brief Display -->
+        <div v-else-if="briefData" class="space-y-6">
+          <!-- Top Brief Action Bar -->
+          <Card class="p-4 border-neutral-800 bg-neutral-900/80 flex flex-wrap items-center justify-between gap-3">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-primary-500/10 text-primary-400 border border-primary-500/20">
+                  Grounded Synthesis
                 </span>
-                <h2 class="font-serif font-bold text-xl text-nexo-text-primary mt-1">
-                  {{ researchResult.query }}
-                </h2>
+                <span class="text-xs text-neutral-400">
+                  Confidence: <span class="font-mono text-emerald-400 font-semibold">{{ Math.round(briefData.confidence_score * 100) }}%</span>
+                </span>
+                <span class="text-xs text-neutral-400">
+                  Uncertainty: <span class="font-mono text-neutral-200 uppercase">{{ briefData.uncertainty_rating }}</span>
+                </span>
               </div>
-              <span class="text-[11px] font-mono text-nexo-text-muted">
-                {{ new Date(researchResult.generated_at).toLocaleTimeString() }}
-              </span>
+              <h2 class="text-lg font-serif text-white font-medium">
+                {{ briefData.title }}
+              </h2>
             </div>
 
-            <!-- Answer Prose -->
-            <div class="font-serif text-sm leading-relaxed text-nexo-text-primary whitespace-pre-wrap">
-              {{ researchResult.answer }}
-            </div>
-
-            <!-- Grounded Citations Box -->
-            <div class="pt-4 border-t border-slate-100 space-y-2">
-              <h4 class="text-xs font-mono uppercase text-nexo-text-muted flex items-center gap-1.5">
-                <BookOpen class="w-3.5 h-3.5 text-cyan-700" /> Corroborated Source Citations ({{ researchResult.grounded_citations.length }})
-              </h4>
-              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                <div
-                  v-for="(c, idx) in researchResult.grounded_citations"
-                  :key="idx"
-                  class="p-2.5 bg-slate-50 rounded border border-slate-200 text-xs space-y-0.5"
-                >
-                  <div class="font-bold text-nexo-text-primary truncate">{{ c.title }}</div>
-                  <div class="text-[10px] font-mono text-nexo-text-muted truncate">Source: {{ c.source }}</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Evidence Limitations Banner -->
-            <div class="p-3 bg-amber-50/70 rounded border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
-              <AlertTriangle class="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-              <div>
-                <span class="font-bold">Evidence Boundaries:</span>
-                <span> {{ researchResult.evidence_limitations }}</span>
-              </div>
+            <div class="flex items-center gap-2">
+              <Button variant="outline" size="sm" class="gap-1.5 text-xs" @click="handleExport('markdown')">
+                <Download class="w-3.5 h-3.5" />
+                <span>Export Markdown</span>
+              </Button>
+              <Button variant="outline" size="sm" class="gap-1.5 text-xs" @click="handleExport('json')">
+                <FileText class="w-3.5 h-3.5" />
+                <span>Export JSON</span>
+              </Button>
             </div>
           </Card>
+
+          <!-- 13 Structured Sections -->
+          <div class="space-y-4 text-xs">
+            <!-- 1. Executive Summary -->
+            <Card class="p-5 border-neutral-800 bg-neutral-900/60 space-y-2">
+              <h3 class="text-sm font-serif font-medium text-primary-300 flex items-center gap-2">
+                <BookOpen class="w-4 h-4 text-primary-400" />
+                <span>1. Executive Summary</span>
+              </h3>
+              <p class="text-neutral-200 leading-relaxed text-sm">
+                {{ briefData.executive_summary }}
+              </p>
+            </Card>
+
+            <!-- 2. Research Question -->
+            <Card class="p-4 border-neutral-800 bg-neutral-900/60 space-y-1">
+              <h4 class="text-xs font-mono uppercase tracking-wider text-neutral-400">
+                2. Research Question
+              </h4>
+              <p class="text-white font-medium">
+                {{ briefData.research_question }}
+              </p>
+            </Card>
+
+            <!-- 3. Background & Context -->
+            <Card class="p-4 border-neutral-800 bg-neutral-900/60 space-y-2">
+              <h4 class="text-xs font-mono uppercase tracking-wider text-neutral-400">
+                3. Background and Context
+              </h4>
+              <p class="text-neutral-300 leading-relaxed">
+                {{ briefData.structured_sections?.background_and_context }}
+              </p>
+            </Card>
+
+            <!-- 4. Key Findings -->
+            <Card class="p-5 border-neutral-800 bg-neutral-900/60 space-y-3">
+              <h4 class="text-xs font-mono uppercase tracking-wider text-neutral-400">
+                4. Key Findings
+              </h4>
+              <div class="space-y-2">
+                <div
+                  v-for="(finding, idx) in briefData.structured_sections?.key_findings"
+                  :key="idx"
+                  class="p-3 rounded-lg bg-neutral-950/70 border border-neutral-800 flex items-start gap-3"
+                >
+                  <CheckCircle2 class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div class="space-y-1">
+                    <div class="text-neutral-200 font-medium">
+                      {{ finding.statement }}
+                    </div>
+                    <div class="text-[11px] text-neutral-500">
+                      Source: {{ finding.source }} | Status: {{ finding.status }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <!-- 5. Relevant Developments -->
+            <Card class="p-4 border-neutral-800 bg-neutral-900/60 space-y-2">
+              <h4 class="text-xs font-mono uppercase tracking-wider text-neutral-400">
+                5. Relevant Developments
+              </h4>
+              <p class="text-neutral-300 leading-relaxed">
+                {{ briefData.structured_sections?.relevant_developments }}
+              </p>
+            </Card>
+
+            <!-- 6. Timeline -->
+            <Card v-if="briefData.structured_sections?.timeline?.length" class="p-5 border-neutral-800 bg-neutral-900/60 space-y-3">
+              <h4 class="text-xs font-mono uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+                <Clock class="w-3.5 h-3.5 text-primary-400" />
+                <span>7. Chronological Timeline</span>
+              </h4>
+              <div class="space-y-2 border-l border-neutral-800 pl-4 ml-2">
+                <div
+                  v-for="(item, idx) in briefData.structured_sections.timeline"
+                  :key="idx"
+                  class="relative space-y-0.5"
+                >
+                  <div class="w-2 h-2 rounded-full bg-primary-400 absolute -left-[21px] top-1" />
+                  <div class="text-[11px] font-mono text-primary-400 font-semibold">{{ item.date }}</div>
+                  <div class="text-neutral-200">{{ item.title }}</div>
+                </div>
+              </div>
+            </Card>
+
+            <!-- 8. Supporting Evidence & Citations -->
+            <Card class="p-5 border-neutral-800 bg-neutral-900/60 space-y-3">
+              <h4 class="text-xs font-mono uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+                <ShieldCheck class="w-4 h-4 text-emerald-400" />
+                <span>8 & 13. Traceable References and Citations</span>
+              </h4>
+              <div class="space-y-2">
+                <div
+                  v-for="cit in briefData.citations"
+                  :key="cit.citation_id"
+                  class="p-3 rounded-lg bg-neutral-950/70 border border-neutral-800/80 flex items-start justify-between gap-3"
+                >
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                      <span class="w-5 h-5 rounded-full bg-primary-500/20 text-primary-400 text-xs font-mono font-bold flex items-center justify-center shrink-0">
+                        [{{ cit.citation_id }}]
+                      </span>
+                      <span class="text-neutral-200 font-medium">{{ cit.document_title }}</span>
+                      <span class="text-[10px] text-neutral-500 uppercase font-mono">({{ cit.document_type }})</span>
+                    </div>
+                    <p v-if="cit.excerpt" class="text-neutral-400 text-[11px] pl-7">
+                      "{{ cit.excerpt }}"
+                    </p>
+                  </div>
+                  <a
+                    v-if="cit.source_url"
+                    :href="cit.source_url"
+                    target="_blank"
+                    rel="noreferrer"
+                    class="text-neutral-400 hover:text-white p-1"
+                  >
+                    <ExternalLink class="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            </Card>
+
+            <!-- 9. Contradictory Evidence -->
+            <Card v-if="briefData.conflicting_evidence?.length" class="p-5 border-neutral-800 bg-neutral-900/60 space-y-3">
+              <h4 class="text-xs font-mono uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                <AlertTriangle class="w-4 h-4 text-rose-400" />
+                <span>9. Contradictory Evidence & Divergent Claims</span>
+              </h4>
+              <div class="space-y-2">
+                <div
+                  v-for="(conf, idx) in briefData.conflicting_evidence"
+                  :key="idx"
+                  class="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 space-y-1"
+                >
+                  <div class="text-rose-200 font-medium">
+                    {{ conf.claim }}
+                  </div>
+                  <div class="text-[11px] text-rose-400/80">
+                    Source: {{ conf.source_name }} (Stance: {{ conf.stance }})
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <!-- 10. Risk & Opportunity Analysis -->
+            <Card class="p-4 border-neutral-800 bg-neutral-900/60 space-y-2">
+              <h4 class="text-xs font-mono uppercase tracking-wider text-neutral-400">
+                10. Risk and Opportunity Analysis
+              </h4>
+              <p class="text-neutral-300 leading-relaxed">
+                {{ briefData.structured_sections?.risk_and_opportunity_analysis }}
+              </p>
+            </Card>
+
+            <!-- 11. Knowledge Gaps -->
+            <Card class="p-4 border-neutral-800 bg-neutral-900/60 space-y-2">
+              <h4 class="text-xs font-mono uppercase tracking-wider text-neutral-400">
+                11. Knowledge Gaps
+              </h4>
+              <p class="text-neutral-300 leading-relaxed">
+                {{ briefData.structured_sections?.knowledge_gaps }}
+              </p>
+            </Card>
+
+            <!-- 12. Conclusion -->
+            <Card class="p-5 border-neutral-800 bg-neutral-900/80 space-y-2">
+              <h4 class="text-xs font-mono uppercase tracking-wider text-primary-400">
+                12. Conclusion
+              </h4>
+              <p class="text-neutral-200 leading-relaxed font-medium">
+                {{ briefData.structured_sections?.conclusion }}
+              </p>
+            </Card>
+          </div>
         </div>
       </main>
     </div>

@@ -43,6 +43,7 @@ const adminNavGroups = [
     items: [
       { name: 'Dashboard Overview', path: '/admin/dashboard', icon: Activity },
       { name: 'Notifications & Dispatch', path: '/admin/notifications', icon: Bell },
+      { name: 'Search Telemetry & Feedback', path: '/admin/search-analytics', icon: Search },
     ],
   },
   {
