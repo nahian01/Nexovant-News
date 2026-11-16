@@ -171,7 +171,7 @@ class UnifiedSearchService
      */
     protected function searchArticles(string $query, array $filters, string $sortBy, array $semanticChunkIds): array
     {
-        $qb = Article::query()->with(['source', 'categories', 'companies']);
+        $qb = Article::query()->with(['source', 'categories', 'companies', 'translations']);
 
         // Apply filters
         $this->filterService->applyDateFilter($qb, $filters, 'published_at');
@@ -180,10 +180,26 @@ class UnifiedSearchService
         $this->filterService->applyCategoryFilter($qb, $filters);
         $this->filterService->applyRegionFilter($qb, $filters);
 
+        // Language filter (Stage 14)
+        if (!empty($filters['language'])) {
+            $lang = strtolower((string) $filters['language']);
+            $qb->where(function (Builder $lq) use ($lang) {
+                $lq->where('original_language', $lang)
+                   ->orWhere('detected_language', $lang)
+                   ->orWhereHas('source', fn(Builder $sq) => $sq->where('language', $lang))
+                   ->orWhereHas('translations', fn(Builder $tq) => $tq->where('target_language', $lang));
+            });
+        }
+
         $qb->where(function (Builder $q) use ($query) {
             $q->where('title', 'like', "%{$query}%")
               ->orWhere('content_normalized', 'like', "%{$query}%")
-              ->orWhere('content_raw', 'like', "%{$query}%");
+              ->orWhere('content_raw', 'like', "%{$query}%")
+              ->orWhereHas('translations', function (Builder $tq) use ($query) {
+                  $tq->where('translated_title', 'like', "%{$query}%")
+                     ->orWhere('translated_summary', 'like', "%{$query}%")
+                     ->orWhere('translated_content', 'like', "%{$query}%");
+              });
         });
 
         $articles = $qb->limit(30)->get();
@@ -191,6 +207,13 @@ class UnifiedSearchService
 
         foreach ($articles as $article) {
             $titleMatch = stripos($article->title, $query) !== false;
+            $translationMatch = $article->translations->first(function ($t) use ($query) {
+                return stripos((string) $t->translated_title, $query) !== false || stripos((string) $t->translated_summary, $query) !== false;
+            });
+            if (!$titleMatch && $translationMatch) {
+                $titleMatch = true;
+            }
+
             $rawCred = (float) ($article->source?->credibility_score ?? 0.85);
             $credibility = $rawCred <= 1.0 ? round($rawCred * 100.0) : $rawCred;
             $trustTier = $article->source?->trust_tier ?? 'reputable_secondary';
@@ -214,9 +237,11 @@ class UnifiedSearchService
                 $classification = 'unverified_report';
             }
 
-            $explanation = $titleMatch
-                ? "Direct headline match with {$credibility}% source credibility and confirmed recency."
-                : "Extracted from verified context with corroborated facts from {$article->source?->name}.";
+            $explanation = $translationMatch
+                ? "Multilingual translation match ('{$translationMatch->target_language}') with {$credibility}% source credibility."
+                : ($titleMatch
+                    ? "Direct headline match with {$credibility}% source credibility and confirmed recency."
+                    : "Extracted from verified context with corroborated facts from {$article->source?->name}.");
 
             $matchedEntities = $article->companies->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'type' => 'company'])->all();
             $matchedTopics = $article->categories->pluck('name')->all();
@@ -224,6 +249,12 @@ class UnifiedSearchService
             $excerptText = is_string($article->summary)
                 ? $article->summary
                 : ($article->summary?->executive_summary ?? Str::limit(strip_tags((string) ($article->content_normalized ?? $article->content_raw ?? '')), 220));
+
+            $translationsSummary = $article->translations->map(fn($t) => [
+                'language' => $t->target_language,
+                'title' => $t->translated_title,
+                'summary' => $t->translated_summary,
+            ])->all();
 
             $items[] = new SearchResultItemDTO(
                 id: (string) $article->id,
@@ -246,7 +277,10 @@ class UnifiedSearchService
                 verificationStatus: $verificationStatus,
                 corroborationCount: 2,
                 url: "/news/{$article->slug}",
-                informationClassification: $classification
+                informationClassification: $classification,
+                originalLanguage: $article->original_language ?? $article->source?->language,
+                detectedLanguage: $article->detected_language,
+                translations: $translationsSummary
             );
         }
 

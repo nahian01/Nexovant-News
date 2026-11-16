@@ -392,10 +392,21 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/clusters/merge', [ClusterAdminController::class, 'merge'])->name('api.admin.clusters.merge');
         Route::post('/clusters/split', [ClusterAdminController::class, 'split'])->name('api.admin.clusters.split');
 
-        // 5. Sources Management
+        // 5. Sources Management & Stage 14 Global Source Network
         Route::get('/sources', [SourceAdminController::class, 'index'])->name('api.admin.sources.index');
         Route::post('/sources', [SourceAdminController::class, 'store'])->name('api.admin.sources.store');
+        Route::get('/sources/onboarding-queue', [SourceAdminController::class, 'onboardingQueue'])->name('api.admin.sources.onboarding_queue');
+        Route::post('/sources/onboard', [SourceAdminController::class, 'onboard'])->name('api.admin.sources.onboard');
+        Route::get('/sources/health-overview', [SourceAdminController::class, 'healthOverview'])->name('api.admin.sources.health_overview');
+        Route::post('/sources/health-check', [SourceAdminController::class, 'triggerHealthCheck'])->name('api.admin.sources.health_check');
+        Route::get('/sources/coverage-analytics', [SourceAdminController::class, 'coverageAnalytics'])->name('api.admin.sources.coverage_analytics');
+        Route::get('/sources/coverage-gaps', [SourceAdminController::class, 'coverageGaps'])->name('api.admin.sources.coverage_gaps');
+        Route::get('/sources/diversity-metrics', [SourceAdminController::class, 'diversityMetrics'])->name('api.admin.sources.diversity_metrics');
         Route::put('/sources/{id}', [SourceAdminController::class, 'update'])->name('api.admin.sources.update');
+        Route::post('/sources/{id}/approve', [SourceAdminController::class, 'approve'])->name('api.admin.sources.approve');
+        Route::post('/sources/{id}/reject', [SourceAdminController::class, 'reject'])->name('api.admin.sources.reject');
+        Route::post('/sources/{id}/suspend', [SourceAdminController::class, 'suspend'])->name('api.admin.sources.suspend');
+        Route::get('/sources/{id}/reliability-profile', [SourceAdminController::class, 'reliabilityProfile'])->name('api.admin.sources.reliability_profile');
         Route::post('/sources/{id}/test', [SourceAdminController::class, 'testConnection'])->name('api.admin.sources.test');
         Route::post('/sources/{id}/scan', [SourceAdminController::class, 'scan'])->name('api.admin.sources.scan');
         Route::put('/sources/{id}/toggle', [SourceAdminController::class, 'toggle'])->name('api.admin.sources.toggle');

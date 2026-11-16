@@ -82,10 +82,65 @@ export const adminService = {
     return res.data
   },
 
-  // 4. News Collection & Sources
-  async getSources() {
-    const res = await apiClient.get('/admin/sources')
+  // 4. News Collection & Sources (Stage 14 Source Network)
+  async getSources(params?: Record<string, any>) {
+    const res = await apiClient.get('/admin/sources', { params })
     return res.data.data
+  },
+
+  async getOnboardingQueue() {
+    const res = await apiClient.get('/admin/sources/onboarding-queue')
+    return res.data
+  },
+
+  async onboardSource(data: Record<string, any>) {
+    const res = await apiClient.post('/admin/sources/onboard', data)
+    return res.data
+  },
+
+  async approveSource(id: string | number, notes?: string) {
+    const res = await apiClient.post(`/admin/sources/${id}/approve`, { notes })
+    return res.data
+  },
+
+  async rejectSource(id: string | number, reason: string) {
+    const res = await apiClient.post(`/admin/sources/${id}/reject`, { reason })
+    return res.data
+  },
+
+  async suspendSource(id: string | number, reason?: string) {
+    const res = await apiClient.post(`/admin/sources/${id}/suspend`, { reason })
+    return res.data
+  },
+
+  async getHealthOverview() {
+    const res = await apiClient.get('/admin/sources/health-overview')
+    return res.data.data
+  },
+
+  async triggerHealthCheck(params?: { source_id?: number | string; source_type?: string }) {
+    const res = await apiClient.post('/admin/sources/health-check', params)
+    return res.data
+  },
+
+  async getCoverageAnalytics() {
+    const res = await apiClient.get('/admin/sources/coverage-analytics')
+    return res.data.data
+  },
+
+  async getCoverageGaps() {
+    const res = await apiClient.get('/admin/sources/coverage-gaps')
+    return res.data.data
+  },
+
+  async getDiversityMetrics() {
+    const res = await apiClient.get('/admin/sources/diversity-metrics')
+    return res.data.data
+  },
+
+  async getReliabilityProfile(id: string | number) {
+    const res = await apiClient.get(`/admin/sources/${id}/reliability-profile`)
+    return res.data
   },
 
   async createSource(data: Record<string, any>) {
@@ -93,27 +148,27 @@ export const adminService = {
     return res.data
   },
 
-  async updateSource(id: string, data: Record<string, any>) {
+  async updateSource(id: string | number, data: Record<string, any>) {
     const res = await apiClient.put(`/admin/sources/${id}`, data)
     return res.data
   },
 
-  async deleteSource(id: string) {
+  async deleteSource(id: string | number) {
     const res = await apiClient.delete(`/admin/sources/${id}`)
     return res.data
   },
 
-  async testSource(id: string) {
+  async testSource(id: string | number) {
     const res = await apiClient.post(`/admin/sources/${id}/test`)
     return res.data
   },
 
-  async scanSource(id: string) {
+  async scanSource(id: string | number) {
     const res = await apiClient.post(`/admin/sources/${id}/scan`)
     return res.data
   },
 
-  async toggleSource(id: string) {
+  async toggleSource(id: string | number) {
     const res = await apiClient.put(`/admin/sources/${id}/toggle`)
     return res.data
   },

@@ -27,7 +27,10 @@ class SearchResultItemDTO
         public readonly int $corroborationCount,
         public readonly string $url,
         public readonly ?string $tenantId = null,
-        public readonly string $informationClassification = 'verified_fact' // verified_fact, disputed_claim, inferred_intelligence, unverified_report
+        public readonly string $informationClassification = 'verified_fact', // verified_fact, disputed_claim, inferred_intelligence, unverified_report
+        public readonly ?string $originalLanguage = null,
+        public readonly ?string $detectedLanguage = null,
+        public readonly array $translations = []
     ) {}
 
     /**
@@ -52,6 +55,9 @@ class SearchResultItemDTO
             'url' => $this->url,
             'tenant_id' => $this->tenantId,
             'information_classification' => $this->informationClassification,
+            'original_language' => $this->originalLanguage,
+            'detected_language' => $this->detectedLanguage,
+            'translations' => $this->translations,
         ];
     }
 }

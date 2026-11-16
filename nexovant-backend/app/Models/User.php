@@ -158,6 +158,11 @@ class User extends Authenticatable
         return $membership?->organization;
     }
 
+    public function getOrganizationIdAttribute(): ?string
+    {
+        return $this->activeOrganization()?->id;
+    }
+
     public function organizationRole(?Organization $org = null): ?string
     {
         $orgId = $org?->id ?? $this->activeOrganization()?->id;

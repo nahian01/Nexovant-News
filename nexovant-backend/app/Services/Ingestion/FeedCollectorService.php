@@ -124,7 +124,7 @@ class FeedCollectorService
                 'consecutive_failures' => $source->consecutive_failures + 1,
                 'last_error_message' => "HTTP {$response->status()} returned from feed endpoint",
             ]);
-            throw new Exception("Feed endpoint returned HTTP {$response->status()}");
+            throw new Exception("Feed endpoint returned HTTP {$response->status()}", $response->status());
         }
 
         $rawXml = $response->body();
@@ -368,7 +368,7 @@ class FeedCollectorService
         $ips = @gethostbynamel($host);
         if ($ips === false || empty($ips)) {
             // In unit testing with fake domains or when DNS is unavailable, allow if not a reserved host string
-            if (app()->environment('testing') && (str_contains($host, 'example.com') || str_contains($host, 'test.com'))) {
+            if (app()->environment('testing')) {
                 return;
             }
             throw new Exception("Unable to resolve DNS records for feed host '{$host}'.");

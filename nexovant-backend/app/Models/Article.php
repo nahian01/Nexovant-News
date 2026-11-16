@@ -30,6 +30,8 @@ class Article extends Model
         'content_hash',
         'published_at',
         'verification_status', // confirmed, reported_reliable, developing, disputed, unverified, retracted
+        'original_language',
+        'detected_language',
         'importance_score',
         'is_breaking',
         'is_editorial_approved',
@@ -75,6 +77,9 @@ class Article extends Model
             }
             if (empty($article->content_hash)) {
                 $article->content_hash = hash('sha256', ($article->slug ?? '') . '|' . ($article->title ?? ''));
+            }
+            if (empty($article->canonical_url)) {
+                $article->canonical_url = 'https://news.nexovant.test/articles/' . ($article->slug ?: Str::random(8));
             }
         });
     }
@@ -160,6 +165,11 @@ class Article extends Model
     public function revisions(): HasMany
     {
         return $this->hasMany(ArticleRevision::class)->orderByDesc('version_number');
+    }
+
+    public function translations(): HasMany
+    {
+        return $this->hasMany(ArticleTranslation::class, 'article_id');
     }
 
     public function savedByUsers(): BelongsToMany
