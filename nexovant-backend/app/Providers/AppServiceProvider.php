@@ -24,5 +24,16 @@ class AppServiceProvider extends ServiceProvider
     {
         // Remove 'data' wrapper from single resource returns for clean API response structures
         JsonResource::withoutWrapping();
+
+        // Automatic opportunistic background surveillance trigger on web requests
+        if (!$this->app->runningInConsole()) {
+            $this->app->terminating(function () {
+                try {
+                    app(\App\Services\Ingestion\AutoIngestSchedulerService::class)->runDueIngestionCycles();
+                } catch (\Throwable) {
+                    // Fail silently in terminating callback to preserve user response integrity
+                }
+            });
+        }
     }
 }
