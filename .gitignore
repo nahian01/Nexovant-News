@@ -3,6 +3,16 @@
 **/.env.*
 !**/.env.example
 !**/.env.*.example
+**/credentials*.txt
+**/credentials*.json
+**/passwords*.txt
+**/passwords*.json
+**/*.secret
+**/*.credentials
+CREDENTIALS.md
+CREDENTIALS.local.md
+PASSWORDS.md
+PASSWORDS.local.md
 
 # Dependencies and generated frontend assets
 **/node_modules/

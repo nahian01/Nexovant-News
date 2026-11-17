@@ -7,6 +7,11 @@
 .env
 .env.backup
 .env.production
+.env.*
+!*.example
+*passwords*
+*credentials*
+*.secret
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml
