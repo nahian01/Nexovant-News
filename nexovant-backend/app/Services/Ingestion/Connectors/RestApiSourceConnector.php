@@ -93,16 +93,29 @@ class RestApiSourceConnector implements SourceConnectorInterface
         // Apply Authentication
         $credentials = $source->getDecryptedCredentials();
         if ($credentials) {
-            if (in_array($source->auth_type, ['bearer', 'bearer_token'], true) && !empty($credentials['token'])) {
-                $headers['Authorization'] = 'Bearer ' . $credentials['token'];
-            } elseif ($source->auth_type === 'api_key' && !empty($credentials['key'])) {
-                $headerName = $credentials['header_name'] ?? 'X-API-Key';
-                $headers[$headerName] = $credentials['key'];
+            $token = $credentials['token'] ?? $credentials['bearer_token'] ?? null;
+            if (in_array($source->auth_type, ['bearer', 'bearer_token'], true) && !empty($token)) {
+                $headers['Authorization'] = 'Bearer ' . $token;
+            } elseif ($source->auth_type === 'api_key') {
+                $key = $credentials['key'] ?? $credentials['api_key'] ?? null;
+                if (!empty($key)) {
+                    $headerName = $credentials['header_name'] ?? 'X-API-Key';
+                    $headers[$headerName] = $key;
+                }
             }
         }
 
         $timeout = $source->timeout_seconds ?: 15;
-        $http = Http::timeout($timeout)->withHeaders($headers);
+        $httpOptions = [
+            'timeout' => $timeout,
+            'connect_timeout' => 8,
+        ];
+
+        if (app()->isLocal() && empty(ini_get('curl.cainfo')) && empty(ini_get('openssl.cafile'))) {
+            $httpOptions['verify'] = false;
+        }
+
+        $http = Http::withOptions($httpOptions)->timeout($timeout)->withHeaders($headers);
 
         if (in_array($source->auth_type, ['basic', 'basic_auth'], true) && !empty($credentials['username'])) {
             $http = $http->withBasicAuth((string) $credentials['username'], (string) ($credentials['password'] ?? ''));

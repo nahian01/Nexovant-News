@@ -269,8 +269,8 @@ const handleCreateSource = async () => {
       publisher_name: newSource.value.publisher_name || newSource.value.name,
       source_type: newSource.value.source_type,
       website_url: newSource.value.website_url || null,
-      feed_url: newSource.value.feed_url || null,
-      api_endpoint: newSource.value.api_endpoint || null,
+      feed_url: newSource.value.source_type === 'rest_api' ? null : (newSource.value.feed_url || null),
+      api_endpoint: newSource.value.api_endpoint || (newSource.value.source_type === 'rest_api' ? newSource.value.feed_url : null),
       country_code: newSource.value.country_code,
       continent: newSource.value.continent,
       language: newSource.value.language,
@@ -285,7 +285,10 @@ const handleCreateSource = async () => {
     }
 
     if (newSource.value.auth_type !== 'none') {
-      payload.credentials = newSource.value.credentials
+      const creds: Record<string, any> = { ...newSource.value.credentials }
+      if (creds.bearer_token) creds.token = creds.bearer_token
+      if (creds.api_key) creds.key = creds.api_key
+      payload.credentials = creds
     }
 
     const res = await adminService.onboardSource(payload)

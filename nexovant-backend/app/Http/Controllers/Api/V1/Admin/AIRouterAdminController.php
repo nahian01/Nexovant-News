@@ -28,6 +28,13 @@ class AIRouterAdminController
      */
     public function index(): JsonResponse
     {
+        // Auto-sync any credentials configured in environment (.env)
+        try {
+            $this->routerService->getVault()->syncFromEnvironment();
+        } catch (\Throwable $e) {
+            // Keep going if environment sync encounters a non-blocking error
+        }
+
         $providers = AIProvider::with([
             'models',
             'quota',
@@ -146,6 +153,13 @@ class AIRouterAdminController
      */
     public function credentials(Request $request): JsonResponse
     {
+        // Auto-sync any credentials configured in environment (.env)
+        try {
+            $this->routerService->getVault()->syncFromEnvironment();
+        } catch (\Throwable $e) {
+            // Non-blocking
+        }
+
         $query = AIProviderCredential::with('provider:id,name,slug');
 
         if ($providerId = $request->query('provider_id')) {
@@ -182,6 +196,14 @@ class AIRouterAdminController
      */
     public function storeCredential(Request $request): JsonResponse
     {
+        // Normalize input keys so frontend naming variants (ai_provider_id, monthly_spending_budget_usd) work seamlessly
+        if (!$request->has('provider_id') && $request->has('ai_provider_id')) {
+            $request->merge(['provider_id' => $request->input('ai_provider_id')]);
+        }
+        if (!$request->has('monthly_spending_budget') && $request->has('monthly_spending_budget_usd')) {
+            $request->merge(['monthly_spending_budget' => $request->input('monthly_spending_budget_usd')]);
+        }
+
         $validated = $request->validate([
             'provider_id' => ['required', 'exists:ai_providers,id'],
             'display_name' => ['required', 'string', 'max:255'],
@@ -233,6 +255,12 @@ class AIRouterAdminController
             'last_tested_at' => now(),
             'last_health_check_at' => now(),
         ]);
+
+        // Auto-activate the parent provider if currently inactive
+        $provider = AIProvider::find($validated['provider_id']);
+        if ($provider && !$provider->is_active) {
+            $provider->update(['is_active' => true]);
+        }
 
         AuditLog::create([
             'user_id' => $admin->id,

@@ -52,6 +52,96 @@ class AICredentialVault
     }
 
     /**
+     * Automatically discover and register API credentials specified in .env or configuration.
+     * Supports:
+     * - GEMINI_API_KEY / GOOGLE_GEMINI_API_KEY / GOOGLE_API_KEY
+     * - OPENAI_API_KEY
+     * - ANTHROPIC_API_KEY / CLAUDE_API_KEY
+     *
+     * @return array<string, AIProviderCredential>
+     */
+    public function syncFromEnvironment(): array
+    {
+        $envProviders = [
+            'google-gemini' => [
+                'env' => ['GEMINI_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+                'label' => 'Google Gemini Primary Gateway (.env)',
+            ],
+            'openai' => [
+                'env' => ['OPENAI_API_KEY'],
+                'label' => 'OpenAI GPT Primary Gateway (.env)',
+            ],
+            'anthropic' => [
+                'env' => ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'],
+                'label' => 'Anthropic Claude Primary Gateway (.env)',
+            ],
+        ];
+
+        $synced = [];
+
+        foreach ($envProviders as $slug => $config) {
+            $apiKey = null;
+            foreach ($config['env'] as $varName) {
+                $val = env($varName) ?: getenv($varName);
+                if (!empty($val) && strlen(trim((string) $val)) >= 10) {
+                    $apiKey = trim((string) $val);
+                    break;
+                }
+            }
+
+            if (!$apiKey) {
+                continue;
+            }
+
+            $provider = \App\Models\AIProvider::where('slug', $slug)->first();
+            if (!$provider) {
+                continue;
+            }
+
+            // Ensure provider is active
+            if (!$provider->is_active) {
+                $provider->update(['is_active' => true]);
+            }
+
+            $fingerprint = $this->calculateFingerprint($apiKey);
+            $existing = AIProviderCredential::where('key_fingerprint', $fingerprint)->first();
+
+            if ($existing) {
+                if (!$existing->routing_eligibility || $existing->status !== 'active') {
+                    $existing->update([
+                        'status' => 'active',
+                        'routing_eligibility' => true,
+                        'is_valid' => true,
+                    ]);
+                }
+                $synced[$slug] = $existing;
+            } else {
+                $encrypted = Crypt::encryptString($apiKey);
+                $cred = AIProviderCredential::create([
+                    'provider_id' => $provider->id,
+                    'label' => $config['label'],
+                    'display_name' => $config['label'],
+                    'encrypted_api_key' => $encrypted,
+                    'key_fingerprint' => $fingerprint,
+                    'account_label' => 'Environment (.env)',
+                    'priority' => 1,
+                    'routing_eligibility' => true,
+                    'status' => 'active',
+                    'is_valid' => true,
+                    'daily_request_budget' => 5000,
+                    'daily_token_budget' => 5000000,
+                    'monthly_spending_budget' => 500.0,
+                    'last_tested_at' => now(),
+                    'last_health_check_at' => now(),
+                ]);
+                $synced[$slug] = $cred;
+            }
+        }
+
+        return $synced;
+    }
+
+    /**
      * Decrypt credential secret for outbound dispatch strictly in memory.
      */
     public function decryptSecret(AIProviderCredential $credential): string
@@ -100,6 +190,14 @@ class AICredentialVault
             ->where('is_valid', true)
             ->where('routing_eligibility', true)
             ->get();
+
+        if ($credentials->isEmpty()) {
+            $this->syncFromEnvironment();
+            $credentials = AIProviderCredential::where('provider_id', $providerId)
+                ->where('is_valid', true)
+                ->where('routing_eligibility', true)
+                ->get();
+        }
 
         $eligible = collect();
 

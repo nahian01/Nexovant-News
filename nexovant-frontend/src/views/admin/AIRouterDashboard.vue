@@ -121,7 +121,12 @@ const fetchAll = async () => {
 
 const handleCreateCredential = async () => {
   try {
-    const res = await adminService.createAICredential(credentialForm.value)
+    const payload = {
+      ...credentialForm.value,
+      provider_id: credentialForm.value.ai_provider_id,
+      monthly_spending_budget: credentialForm.value.monthly_spending_budget_usd,
+    }
+    const res = await adminService.createAICredential(payload)
     statusMessage.value = res.message || 'API credential encrypted and added to routing pool.'
     isAddCredentialModalOpen.value = false
     credentialForm.value = {
@@ -137,7 +142,7 @@ const handleCreateCredential = async () => {
     }
     await fetchAll()
   } catch (err: any) {
-    errorMessage.value = err.response?.data?.message || 'Failed to save credential.'
+    errorMessage.value = err.response?.data?.message || err.response?.data?.error?.message || 'Failed to save credential.'
   }
 }
 
