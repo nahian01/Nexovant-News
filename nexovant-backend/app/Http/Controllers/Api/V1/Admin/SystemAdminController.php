@@ -40,6 +40,12 @@ class SystemAdminController
         File::ensureDirectoryExists(dirname($path));
         File::put($path, json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
+        // Sync fetch interval to news sources if modified
+        if (isset($incoming['feed_fetch_interval_minutes']) || isset($incoming['rss_polling_interval_minutes'])) {
+            $interval = (int) ($incoming['feed_fetch_interval_minutes'] ?? $incoming['rss_polling_interval_minutes'] ?? 15);
+            \App\Models\NewsSource::where('is_active', true)->update(['fetch_interval_minutes' => max(1, $interval)]);
+        }
+
         AuditLog::create([
             'user_id' => $admin->id,
             'action' => 'system.settings_updated',

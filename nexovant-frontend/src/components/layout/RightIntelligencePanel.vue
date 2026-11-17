@@ -29,25 +29,10 @@ const isLoadingTrends = ref(true)
 const followedEntities = ref<Record<string, boolean>>({})
 
 // Suggested Entities
-const suggestedCompanies = ref<any[]>([
-  { id: 'nvidia-corp', name: 'NVIDIA Corporation', ticker: 'NVDA', type: 'company', followers: '18.4k' },
-  { id: 'asml-corp', name: 'ASML Holding NV', ticker: 'ASML', type: 'company', followers: '12.1k' },
-  { id: 'tsmc-corp', name: 'TSMC', ticker: 'TSM', type: 'company', followers: '15.6k' },
-  { id: 'microsoft-corp', name: 'Microsoft Corporation', ticker: 'MSFT', type: 'company', followers: '22.3k' },
-])
-
-const emergingTechnologies = ref<any[]>([
-  { slug: 'high-na-euv', name: 'High-NA EUV Lithography', type: 'technology', category: 'Semiconductors' },
-  { slug: 'generative-agents', name: 'Autonomous AI Agents', type: 'technology', category: 'Artificial Intelligence' },
-  { slug: 'quantum-annealing', name: 'Fault-Tolerant Quantum Computing', type: 'technology', category: 'Hardware' },
-  { slug: 'radioligand-therapy', name: 'Radioligand Targeted Therapy', type: 'technology', category: 'Biotechnology' },
-])
-
-const suggestedTopics = ref<any[]>([
-  { slug: 'silicon-sovereignty', tag: '#SiliconSovereignty', name: 'Silicon Sovereignty', count: '14.2k mentions' },
-  { slug: 'eu-chips-act', tag: '#EUChipsAct', name: 'EU Chips Act', count: '9.8k mentions' },
-  { slug: 'antitrust-regulatory', tag: '#AntitrustRegulatory', name: 'Antitrust Regulatory', count: '7.4k mentions' },
-])
+const suggestedCompanies = ref<any[]>([])
+const emergingTechnologies = ref<any[]>([])
+const suggestedTopics = ref<any[]>([])
+const isLoadingSuggestions = ref(true)
 
 const loadPanelData = async () => {
   // 1. Fetch live trends
@@ -101,6 +86,8 @@ const loadPanelData = async () => {
     }
   } catch {
     //
+  } finally {
+    isLoadingSuggestions.value = false
   }
 }
 
@@ -218,7 +205,10 @@ onMounted(() => {
         </RouterLink>
       </div>
 
-      <div class="space-y-1.5">
+      <div v-if="isLoadingSuggestions" class="space-y-2 py-1">
+        <div v-for="i in 3" :key="i" class="h-10 bg-nexo-bg/60 animate-pulse rounded-xl" />
+      </div>
+      <div v-else-if="suggestedCompanies.length" class="space-y-1.5">
         <div
           v-for="company in suggestedCompanies"
           :key="company.id"
@@ -267,7 +257,10 @@ onMounted(() => {
         </RouterLink>
       </div>
 
-      <div class="space-y-1.5">
+      <div v-if="isLoadingSuggestions" class="space-y-2 py-1">
+        <div v-for="i in 3" :key="i" class="h-10 bg-nexo-bg/60 animate-pulse rounded-xl" />
+      </div>
+      <div v-else-if="emergingTechnologies.length" class="space-y-1.5">
         <div
           v-for="tech in emergingTechnologies"
           :key="tech.slug"
@@ -305,7 +298,10 @@ onMounted(() => {
         </span>
       </div>
 
-      <div class="flex flex-wrap gap-1.5">
+      <div v-if="isLoadingSuggestions" class="flex gap-1.5 py-1">
+        <div v-for="i in 3" :key="i" class="h-6 w-20 bg-nexo-bg/60 animate-pulse rounded-full" />
+      </div>
+      <div v-else-if="suggestedTopics.length" class="flex flex-wrap gap-1.5">
         <button
           v-for="topic in suggestedTopics"
           :key="topic.slug"

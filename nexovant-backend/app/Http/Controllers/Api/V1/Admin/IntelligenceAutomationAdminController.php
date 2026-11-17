@@ -204,17 +204,43 @@ class IntelligenceAutomationAdminController
     }
 
     /**
-     * Trigger on-demand monitoring scan.
+     * Trigger on-demand monitoring and intelligence ingestion scan.
      */
-    public function triggerScan(Request $request): JsonResponse
+    public function triggerScan(Request $request, \App\Services\Ingestion\IntelligencePipelineCoordinator $coordinator): JsonResponse
     {
+        $admin = $request->user();
         $hours = (int) $request->input('hours', 24);
+
+        // 1. Ingest from active sources
+        $sources = \App\Models\NewsSource::where('is_active', true)->whereNotNull('feed_url')->get();
+        $sourcesScanned = 0;
+        $itemsFetched = 0;
+        $storiesCreated = 0;
+        $articlesGenerated = 0;
+
+        foreach ($sources as $source) {
+            try {
+                $stats = $coordinator->processSource($source, $admin, true);
+                $itemsFetched += $stats['items_fetched'];
+                $storiesCreated += $stats['stories_created'];
+                $articlesGenerated += $stats['articles_generated'];
+                $sourcesScanned++;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Intelligence automation scan error on [{$source->name}]: " . $e->getMessage());
+            }
+        }
+
+        // 2. Evaluate monitoring rules & early warnings across articles
         $processed = $this->monitoringService->runScheduledMonitorScan($hours);
 
         return response()->json([
             'success' => true,
-            'message' => "Monitoring scan executed across {$processed} articles.",
+            'message' => "Intelligence scan complete: scanned {$sourcesScanned} sources, fetched {$itemsFetched} items, generated {$articlesGenerated} articles, and evaluated {$processed} articles for early warnings.",
             'processed_count' => $processed,
+            'sources_scanned' => $sourcesScanned,
+            'items_fetched' => $itemsFetched,
+            'stories_created' => $storiesCreated,
+            'articles_generated' => $articlesGenerated,
         ]);
     }
 }

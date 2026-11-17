@@ -7,21 +7,65 @@ namespace App\Console\Commands;
 use App\Models\NewsSource;
 use App\Services\Ingestion\IntelligencePipelineCoordinator;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\File;
 use Throwable;
 
 class IngestFeedsCommand extends Command
 {
     protected $signature = 'nexovant:ingest-feeds 
                             {--source= : Specific NewsSource UUID or slug to ingest}
-                            {--force : Force ingestion even if fetch interval has not elapsed}';
+                            {--force : Force ingestion even if fetch interval has not elapsed}
+                            {--daemon : Run continuously as a background automated surveillance scanner}
+                            {--interval= : Polling check interval in minutes (default 15)}';
 
     protected $description = 'Ingest RSS/Atom feeds, detect duplicates, cluster stories, and synthesize intelligence articles';
 
     public function handle(IntelligencePipelineCoordinator $coordinator): int
     {
-        $this->info("Starting Nexovant Intelligence Ingestion Pipeline...");
+        $isDaemon = (bool) $this->option('daemon');
 
-        $sourceQuery = NewsSource::where('is_active', true);
+        if ($isDaemon) {
+            $this->info("Starting Nexovant Continuous Surveillance Scanner Daemon...");
+            $this->info("Press Ctrl+C to terminate gracefully.");
+
+            while (true) {
+                $this->runIngestionCycle($coordinator);
+
+                $interval = $this->determineInterval();
+                $this->info("Sleeping for {$interval} minutes until next intelligence surveillance cycle...");
+
+                for ($i = 0; $i < ($interval * 60); $i += 5) {
+                    if (connection_aborted()) {
+                        break 2;
+                    }
+                    sleep(5);
+                }
+            }
+
+            return self::SUCCESS;
+        }
+
+        return $this->runIngestionCycle($coordinator);
+    }
+
+    /**
+     * Run a single ingestion pass across active news sources.
+     */
+    protected function runIngestionCycle(IntelligencePipelineCoordinator $coordinator): int
+    {
+        $this->info("[" . now()->toIso8601String() . "] Initiating Nexovant Intelligence Ingestion Pipeline...");
+
+        // Check if automation is paused in global system settings
+        $settingsPath = storage_path('app/settings.json');
+        if (File::exists($settingsPath)) {
+            $settings = json_decode(File::get($settingsPath), true) ?? [];
+            if (!empty($settings['pipeline_automation_paused']) || !empty($settings['is_ingestion_paused'])) {
+                $this->warn("Ingestion pipeline is paused in system settings (pipeline_automation_paused / is_ingestion_paused).");
+                return self::SUCCESS;
+            }
+        }
+
+        $sourceQuery = NewsSource::where('is_active', true)->whereNotNull('feed_url');
 
         if ($sourceIdentifier = $this->option('source')) {
             $sourceQuery->where(function ($q) use ($sourceIdentifier) {
@@ -32,7 +76,7 @@ class IngestFeedsCommand extends Command
         $sources = $sourceQuery->get();
 
         if ($sources->isEmpty()) {
-            $this->warn("No active news sources found for ingestion.");
+            $this->warn("No active news sources with valid feeds found for ingestion.");
             return self::SUCCESS;
         }
 
@@ -50,10 +94,10 @@ class IngestFeedsCommand extends Command
                 }
             }
 
-            $this->info("Ingesting source: {$source->name} ({$source->url})...");
+            $this->info("Ingesting source: {$source->name} ({$source->feed_url})...");
 
             try {
-                $stats = $coordinator->processSource($source);
+                $stats = $coordinator->processSource($source, null, $force);
                 $this->info("  ✓ Fetched: {$stats['items_fetched']} items, Created: {$stats['stories_created']} stories, Duplicates: {$stats['duplicates_found']}, Clusters: {$stats['clusters_updated']}, Articles: {$stats['articles_generated']}");
                 $totalProcessed++;
                 $totalArticles += $stats['articles_generated'];
@@ -62,7 +106,30 @@ class IngestFeedsCommand extends Command
             }
         }
 
-        $this->info("Pipeline ingestion completed. {$totalProcessed} sources processed, {$totalArticles} articles synthesized.");
+        $this->info("Pipeline cycle completed. {$totalProcessed} sources processed, {$totalArticles} articles synthesized.");
         return self::SUCCESS;
+    }
+
+    /**
+     * Determine polling interval in minutes.
+     */
+    protected function determineInterval(): int
+    {
+        if ($option = $this->option('interval')) {
+            return max(1, (int) $option);
+        }
+
+        $settingsPath = storage_path('app/settings.json');
+        if (File::exists($settingsPath)) {
+            $settings = json_decode(File::get($settingsPath), true) ?? [];
+            if (!empty($settings['rss_polling_interval_minutes'])) {
+                return max(1, (int) $settings['rss_polling_interval_minutes']);
+            }
+            if (!empty($settings['feed_fetch_interval_minutes'])) {
+                return max(1, (int) $settings['feed_fetch_interval_minutes']);
+            }
+        }
+
+        return 15;
     }
 }

@@ -302,24 +302,123 @@ class DatabaseSeeder extends Seeder
                 'name' => 'SEC EDGAR Official Disclosures',
                 'source_type' => 'regulatory',
                 'url' => 'https://www.sec.gov/edgar',
-                'feed_url' => 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent',
+                'feed_url' => 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&CIK=&type=8-K&company=&dateb=&owner=include&start=0&count=20&output=atom',
                 'credibility_score' => 1.00,
                 'is_active' => true,
                 'health_status' => 'healthy',
                 'fetch_interval_minutes' => 15,
+                'source_category' => 'regulatory',
+                'geographic_region' => 'US',
+                'language' => 'en',
+                'trust_tier' => 'primary_regulatory',
             ]
         );
 
         $financialSource = NewsSource::updateOrCreate(
-            ['slug' => 'global-business-wire'],
+            ['slug' => 'ars-technica'],
             [
-                'name' => 'Global Regulatory Disclosures Wire',
-                'source_type' => 'official_disclosure',
-                'url' => 'https://www.businesswire.com',
+                'name' => 'Ars Technica Technology & Science',
+                'source_type' => 'technology',
+                'url' => 'https://arstechnica.com',
+                'feed_url' => 'https://feeds.arstechnica.com/arstechnica/index',
                 'credibility_score' => 0.95,
                 'is_active' => true,
                 'health_status' => 'healthy',
                 'fetch_interval_minutes' => 15,
+                'source_category' => 'technology',
+                'geographic_region' => 'GLOBAL',
+                'language' => 'en',
+                'trust_tier' => 'reputable_secondary',
+            ]
+        );
+
+        NewsSource::updateOrCreate(
+            ['slug' => 'bbc-news-tech'],
+            [
+                'name' => 'BBC Global Technology Intelligence',
+                'source_type' => 'news_wire',
+                'url' => 'https://www.bbc.com/news/technology',
+                'feed_url' => 'https://feeds.bbci.co.uk/news/technology/rss.xml',
+                'credibility_score' => 0.95,
+                'is_active' => true,
+                'health_status' => 'healthy',
+                'fetch_interval_minutes' => 15,
+                'source_category' => 'technology',
+                'geographic_region' => 'GLOBAL',
+                'language' => 'en',
+                'trust_tier' => 'reputable_secondary',
+            ]
+        );
+
+        NewsSource::updateOrCreate(
+            ['slug' => 'techcrunch'],
+            [
+                'name' => 'TechCrunch Strategic Innovation',
+                'source_type' => 'technology',
+                'url' => 'https://techcrunch.com',
+                'feed_url' => 'https://techcrunch.com/feed/',
+                'credibility_score' => 0.90,
+                'is_active' => true,
+                'health_status' => 'healthy',
+                'fetch_interval_minutes' => 15,
+                'source_category' => 'technology',
+                'geographic_region' => 'GLOBAL',
+                'language' => 'en',
+                'trust_tier' => 'reputable_secondary',
+            ]
+        );
+
+        NewsSource::updateOrCreate(
+            ['slug' => 'the-verge'],
+            [
+                'name' => 'The Verge Policy & Science',
+                'source_type' => 'technology',
+                'url' => 'https://www.theverge.com',
+                'feed_url' => 'https://www.theverge.com/rss/index.xml',
+                'credibility_score' => 0.90,
+                'is_active' => true,
+                'health_status' => 'healthy',
+                'fetch_interval_minutes' => 15,
+                'source_category' => 'technology',
+                'geographic_region' => 'GLOBAL',
+                'language' => 'en',
+                'trust_tier' => 'reputable_secondary',
+            ]
+        );
+
+        NewsSource::updateOrCreate(
+            ['slug' => 'wired'],
+            [
+                'name' => 'Wired Business & Strategic Technology',
+                'source_type' => 'technology',
+                'url' => 'https://www.wired.com',
+                'feed_url' => 'https://www.wired.com/feed/rss',
+                'credibility_score' => 0.90,
+                'is_active' => true,
+                'health_status' => 'healthy',
+                'fetch_interval_minutes' => 15,
+                'source_category' => 'technology',
+                'geographic_region' => 'GLOBAL',
+                'language' => 'en',
+                'trust_tier' => 'reputable_secondary',
+            ]
+        );
+
+        NewsSource::updateOrCreate(
+            ['slug' => 'mit-tech-review'],
+            [
+                'name' => 'MIT Technology Review DeepTech',
+                'source_type' => 'research',
+                'url' => 'https://www.technologyreview.com',
+                'feed_url' => 'https://www.technologyreview.com/feed/',
+                'credibility_score' => 0.98,
+                'is_active' => true,
+                'health_status' => 'healthy',
+                'fetch_interval_minutes' => 15,
+                'source_category' => 'technology',
+                'geographic_region' => 'GLOBAL',
+                'language' => 'en',
+                'trust_tier' => 'primary_regulatory',
             ]
         );
 

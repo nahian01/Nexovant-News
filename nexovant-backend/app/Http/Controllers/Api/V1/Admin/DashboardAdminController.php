@@ -146,35 +146,48 @@ class DashboardAdminController
     /**
      * Trigger immediate ingestion scan across all active sources.
      */
-    public function triggerScan(Request $request): JsonResponse
+    public function triggerScan(Request $request, \App\Services\Ingestion\IntelligencePipelineCoordinator $coordinator): JsonResponse
     {
         $admin = $request->user();
-        $sources = NewsSource::where('is_active', true)->get();
+        $sources = NewsSource::where('is_active', true)->whereNotNull('feed_url')->get();
 
-        $jobsCreated = 0;
+        $sourcesScanned = 0;
+        $itemsFetched = 0;
+        $storiesCreated = 0;
+        $articlesGenerated = 0;
+
         foreach ($sources as $source) {
-            PipelineJob::create([
-                'source_id' => $source->id,
-                'stage' => '1. Source Discovery',
-                'status' => 'processing',
-                'item_title' => "Manual Ingestion Scan for {$source->name}",
-                'started_at' => now(),
-            ]);
-            $jobsCreated++;
+            try {
+                $stats = $coordinator->processSource($source, $admin, true);
+                $itemsFetched += $stats['items_fetched'];
+                $storiesCreated += $stats['stories_created'];
+                $articlesGenerated += $stats['articles_generated'];
+                $sourcesScanned++;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Dashboard scan error on [{$source->name}]: " . $e->getMessage());
+            }
         }
 
         AuditLog::create([
-            'user_id' => $admin->id,
+            'user_id' => $admin?->id,
             'action' => 'pipeline.scan_triggered',
             'resource_type' => 'PipelineJob',
-            'new_values' => ['jobs_created' => $jobsCreated],
+            'new_values' => [
+                'sources_scanned' => $sourcesScanned,
+                'items_fetched' => $itemsFetched,
+                'stories_created' => $storiesCreated,
+                'articles_generated' => $articlesGenerated,
+            ],
             'created_at' => now(),
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => "Successfully initiated ingestion scan across {$jobsCreated} active news sources.",
-            'jobs_created' => $jobsCreated,
+            'message' => "Successfully executed ingestion scan across {$sourcesScanned} active news sources ({$articlesGenerated} articles generated).",
+            'sources_scanned' => $sourcesScanned,
+            'items_fetched' => $itemsFetched,
+            'stories_created' => $storiesCreated,
+            'articles_generated' => $articlesGenerated,
         ]);
     }
 

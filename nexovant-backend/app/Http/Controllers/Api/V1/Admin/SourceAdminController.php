@@ -424,38 +424,35 @@ class SourceAdminController
     /**
      * Trigger immediate ingestion scan for a single source.
      */
-    public function scan(string $id, Request $request): JsonResponse
+    public function scan(string $id, Request $request, \App\Services\Ingestion\IntelligencePipelineCoordinator $coordinator): JsonResponse
     {
         $source = NewsSource::findOrFail($id);
         $this->authorizeSourceAccess($request->user(), $source);
         $admin = $request->user();
 
-        $job = PipelineJob::create([
-            'source_id' => $source->id,
-            'stage' => '1. Source Discovery',
-            'status' => 'processing',
-            'item_title' => "Scan for {$source->name}",
-            'started_at' => now(),
-        ]);
+        try {
+            $stats = $coordinator->processSource($source, $admin, true);
 
-        $source->update([
-            'last_polled_at' => now(),
-            'total_items_ingested' => $source->total_items_ingested + 1,
-        ]);
+            AuditLog::create([
+                'user_id' => $admin?->id,
+                'action' => 'source.scan_triggered',
+                'resource_type' => 'NewsSource',
+                'resource_id' => $source->id,
+                'new_values' => $stats,
+                'created_at' => now(),
+            ]);
 
-        AuditLog::create([
-            'user_id' => $admin?->id ?? 1,
-            'action' => 'source.scan_triggered',
-            'resource_type' => 'NewsSource',
-            'resource_id' => $source->id,
-            'created_at' => now(),
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => "Ingestion scan initiated for '{$source->name}'.",
-            'job' => $job,
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => "Ingestion scan completed for '{$source->name}': fetched {$stats['items_fetched']} items, created {$stats['stories_created']} stories, synthesized {$stats['articles_generated']} articles.",
+                'stats' => $stats,
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => "Scan failed for '{$source->name}': {$e->getMessage()}",
+            ], 422);
+        }
     }
 
     /**

@@ -198,6 +198,41 @@ const handleSubmitReview = async () => {
 const telemetryData = ref<any | null>(null)
 const isLoadingTelemetry = ref(false)
 
+// 6. Surveillance Interval Calibration
+const scanInterval = ref(15)
+const isUpdatingInterval = ref(false)
+
+const fetchSettings = async () => {
+  try {
+    const s = await adminService.getSystemSettings()
+    if (s?.feed_fetch_interval_minutes) {
+      scanInterval.value = Number(s.feed_fetch_interval_minutes)
+    } else if (s?.rss_polling_interval_minutes) {
+      scanInterval.value = Number(s.rss_polling_interval_minutes)
+    }
+  } catch (err: any) {
+    console.error('Failed to load scan interval settings', err)
+  }
+}
+
+const handleIntervalChange = async (val: number) => {
+  isUpdatingInterval.value = true
+  statusMessage.value = ''
+  errorMessage.value = ''
+  try {
+    await adminService.updateSystemSettings({
+      feed_fetch_interval_minutes: val,
+      rss_polling_interval_minutes: val,
+    })
+    scanInterval.value = val
+    statusMessage.value = `Surveillance scan interval calibrated to ${val} minutes across all active collectors.`
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || 'Failed to update scan interval.'
+  } finally {
+    isUpdatingInterval.value = false
+  }
+}
+
 const fetchTelemetry = async () => {
   isLoadingTelemetry.value = true
   try {
@@ -218,6 +253,7 @@ onMounted(() => {
   fetchAnomalies()
   fetchReviews()
   fetchTelemetry()
+  fetchSettings()
 })
 </script>
 
@@ -235,7 +271,25 @@ onMounted(() => {
           </p>
         </div>
 
-        <div class="flex items-center space-x-2">
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Interval selector -->
+          <div class="flex items-center gap-2 bg-nexo-surface-card border border-nexo-border px-3 py-1.5 rounded-[4px] text-xs">
+            <Clock class="h-3.5 w-3.5 text-nexo-accent-gold" />
+            <span class="text-nexo-text-muted font-mono uppercase text-[10px]">Interval:</span>
+            <select
+              :value="scanInterval"
+              :disabled="isUpdatingInterval"
+              @change="handleIntervalChange(Number(($event.target as HTMLSelectElement).value))"
+              class="bg-transparent text-nexo-text-primary font-medium text-xs focus:outline-none cursor-pointer"
+            >
+              <option :value="5">Every 5 minutes</option>
+              <option :value="10">Every 10 minutes</option>
+              <option :value="15">Every 15 minutes (Default)</option>
+              <option :value="30">Every 30 minutes</option>
+              <option :value="60">Every 60 minutes</option>
+            </select>
+          </div>
+
           <Button
             variant="primary"
             size="sm"

@@ -974,6 +974,11 @@ class PersonalizedFeedService
                 'slug' => 'strategic-technology',
                 'color' => '#147A67',
             ],
+            'subcategory' => $article->subcategories?->first() ? [
+                'id' => $article->subcategories->first()->id,
+                'name' => $article->subcategories->first()->name,
+                'slug' => $article->subcategories->first()->slug,
+            ] : null,
             'subcategories' => $article->relationLoaded('subcategories') && $article->subcategories
                 ? $article->subcategories->map(fn ($s) => [
                     'id' => $s->id,

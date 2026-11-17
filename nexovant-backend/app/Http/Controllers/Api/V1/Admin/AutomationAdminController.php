@@ -145,35 +145,48 @@ class AutomationAdminController
     /**
      * Trigger batch scan across all active sources.
      */
-    public function triggerScan(Request $request): JsonResponse
+    public function triggerScan(Request $request, \App\Services\Ingestion\IntelligencePipelineCoordinator $coordinator): JsonResponse
     {
         $admin = $request->user();
-        $sources = NewsSource::where('is_active', true)->get();
+        $sources = NewsSource::where('is_active', true)->whereNotNull('feed_url')->get();
 
         $count = 0;
+        $itemsFetched = 0;
+        $storiesCreated = 0;
+        $articlesGenerated = 0;
+
         foreach ($sources as $source) {
-            PipelineJob::create([
-                'source_id' => $source->id,
-                'stage' => '1. Source Discovery',
-                'status' => 'processing',
-                'item_title' => "Scheduled Feed Scan: {$source->name}",
-                'started_at' => now(),
-            ]);
-            $count++;
+            try {
+                $stats = $coordinator->processSource($source, $admin, true);
+                $itemsFetched += $stats['items_fetched'];
+                $storiesCreated += $stats['stories_created'];
+                $articlesGenerated += $stats['articles_generated'];
+                $count++;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Batch scan error on source [{$source->name}]: " . $e->getMessage());
+            }
         }
 
         AuditLog::create([
-            'user_id' => $admin->id,
+            'user_id' => $admin?->id,
             'action' => 'pipeline.batch_scan',
             'resource_type' => 'PipelineJob',
-            'new_values' => ['sources_count' => $count],
+            'new_values' => [
+                'sources_count' => $count,
+                'items_fetched' => $itemsFetched,
+                'stories_created' => $storiesCreated,
+                'articles_generated' => $articlesGenerated,
+            ],
             'created_at' => now(),
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => "Pipeline discovery initiated for {$count} sources.",
-            'jobs_created' => $count,
+            'message' => "Pipeline discovery completed for {$count} sources. Discovered {$storiesCreated} stories, generated {$articlesGenerated} synthesized articles.",
+            'sources_scanned' => $count,
+            'items_fetched' => $itemsFetched,
+            'stories_created' => $storiesCreated,
+            'articles_generated' => $articlesGenerated,
         ]);
     }
 }

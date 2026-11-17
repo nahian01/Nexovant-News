@@ -44,7 +44,7 @@ class IntelligencePipelineCoordinator
      *
      * @return array{source_id: string, items_fetched: int, stories_created: int, duplicates_found: int, clusters_updated: int, articles_generated: int}
      */
-    public function processSource(NewsSource $source, ?User $initiator = null): array
+    public function processSource(NewsSource $source, ?User $initiator = null, bool $force = false): array
     {
         $startTime = microtime(true);
 
@@ -68,7 +68,7 @@ class IntelligencePipelineCoordinator
 
         try {
             // Stage 1 & 2: Fetch feed items with SSRF validation
-            $feedResult = $this->feedCollector->fetchSourceFeed($source);
+            $feedResult = $this->feedCollector->fetchSourceFeed($source, $force);
             $feedItems = $feedResult['items'];
             $stats['items_fetched'] = count($feedItems);
 
@@ -251,7 +251,7 @@ class IntelligencePipelineCoordinator
             // Determine editorial publication policy from persistent settings
             $settingsPath = storage_path('app/settings.json');
             $settings = File::exists($settingsPath) ? (json_decode(File::get($settingsPath), true) ?? []) : [];
-            $policyMode = strtolower((string) ($settings['publishing_mode'] ?? $settings['editorial_publication_mode'] ?? 'auto_review'));
+            $policyMode = strtolower((string) ($settings['publishing_mode'] ?? $settings['editorial_publication_mode'] ?? 'full_auto'));
 
             $targetStatus = match ($policyMode) {
                 'full_auto' => 'PUBLISHED',
@@ -343,6 +343,9 @@ class IntelligencePipelineCoordinator
                 }
 
                 if (!empty($updateData)) {
+                    if ($targetStatus === 'PUBLISHED') {
+                        $updateData['is_editorial_approved'] = true;
+                    }
                     $existingArticle->update($updateData);
 
                     // Create ArticleRevision
@@ -376,6 +379,7 @@ class IntelligencePipelineCoordinator
                 'content_hash' => hash('sha256', $slug . '|' . $synthesis['title']),
                 'published_at' => now(),
                 'status' => $targetStatus,
+                'is_editorial_approved' => ($targetStatus === 'PUBLISHED'),
                 'verification_status' => 'reported_reliable',
                 'importance_score' => 7.50,
                 'featured_image' => $leadStory->featured_image,

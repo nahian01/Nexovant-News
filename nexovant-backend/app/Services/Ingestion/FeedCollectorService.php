@@ -21,7 +21,7 @@ class FeedCollectorService
      * @return array{items: array<int, FeedItemDTO>, etag: ?string, last_modified: ?string, not_modified: bool}
      * @throws Exception
      */
-    public function fetchSourceFeed(NewsSource $source): array
+    public function fetchSourceFeed(NewsSource $source, bool $force = false): array
     {
         $feedUrl = $source->feed_url ?: $source->url;
 
@@ -34,11 +34,13 @@ class FeedCollectorService
             'Accept' => 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
         ];
 
-        if ($source->etag) {
-            $headers['If-None-Match'] = $source->etag;
-        }
-        if ($source->last_modified_header) {
-            $headers['If-Modified-Since'] = $source->last_modified_header;
+        if (!$force) {
+            if ($source->etag) {
+                $headers['If-None-Match'] = $source->etag;
+            }
+            if ($source->last_modified_header) {
+                $headers['If-Modified-Since'] = $source->last_modified_header;
+            }
         }
 
         $timeout = $source->timeout_seconds ?? 15;
