@@ -245,9 +245,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/push/unsubscribe', [NotificationController::class, 'unsubscribePush'])->name('api.notifications.push.unsubscribe');
         Route::post('/telegram/link-token', [NotificationController::class, 'generateTelegramToken'])->name('api.notifications.telegram.token');
         Route::post('/telegram/verify', [NotificationController::class, 'verifyTelegram'])->name('api.notifications.telegram.verify');
+        Route::post('/telegram/connect', [NotificationController::class, 'connectTelegram'])->name('api.notifications.telegram.connect');
         Route::post('/telegram/disconnect', [NotificationController::class, 'disconnectTelegram'])->name('api.notifications.telegram.disconnect');
         Route::post('/telegram/test', [NotificationController::class, 'testTelegram'])->name('api.notifications.telegram.test');
         Route::get('/whatsapp/status', [NotificationController::class, 'whatsappStatus'])->name('api.notifications.whatsapp.status');
+        Route::post('/whatsapp/connect', [NotificationController::class, 'connectWhatsapp'])->name('api.notifications.whatsapp.connect');
+        Route::post('/whatsapp/disconnect', [NotificationController::class, 'disconnectWhatsapp'])->name('api.notifications.whatsapp.disconnect');
+        Route::post('/whatsapp/test', [NotificationController::class, 'testWhatsapp'])->name('api.notifications.whatsapp.test');
     });
 
     // Subscriber Workspace & Personalized Intelligence (Phase 7C)
@@ -310,9 +314,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/notifications/push/unsubscribe', [NotificationController::class, 'unsubscribePush'])->name('api.workspace.notifications.push.unsubscribe');
         Route::post('/notifications/telegram/link-token', [NotificationController::class, 'generateTelegramToken'])->name('api.workspace.notifications.telegram.token');
         Route::post('/notifications/telegram/verify', [NotificationController::class, 'verifyTelegram'])->name('api.workspace.notifications.telegram.verify');
+        Route::post('/notifications/telegram/connect', [NotificationController::class, 'connectTelegram'])->name('api.workspace.notifications.telegram.connect');
         Route::post('/notifications/telegram/disconnect', [NotificationController::class, 'disconnectTelegram'])->name('api.workspace.notifications.telegram.disconnect');
         Route::post('/notifications/telegram/test', [NotificationController::class, 'testTelegram'])->name('api.workspace.notifications.telegram.test');
         Route::get('/notifications/whatsapp/status', [NotificationController::class, 'whatsappStatus'])->name('api.workspace.notifications.whatsapp.status');
+        Route::post('/notifications/whatsapp/connect', [NotificationController::class, 'connectWhatsapp'])->name('api.workspace.notifications.whatsapp.connect');
+        Route::post('/notifications/whatsapp/disconnect', [NotificationController::class, 'disconnectWhatsapp'])->name('api.workspace.notifications.whatsapp.disconnect');
+        Route::post('/notifications/whatsapp/test', [NotificationController::class, 'testWhatsapp'])->name('api.workspace.notifications.whatsapp.test');
 
         // Personalized Research
         Route::post('/research/query', [SubscriberResearchController::class, 'query'])->name('api.workspace.research.query');

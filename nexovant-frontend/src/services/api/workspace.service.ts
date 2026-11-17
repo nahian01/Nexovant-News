@@ -285,14 +285,34 @@ export const workspaceService = {
     return res.data
   },
 
+  async connectTelegram(chatId: string) {
+    const res = await apiClient.post('/workspace/notifications/telegram/connect', { chat_id: chatId })
+    return res.data
+  },
+
   async testTelegram() {
     const res = await apiClient.post('/workspace/notifications/telegram/test')
     return res.data
   },
 
-  // WhatsApp Status
+  // WhatsApp Integration
   async getWhatsAppStatus() {
     const res = await apiClient.get('/workspace/notifications/whatsapp/status')
+    return res.data
+  },
+
+  async connectWhatsApp(phoneNumber: string) {
+    const res = await apiClient.post('/workspace/notifications/whatsapp/connect', { phone_number: phoneNumber })
+    return res.data
+  },
+
+  async disconnectWhatsApp() {
+    const res = await apiClient.post('/workspace/notifications/whatsapp/disconnect')
+    return res.data
+  },
+
+  async testWhatsApp() {
+    const res = await apiClient.post('/workspace/notifications/whatsapp/test')
     return res.data
   },
 

@@ -34,16 +34,7 @@ class PersonalizedFeedService
         $watchlists = $user->watchlists()->with('items')->get();
 
         // Collect followed entity names and topics
-        $followedEntityNames = [];
-        foreach ($watchlists as $wl) {
-            foreach ($wl->items as $it) {
-                $followedEntityNames[] = $it->entity_name;
-            }
-        }
-        if ($preferences && !empty($preferences->preferred_companies)) {
-            $followedEntityNames = array_merge($followedEntityNames, (array) $preferences->preferred_companies);
-        }
-        $followedEntityNames = array_unique(array_filter($followedEntityNames));
+        $followedEntityNames = $this->collectFollowedEntityNames($user);
 
         $preferredTopics = (array) ($preferences?->preferred_topics ?? ['Artificial Intelligence', 'Semiconductors', 'Cloud Infrastructure']);
         $preferredIndustries = (array) ($preferences?->preferred_industries ?? ['Technology', 'Semiconductors']);
@@ -79,29 +70,125 @@ class PersonalizedFeedService
     }
 
     /**
-     * Section 1: For You (Ranked algorithmic feed with transparent explanations)
+     * Section 1: For You (Strict user-profile grounded algorithmic intelligence)
+     * Fully personalized against subscriber's followed portfolio, preferred topics, and reading history.
      */
     protected function buildForYouSection(User $user, array $entityNames, array $topics, array $hiddenIds, bool $active): array
     {
-        $articles = Article::whereNotIn('id', $hiddenIds)
+        $preferences = $user->preferences;
+        $preferredIndustries = (array) ($preferences?->preferred_industries ?? []);
+
+        // Behavioral reading history
+        $interactedArticleIds = $user->interactions()
+            ->whereIn('interaction_type', ['view', 'save', 'share'])
+            ->latest('created_at')
+            ->limit(30)
+            ->pluck('target_id')
+            ->filter()
+            ->toArray();
+
+        // 1. Build strictly profile-grounded query
+        $query = Article::whereNotIn('id', $hiddenIds)
             ->whereIn('verification_status', ['verified', 'confirmed', 'reported_reliable', 'developing'])
-            ->with(['source', 'companies'])
-            ->latest('published_at')
-            ->limit(15)
-            ->get();
+            ->with(['source:id,name,credibility_score', 'companies:id,name,ticker', 'categories:id,name,slug,color', 'subcategories:id,name,slug']);
+
+        $hasProfileSignals = !empty($entityNames) || !empty($topics) || !empty($preferredIndustries) || !empty($interactedArticleIds);
+
+        if ($hasProfileSignals) {
+            $query->where(function ($q) use ($entityNames, $topics, $preferredIndustries, $interactedArticleIds) {
+                // Match followed entities by title, content, or company relation
+                if (!empty($entityNames)) {
+                    foreach ($entityNames as $name) {
+                        $q->orWhere('title', 'like', "%{$name}%")
+                          ->orWhere('content_normalized', 'like', "%{$name}%");
+                    }
+                    $q->orWhereHas('companies', function ($cq) use ($entityNames) {
+                        $cq->whereIn('name', $entityNames);
+                    });
+                }
+
+                // Match preferred topics
+                if (!empty($topics)) {
+                    foreach ($topics as $top) {
+                        $q->orWhere('title', 'like', "%{$top}%")
+                          ->orWhere('content_normalized', 'like', "%{$top}%");
+                    }
+                    $q->orWhereHas('topics', function ($tq) use ($topics) {
+                        $tq->whereIn('name', $topics);
+                    });
+                }
+
+                // Match preferred industries / categories
+                if (!empty($preferredIndustries)) {
+                    $q->orWhereHas('categories', function ($catQ) use ($preferredIndustries) {
+                        $catQ->whereIn('name', $preferredIndustries)
+                             ->orWhereIn('slug', array_map('Str::slug', $preferredIndustries));
+                    });
+                }
+
+                // Match previously interacted / similar articles
+                if (!empty($interactedArticleIds)) {
+                    $q->orWhereIn('id', $interactedArticleIds);
+                }
+            });
+        }
+
+        $articles = $query->latest('published_at')->limit(20)->get();
+
+        // If user profile is pristine/brand new and matches were sparse, backfill with top tier verified reports
+        if ($articles->count() < 5) {
+            $fallbackArticles = Article::whereNotIn('id', array_merge($hiddenIds, $articles->pluck('id')->toArray()))
+                ->whereIn('verification_status', ['verified', 'confirmed', 'reported_reliable'])
+                ->with(['source:id,name,credibility_score', 'companies:id,name,ticker', 'categories:id,name,slug,color', 'subcategories:id,name,slug'])
+                ->orderByDesc('importance_score')
+                ->latest('published_at')
+                ->limit(10 - $articles->count())
+                ->get();
+            $articles = $articles->concat($fallbackArticles);
+        }
 
         $items = [];
-        foreach ($articles as $article) {
-            $explanation = 'High-confidence verified technology development';
-            $score = 70;
+        $savedIds = $user->libraryItems()->where('item_type', 'article')->pluck('item_id')->toArray();
 
-            // Boost score and assign explanation if entity matches
+        foreach ($articles as $article) {
+            $explanation = 'Grounded in your institutional intelligence profile';
+            $score = 70;
+            $matchedReason = 'profile';
+
+            // Boost score and assign transparent explanation if entity matches
             if (!empty($entityNames)) {
                 foreach ($entityNames as $ent) {
                     if (str_contains(strtolower($article->title), strtolower($ent)) ||
-                        str_contains(strtolower($article->content_normalized ?? ''), strtolower($ent))) {
+                        str_contains(strtolower($article->content_normalized ?? ''), strtolower($ent)) ||
+                        $article->companies->contains('name', $ent)) {
                         $explanation = "Because you follow {$ent}";
-                        $score += 25;
+                        $score += 30;
+                        $matchedReason = 'followed_entity';
+                        break;
+                    }
+                }
+            }
+
+            // Check topic match
+            if ($matchedReason === 'profile' && !empty($topics)) {
+                foreach ($topics as $top) {
+                    if (str_contains(strtolower($article->title), strtolower($top)) ||
+                        str_contains(strtolower($article->content_normalized ?? ''), strtolower($top))) {
+                        $explanation = "Matched to your focus in {$top}";
+                        $score += 20;
+                        $matchedReason = 'preferred_topic';
+                        break;
+                    }
+                }
+            }
+
+            // Check industry match
+            if ($matchedReason === 'profile' && !empty($preferredIndustries)) {
+                foreach ($article->categories as $cat) {
+                    if (in_array($cat->name, $preferredIndustries, true)) {
+                        $explanation = "Monitored industry development in {$cat->name}";
+                        $score += 15;
+                        $matchedReason = 'preferred_industry';
                         break;
                     }
                 }
@@ -110,18 +197,39 @@ class PersonalizedFeedService
             // Boost for importance score
             $score += (int) (($article->importance_score ?? 5.0) * 2);
 
+            $rawText = strip_tags($article->content_normalized ?? $article->content_raw ?? '');
+            $category = $article->categories->first();
+
             $items[] = [
                 'id' => $article->id,
                 'type' => 'article',
                 'title' => $article->title,
+                'headline' => $article->title,
                 'slug' => $article->slug,
-                'summary' => substr(strip_tags($article->content_normalized ?? $article->content_raw), 0, 200) . '...',
-                'source' => $article->source?->name ?? 'Wire Service',
+                'summary' => substr($rawText, 0, 220) . (strlen($rawText) > 220 ? '...' : ''),
+                'source' => [
+                    'name' => $article->source?->name ?? 'Wire Service',
+                    'credibility_score' => $article->source?->credibility_score ?? 9.2,
+                ],
+                'category' => $category ? [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'slug' => $category->slug,
+                    'color' => $category->color ?? '#147A67',
+                ] : [
+                    'name' => 'Strategic Technology',
+                    'slug' => 'strategic-technology',
+                    'color' => '#147A67',
+                ],
+                'subcategories' => $article->subcategories->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'slug' => $s->slug])->toArray(),
                 'published_at' => $article->published_at?->toIso8601String(),
-                'verification_status' => $article->verification_status,
+                'verification_status' => $article->verification_status ?? 'confirmed',
                 'importance_score' => $article->importance_score,
                 'personalization_explanation' => $explanation,
+                'match_reason' => $matchedReason,
                 'relevance_score' => min(99, $score),
+                'is_saved' => in_array($article->id, $savedIds, true),
+                'is_profile_grounded' => true,
             ];
         }
 
@@ -535,6 +643,7 @@ class PersonalizedFeedService
 
     /**
      * Get paginated stream of intelligence items with dynamic category and multi-tier sorting.
+     * Enforces an 80% user interest / 20% diverse serendipity ratio on the overview feed.
      */
     public function getFeedStream(User $user, array $filters = []): array
     {
@@ -551,8 +660,183 @@ class PersonalizedFeedService
             ->filter()
             ->toArray();
 
+        $followedNames = $this->collectFollowedEntityNames($user);
+        $savedArticleIds = $user->libraryItems()->where('item_type', 'article')->pluck('item_id')->toArray();
+
+        $isOverviewFeed = (empty($category) || $category === 'all' || $category === 'All Intelligence') && empty($search) && (empty($sort) || $sort === 'relevance');
+
+        // When viewing the main Overview Feed, apply 80% user interest / 20% diverse discovery ratio
+        if ($isOverviewFeed) {
+            $preferences = $user->preferences;
+            $preferredTopics = (array) ($preferences?->preferred_topics ?? ['Artificial Intelligence', 'Semiconductors', 'Cloud Infrastructure']);
+            $preferredIndustries = (array) ($preferences?->preferred_industries ?? ['Technology', 'Semiconductors']);
+
+            $interactedArticleIds = $user->interactions()
+                ->whereIn('interaction_type', ['view', 'save', 'share'])
+                ->pluck('target_id')
+                ->filter()
+                ->toArray();
+
+            $interactedCategoryIds = !empty($interactedArticleIds)
+                ? \Illuminate\Support\Facades\DB::table('article_categories')
+                    ->whereIn('article_id', $interactedArticleIds)
+                    ->pluck('category_id')
+                    ->unique()
+                    ->toArray()
+                : [];
+
+            $targetInterestCount = (int) max(1, (int) round($perPage * 0.8));
+            $targetDiverseCount = (int) max(1, $perPage - $targetInterestCount);
+
+            // 1. User Interest Query (80%)
+            $interestQuery = Article::whereNotIn('id', $hiddenIds)
+                ->whereIn('verification_status', ['verified', 'confirmed', 'reported_reliable', 'developing'])
+                ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'subcategories:id,name,slug', 'companies:id,name,slug,ticker']);
+
+            $interestQuery->where(function ($q) use ($followedNames, $preferredTopics, $preferredIndustries, $interactedCategoryIds) {
+                if (!empty($followedNames)) {
+                    foreach ($followedNames as $name) {
+                        $q->orWhere('title', 'like', "%{$name}%")
+                          ->orWhere('content_normalized', 'like', "%{$name}%");
+                    }
+                    $q->orWhereHas('companies', function ($cq) use ($followedNames) {
+                        $cq->whereIn('name', $followedNames);
+                    });
+                }
+                if (!empty($preferredTopics)) {
+                    foreach ($preferredTopics as $top) {
+                        $q->orWhere('title', 'like', "%{$top}%")
+                          ->orWhere('content_normalized', 'like', "%{$top}%");
+                    }
+                    $q->orWhereHas('topics', function ($tq) use ($preferredTopics) {
+                        $tq->whereIn('name', $preferredTopics);
+                    });
+                }
+                if (!empty($preferredIndustries)) {
+                    $q->orWhereHas('categories', function ($catQ) use ($preferredIndustries) {
+                        $catQ->whereIn('name', $preferredIndustries);
+                    });
+                }
+                if (!empty($interactedCategoryIds)) {
+                    $q->orWhereHas('categories', function ($catQ) use ($interactedCategoryIds) {
+                        $catQ->whereIn('id', $interactedCategoryIds);
+                    });
+                }
+            });
+
+            $totalInterest = (clone $interestQuery)->count();
+            $interestArticles = $interestQuery->orderByDesc('importance_score')
+                ->latest('published_at')
+                ->forPage($page, $targetInterestCount)
+                ->get();
+
+            $usedIds = array_merge($hiddenIds, $interestArticles->pluck('id')->toArray());
+
+            // 2. Diverse Discovery Query (20% - outside primary user interests to prevent filter bubble)
+            $diverseQuery = Article::whereNotIn('id', $usedIds)
+                ->whereIn('verification_status', ['verified', 'confirmed', 'reported_reliable', 'developing'])
+                ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'subcategories:id,name,slug', 'companies:id,name,slug,ticker']);
+
+            // Exclude user's top categories if possible to ensure real diversity
+            if (!empty($preferredIndustries) || !empty($interactedCategoryIds)) {
+                $diverseQuery->whereDoesntHave('categories', function ($cq) use ($preferredIndustries, $interactedCategoryIds) {
+                    if (!empty($preferredIndustries)) {
+                        $cq->whereIn('name', $preferredIndustries);
+                    }
+                    if (!empty($interactedCategoryIds)) {
+                        $cq->orWhereIn('id', $interactedCategoryIds);
+                    }
+                });
+            }
+
+            $totalDiverse = (clone $diverseQuery)->count();
+            $diverseArticles = $diverseQuery->orderByDesc('importance_score')
+                ->latest('published_at')
+                ->forPage($page, $targetDiverseCount)
+                ->get();
+
+            // Fallback backfill if diverse or interest pools had fewer items
+            if ($diverseArticles->count() < $targetDiverseCount) {
+                $needed = $targetDiverseCount - $diverseArticles->count();
+                $backfill = Article::whereNotIn('id', array_merge($usedIds, $diverseArticles->pluck('id')->toArray()))
+                    ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'subcategories:id,name,slug', 'companies:id,name,slug,ticker'])
+                    ->latest('published_at')
+                    ->limit($needed)
+                    ->get();
+                $diverseArticles = $diverseArticles->concat($backfill);
+            }
+
+            // Format items with explicit 80/20 attribution
+            $formattedInterest = [];
+            foreach ($interestArticles as $art) {
+                $item = $this->formatFeedItem($art, $user, null, $followedNames, $savedArticleIds);
+                $item['match_type'] = 'interest';
+                $item['is_interest_match'] = true;
+                $item['is_serendipity'] = false;
+                $item['personalization_factor'] = '80% User Interests';
+                $formattedInterest[] = $item;
+            }
+
+            $formattedDiverse = [];
+            foreach ($diverseArticles as $art) {
+                $item = $this->formatFeedItem(
+                    $art,
+                    $user,
+                    'Diverse Discovery: Key development outside your primary focus to broaden strategic intelligence',
+                    $followedNames,
+                    $savedArticleIds
+                );
+                $item['match_type'] = 'diverse';
+                $item['is_interest_match'] = false;
+                $item['is_serendipity'] = true;
+                $item['personalization_factor'] = '20% Diverse Discovery';
+                $formattedDiverse[] = $item;
+            }
+
+            // Interleave items cleanly: 4 interest, 1 diverse, 4 interest, 1 diverse...
+            $blendedItems = [];
+            $iIdx = 0;
+            $dIdx = 0;
+            $iCount = count($formattedInterest);
+            $dCount = count($formattedDiverse);
+
+            while ($iIdx < $iCount || $dIdx < $dCount) {
+                for ($k = 0; $k < 4 && $iIdx < $iCount; $k++) {
+                    $blendedItems[] = $formattedInterest[$iIdx++];
+                }
+                if ($dIdx < $dCount) {
+                    $blendedItems[] = $formattedDiverse[$dIdx++];
+                }
+            }
+
+            $totalApprox = $totalInterest + $totalDiverse;
+            $lastPage = (int) max(1, (int) ceil($totalApprox / $perPage));
+
+            return [
+                'items' => $blendedItems,
+                'meta' => [
+                    'current_page' => $page,
+                    'last_page' => $lastPage,
+                    'per_page' => $perPage,
+                    'total' => $totalApprox,
+                    'personalization_distribution' => [
+                        'interest_percentage' => 80,
+                        'diversity_percentage' => 20,
+                        'interest_items_count' => count($formattedInterest),
+                        'diverse_items_count' => count($formattedDiverse),
+                    ],
+                ],
+                'filters' => [
+                    'category' => 'all',
+                    'sort' => $sort,
+                    'q' => null,
+                ],
+            ];
+        }
+
+        // Standard Filtered Query
         $query = Article::whereNotIn('id', $hiddenIds)
-            ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'companies:id,name,slug,ticker']);
+            ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'subcategories:id,name,slug', 'companies:id,name,slug,ticker']);
 
         // Category filter
         if (!empty($category) && $category !== 'all' && $category !== 'All Intelligence') {
@@ -600,9 +884,6 @@ class PersonalizedFeedService
                       ->latest('published_at');
                 break;
             case 'discussed':
-                $query->orderByDesc('importance_score')
-                      ->latest('published_at');
-                break;
             case 'relevance':
             default:
                 $query->orderByDesc('importance_score')
@@ -611,12 +892,15 @@ class PersonalizedFeedService
         }
 
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
-        $followedNames = $this->collectFollowedEntityNames($user);
-        $savedArticleIds = $user->libraryItems()->where('item_type', 'article')->pluck('item_id')->toArray();
 
         $items = [];
         foreach ($paginator->items() as $article) {
-            $items[] = $this->formatFeedItem($article, $user, null, $followedNames, $savedArticleIds);
+            $item = $this->formatFeedItem($article, $user, null, $followedNames, $savedArticleIds);
+            $item['match_type'] = 'filtered';
+            $item['is_interest_match'] = true;
+            $item['is_serendipity'] = false;
+            $item['personalization_factor'] = 'Direct Category Query';
+            $items[] = $item;
         }
 
         if ($sort === 'relevance') {
@@ -690,6 +974,13 @@ class PersonalizedFeedService
                 'slug' => 'strategic-technology',
                 'color' => '#147A67',
             ],
+            'subcategories' => $article->relationLoaded('subcategories') && $article->subcategories
+                ? $article->subcategories->map(fn ($s) => [
+                    'id' => $s->id,
+                    'name' => $s->name,
+                    'slug' => $s->slug,
+                ])->toArray()
+                : [],
             'published_at' => $article->published_at?->toIso8601String(),
             'source' => [
                 'name' => $article->source?->name ?? 'Wire Service',

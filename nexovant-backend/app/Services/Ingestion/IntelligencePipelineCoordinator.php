@@ -13,6 +13,7 @@ use App\Models\DiscoveredStory;
 use App\Models\NewsSource;
 use App\Models\PipelineJob;
 use App\Models\StoryCluster;
+use App\Models\Subcategory;
 use App\Models\Tag;
 use App\Models\Topic;
 use App\Models\User;
@@ -295,9 +296,31 @@ class IntelligencePipelineCoordinator
                 }
 
                 if (!$existingArticle->lock_category && !empty($classification['category_slug'])) {
-                    $cat = Category::where('slug', $classification['category_slug'])->first();
-                    if ($cat) {
-                        $existingArticle->categories()->sync([$cat->id]);
+                    $categoryName = $classification['category_name'] ?? ucwords(str_replace('-', ' ', $classification['category_slug']));
+                    $categorySlug = Str::slug($classification['category_slug']);
+                    $cat = Category::firstOrCreate(
+                        ['slug' => $categorySlug],
+                        [
+                            'name' => $categoryName,
+                            'description' => "Intelligence and industry developments in {$categoryName}",
+                            'color' => '#147A67',
+                            'is_active' => true,
+                        ]
+                    );
+                    $existingArticle->categories()->syncWithoutDetaching([$cat->id]);
+
+                    if (!empty($classification['subcategory_name']) || !empty($classification['subcategory_slug'])) {
+                        $subName = $classification['subcategory_name'] ?? ucwords(str_replace('-', ' ', $classification['subcategory_slug'] ?? 'General'));
+                        $subSlug = Str::slug($classification['subcategory_slug'] ?? $subName);
+                        $sub = Subcategory::firstOrCreate(
+                            ['category_id' => $cat->id, 'slug' => $subSlug],
+                            [
+                                'name' => $subName,
+                                'description' => "Subcategory for {$subName} under {$categoryName}",
+                                'is_active' => true,
+                            ]
+                        );
+                        $existingArticle->subcategories()->syncWithoutDetaching([$sub->id]);
                     }
                 }
 
@@ -387,11 +410,32 @@ class IntelligencePipelineCoordinator
                 'change_summary' => 'Initial automated intelligence synthesis',
             ]);
 
-            // Attach taxonomy categories, topics, and tags
-            $categorySlug = $classification['category_slug'] ?? 'artificial-intelligence';
-            $category = Category::where('slug', $categorySlug)->first();
-            if ($category) {
-                $article->categories()->syncWithoutDetaching([$category->id]);
+            // Attach taxonomy categories, subcategories, topics, and tags
+            $categoryName = $classification['category_name'] ?? ucwords(str_replace('-', ' ', $classification['category_slug'] ?? 'artificial-intelligence'));
+            $categorySlug = Str::slug($classification['category_slug'] ?? $categoryName);
+            $category = Category::firstOrCreate(
+                ['slug' => $categorySlug],
+                [
+                    'name' => $categoryName,
+                    'description' => "Intelligence and industry developments in {$categoryName}",
+                    'color' => '#147A67',
+                    'is_active' => true,
+                ]
+            );
+            $article->categories()->syncWithoutDetaching([$category->id]);
+
+            if (!empty($classification['subcategory_name']) || !empty($classification['subcategory_slug'])) {
+                $subName = $classification['subcategory_name'] ?? ucwords(str_replace('-', ' ', $classification['subcategory_slug'] ?? 'General'));
+                $subSlug = Str::slug($classification['subcategory_slug'] ?? $subName);
+                $subcategory = Subcategory::firstOrCreate(
+                    ['category_id' => $category->id, 'slug' => $subSlug],
+                    [
+                        'name' => $subName,
+                        'description' => "Subcategory for {$subName} under {$categoryName}",
+                        'is_active' => true,
+                    ]
+                );
+                $article->subcategories()->syncWithoutDetaching([$subcategory->id]);
             }
 
             if (!empty($classification['topics'])) {

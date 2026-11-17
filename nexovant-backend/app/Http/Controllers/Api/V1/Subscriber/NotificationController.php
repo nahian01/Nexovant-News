@@ -243,13 +243,47 @@ class NotificationController
 
     public function disconnectTelegram(Request $request): JsonResponse
     {
-        $this->notificationService->updatePreferences($request->user(), [
+        $user = $request->user();
+        $pref = $this->notificationService->getPreferences($user);
+        $channels = (array) ($pref->channels ?? []);
+        $channels['telegram'] = false;
+
+        $this->notificationService->updatePreferences($user, [
             'telegram_chat_id' => null,
+            'channels' => $channels,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Telegram account disconnected.',
+        ]);
+    }
+
+    public function connectTelegram(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'chat_id' => ['required', 'string', 'max:100'],
+        ]);
+
+        $chatId = trim($validated['chat_id']);
+        if (str_starts_with($chatId, '@')) {
+            $chatId = substr($chatId, 1);
+        }
+
+        $user = $request->user();
+        $pref = $this->notificationService->getPreferences($user);
+        $channels = (array) ($pref->channels ?? []);
+        $channels['telegram'] = true;
+
+        $this->notificationService->updatePreferences($user, [
+            'telegram_chat_id' => $chatId,
+            'channels' => $channels,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Telegram account connected and enabled successfully.',
+            'chat_id' => $chatId,
         ]);
     }
 
@@ -261,17 +295,18 @@ class NotificationController
         if (empty($pref->telegram_chat_id)) {
             return response()->json([
                 'success' => false,
-                'message' => 'No Telegram account linked yet. Generate a linking token first.',
+                'message' => 'No Telegram account linked yet. Generate a linking token or enter your Chat ID first.',
             ], 400);
         }
 
-        $dummyNotification = new Notification([
-            'id' => (string) Str::uuid(),
+        $dummyNotification = Notification::create([
+            'user_id' => $user->id,
             'title' => 'Nexovant Intelligence Test Alert',
             'message' => 'Your Telegram integration is verified and operational. You will receive high-priority technology intelligence alerts directly in this chat.',
             'category' => 'system',
             'priority' => 'high',
             'link' => '/workspace/notifications',
+            'delivery_status' => 'pending',
         ]);
 
         $result = $this->telegramAdapter->send($dummyNotification, $user, [
@@ -286,7 +321,7 @@ class NotificationController
     }
 
     // ---------------------------------------------------------------------
-    // WhatsApp Status Endpoint
+    // WhatsApp Integration Endpoints
     // ---------------------------------------------------------------------
 
     public function whatsappStatus(): JsonResponse
@@ -294,6 +329,99 @@ class NotificationController
         return response()->json([
             'success' => true,
             'data' => $this->whatsappAdapter->getOnboardingStatus(),
+        ]);
+    }
+
+    public function connectWhatsapp(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'phone_number' => ['required', 'string', 'min:7', 'max:25'],
+        ]);
+
+        // Clean and normalize phone number to E.164
+        $cleanPhone = preg_replace('/[^\d+]/', '', $validated['phone_number']);
+        if (!str_starts_with($cleanPhone, '+')) {
+            $cleanPhone = '+' . $cleanPhone;
+        }
+
+        if (!preg_match('/^\+[1-9]\d{6,14}$/', $cleanPhone)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid phone number format. Please provide a valid international phone number in E.164 format (e.g. +14155552671).',
+            ], 422);
+        }
+
+        $user = $request->user();
+        $pref = $this->notificationService->getPreferences($user);
+        $channels = (array) ($pref->channels ?? []);
+        $channels['whatsapp'] = true;
+
+        $this->notificationService->updatePreferences($user, [
+            'whatsapp_phone' => $cleanPhone,
+            'channels' => $channels,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'WhatsApp number connected and enabled successfully.',
+            'phone_number' => $cleanPhone,
+        ]);
+    }
+
+    public function disconnectWhatsapp(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $pref = $this->notificationService->getPreferences($user);
+        $channels = (array) ($pref->channels ?? []);
+        $channels['whatsapp'] = false;
+
+        $this->notificationService->updatePreferences($user, [
+            'whatsapp_phone' => null,
+            'channels' => $channels,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'WhatsApp number disconnected.',
+        ]);
+    }
+
+    public function testWhatsapp(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $pref = $this->notificationService->getPreferences($user);
+
+        if (empty($pref->whatsapp_phone)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No WhatsApp phone number configured. Please connect your phone number first.',
+            ], 400);
+        }
+
+        $dummyNotification = Notification::create([
+            'user_id' => $user->id,
+            'title' => 'Nexovant Intelligence Test Alert',
+            'message' => 'Your WhatsApp Business integration is verified and operational. High-priority intelligence alerts and morning executive briefings will be delivered directly to this number.',
+            'category' => 'system',
+            'priority' => 'high',
+            'link' => '/workspace/notifications',
+            'delivery_status' => 'pending',
+        ]);
+
+        $result = $this->whatsappAdapter->send($dummyNotification, $user, [
+            'phone' => $pref->whatsapp_phone,
+        ]);
+
+        $isDelivered = ($result['status'] ?? '') === 'delivered';
+
+        return response()->json([
+            'success' => $isDelivered,
+            'status' => $result['status'] ?? 'pending',
+            'phone_number' => $pref->whatsapp_phone,
+            'details' => $result,
+            'message' => $isDelivered
+                ? "Test message successfully dispatched to {$pref->whatsapp_phone}."
+                : ($result['error'] ?? 'WhatsApp test message dispatched (channel evaluation status reported).'),
         ]);
     }
 }

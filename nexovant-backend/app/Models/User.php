@@ -106,6 +106,16 @@ class User extends Authenticatable
         return $this->hasMany(SubscriberInteraction::class);
     }
 
+    public function followedCompanies(): HasMany
+    {
+        return $this->hasMany(FollowedCompany::class);
+    }
+
+    public function followedExecutives(): HasMany
+    {
+        return $this->hasMany(FollowedExecutive::class);
+    }
+
     public function notificationPreference(): HasOne
     {
         return $this->hasOne(SubscriberNotificationPreference::class);

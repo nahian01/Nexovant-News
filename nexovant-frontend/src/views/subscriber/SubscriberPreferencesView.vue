@@ -5,6 +5,7 @@ import AppHeader from '@/components/layout/AppHeader.vue'
 import Card from '@/components/ui/Card.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Modal from '@/components/ui/Modal.vue'
 import { workspaceService } from '@/services/api/workspace.service'
 import {
   Sliders,
@@ -24,7 +25,10 @@ import {
   Building2,
   Cpu,
   Layers,
-  Clock
+  Clock,
+  ExternalLink,
+  Copy,
+  Check
 } from 'lucide-vue-next'
 
 const loading = ref(true)
@@ -56,6 +60,23 @@ const digestFrequency = ref('daily')
 const quietHoursStart = ref('22:00')
 const quietHoursEnd = ref('07:00')
 
+// Channel Integrations
+const telegramChatId = ref('')
+const isTelegramModalOpen = ref(false)
+const telegramConnecting = ref(false)
+const telegramTesting = ref(false)
+const telegramInputChatId = ref('')
+const telegramTokenData = ref<{ token: string; bot_username: string; deep_link: string } | null>(null)
+const isTelegramLoadingToken = ref(false)
+const telegramCopied = ref(false)
+
+const whatsappPhone = ref('')
+const isWhatsAppModalOpen = ref(false)
+const whatsappConnecting = ref(false)
+const whatsappTesting = ref(false)
+const whatsappInputPhone = ref('')
+const whatsappStatusData = ref<any>(null)
+
 // Reading history stats
 const readingHistoryCount = ref(0)
 const clearingHistory = ref(false)
@@ -84,6 +105,8 @@ const loadAllPreferences = async () => {
         telegram: !!resNotif.preferences.channels?.telegram,
         whatsapp: !!resNotif.preferences.channels?.whatsapp,
       }
+      telegramChatId.value = resNotif.preferences.telegram_chat_id || ''
+      whatsappPhone.value = resNotif.preferences.whatsapp_phone || ''
       digestFrequency.value = resNotif.preferences.digest_frequency || 'daily'
       quietHoursStart.value = resNotif.preferences.quiet_hours_start || '22:00'
       quietHoursEnd.value = resNotif.preferences.quiet_hours_end || '07:00'
@@ -96,6 +119,154 @@ const loadAllPreferences = async () => {
     errorMsg.value = err.response?.data?.message || 'Failed to load preferences.'
   } finally {
     loading.value = false
+  }
+}
+
+// Telegram Channel Actions
+const openTelegramModal = async () => {
+  isTelegramModalOpen.value = true
+  telegramInputChatId.value = telegramChatId.value
+  isTelegramLoadingToken.value = true
+  try {
+    const res = await workspaceService.getTelegramLinkToken()
+    if (res.success) {
+      telegramTokenData.value = res
+    }
+  } catch {
+    //
+  } finally {
+    isTelegramLoadingToken.value = false
+  }
+}
+
+const copyTelegramCommand = async () => {
+  if (!telegramTokenData.value?.token) return
+  try {
+    await navigator.clipboard.writeText(`/start ${telegramTokenData.value.token}`)
+    telegramCopied.value = true
+    setTimeout(() => { telegramCopied.value = false }, 2500)
+  } catch {
+    //
+  }
+}
+
+const handleConnectTelegram = async () => {
+  if (!telegramInputChatId.value.trim()) return
+  telegramConnecting.value = true
+  errorMsg.value = ''
+  try {
+    const res = await workspaceService.connectTelegram(telegramInputChatId.value.trim())
+    if (res.success) {
+      telegramChatId.value = res.chat_id
+      channels.value.telegram = true
+      isTelegramModalOpen.value = false
+      successMsg.value = `Telegram bot alerts successfully connected to @${res.chat_id}!`
+      setTimeout(() => { successMsg.value = '' }, 4000)
+    }
+  } catch (err: any) {
+    errorMsg.value = err.response?.data?.message || 'Failed to link Telegram account.'
+  } finally {
+    telegramConnecting.value = false
+  }
+}
+
+const handleDisconnectTelegram = async () => {
+  if (!confirm('Disconnect Telegram alert notifications?')) return
+  try {
+    const res = await workspaceService.disconnectTelegram()
+    if (res.success) {
+      telegramChatId.value = ''
+      channels.value.telegram = false
+      successMsg.value = 'Telegram channel unlinked.'
+      setTimeout(() => { successMsg.value = '' }, 4000)
+    }
+  } catch (err: any) {
+    errorMsg.value = err.response?.data?.message || 'Failed to disconnect Telegram.'
+  }
+}
+
+const handleTestTelegram = async () => {
+  telegramTesting.value = true
+  errorMsg.value = ''
+  try {
+    const res = await workspaceService.testTelegram()
+    if (res.success) {
+      successMsg.value = 'Test alert successfully delivered to your Telegram chat!'
+    } else {
+      successMsg.value = res.details?.error || 'Test notification dispatched to Telegram.'
+    }
+    setTimeout(() => { successMsg.value = '' }, 4000)
+  } catch (err: any) {
+    errorMsg.value = err.response?.data?.message || 'Failed to dispatch Telegram test alert.'
+  } finally {
+    telegramTesting.value = false
+  }
+}
+
+// WhatsApp Channel Actions
+const openWhatsAppModal = async () => {
+  isWhatsAppModalOpen.value = true
+  whatsappInputPhone.value = whatsappPhone.value
+  try {
+    const res = await workspaceService.getWhatsAppStatus()
+    if (res.success) {
+      whatsappStatusData.value = res.data
+    }
+  } catch {
+    //
+  }
+}
+
+const handleConnectWhatsApp = async () => {
+  if (!whatsappInputPhone.value.trim()) return
+  whatsappConnecting.value = true
+  errorMsg.value = ''
+  try {
+    const res = await workspaceService.connectWhatsApp(whatsappInputPhone.value.trim())
+    if (res.success) {
+      whatsappPhone.value = res.phone_number
+      channels.value.whatsapp = true
+      isWhatsAppModalOpen.value = false
+      successMsg.value = `WhatsApp alerts connected for ${res.phone_number}!`
+      setTimeout(() => { successMsg.value = '' }, 4000)
+    }
+  } catch (err: any) {
+    errorMsg.value = err.response?.data?.message || 'Failed to connect WhatsApp phone number.'
+  } finally {
+    whatsappConnecting.value = false
+  }
+}
+
+const handleDisconnectWhatsApp = async () => {
+  if (!confirm('Disconnect WhatsApp alert notifications?')) return
+  try {
+    const res = await workspaceService.disconnectWhatsApp()
+    if (res.success) {
+      whatsappPhone.value = ''
+      channels.value.whatsapp = false
+      successMsg.value = 'WhatsApp channel disconnected.'
+      setTimeout(() => { successMsg.value = '' }, 4000)
+    }
+  } catch (err: any) {
+    errorMsg.value = err.response?.data?.message || 'Failed to disconnect WhatsApp.'
+  }
+}
+
+const handleTestWhatsApp = async () => {
+  whatsappTesting.value = true
+  errorMsg.value = ''
+  try {
+    const res = await workspaceService.testWhatsApp()
+    if (res.success) {
+      successMsg.value = res.message || 'Test alert successfully sent to WhatsApp!'
+    } else {
+      successMsg.value = res.message || 'WhatsApp test alert dispatched (channel evaluation status reported).'
+    }
+    setTimeout(() => { successMsg.value = '' }, 5000)
+  } catch (err: any) {
+    errorMsg.value = err.response?.data?.message || 'Failed to dispatch WhatsApp test alert.'
+  } finally {
+    whatsappTesting.value = false
   }
 }
 
@@ -382,30 +553,136 @@ onMounted(() => {
                     <input type="checkbox" v-model="channels.email" class="h-4 w-4 rounded text-nexo-accent-cyan focus:ring-nexo-accent-cyan" />
                   </div>
 
-                  <div class="flex items-center justify-between rounded-xl border border-nexo-border bg-nexo-bg/60 p-4">
-                    <div class="flex items-center gap-3">
-                      <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
-                        <MessageSquare class="h-4 w-4" />
+                  <!-- Telegram Bot Dispatch Card -->
+                  <div class="rounded-xl border border-nexo-border bg-nexo-bg/60 p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-3">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
+                          <MessageSquare class="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div class="text-xs font-semibold text-nexo-text-primary">Telegram Bot Dispatch</div>
+                          <div class="flex items-center gap-1.5 mt-0.5">
+                            <span v-if="telegramChatId" class="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+                              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                              Connected: @{{ telegramChatId }}
+                            </span>
+                            <span v-else class="inline-flex items-center gap-1 text-[10px] text-nexo-text-muted">
+                              <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                              Not connected
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div class="text-xs font-semibold text-nexo-text-primary">Telegram Bot Dispatch</div>
-                        <div class="text-[10px] text-nexo-text-muted">Requires connected Telegram ID</div>
-                      </div>
+                      <input
+                        type="checkbox"
+                        v-model="channels.telegram"
+                        :disabled="!telegramChatId"
+                        class="h-4 w-4 rounded text-nexo-accent-cyan focus:ring-nexo-accent-cyan disabled:opacity-40"
+                        title="Toggle alert delivery to Telegram"
+                      />
                     </div>
-                    <input type="checkbox" v-model="channels.telegram" class="h-4 w-4 rounded text-nexo-accent-cyan focus:ring-nexo-accent-cyan" />
+
+                    <div class="flex items-center gap-2 pt-2 border-t border-nexo-border/60">
+                      <button
+                        v-if="!telegramChatId"
+                        type="button"
+                        @click="openTelegramModal"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 transition-colors shadow-xs"
+                      >
+                        <Plus class="w-3.5 h-3.5" /> Connect Telegram
+                      </button>
+                      <template v-else>
+                        <button
+                          type="button"
+                          @click="openTelegramModal"
+                          class="px-2.5 py-1 rounded-lg border border-nexo-border bg-white text-xs text-nexo-text-primary hover:bg-nexo-bg font-medium"
+                        >
+                          Configure
+                        </button>
+                        <button
+                          type="button"
+                          @click="handleTestTelegram"
+                          :disabled="telegramTesting"
+                          class="px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50/50 text-xs text-indigo-700 hover:bg-indigo-100 font-medium"
+                        >
+                          {{ telegramTesting ? 'Sending...' : 'Test Alert' }}
+                        </button>
+                        <button
+                          type="button"
+                          @click="handleDisconnectTelegram"
+                          class="px-2.5 py-1 rounded-lg text-xs text-rose-600 hover:bg-rose-50 font-medium"
+                        >
+                          Disconnect
+                        </button>
+                      </template>
+                    </div>
                   </div>
 
-                  <div class="flex items-center justify-between rounded-xl border border-nexo-border bg-nexo-bg/60 p-4">
-                    <div class="flex items-center gap-3">
-                      <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-                        <Smartphone class="h-4 w-4" />
+                  <!-- WhatsApp Urgent Alerts Card -->
+                  <div class="rounded-xl border border-nexo-border bg-nexo-bg/60 p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-3">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                          <Smartphone class="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div class="text-xs font-semibold text-nexo-text-primary">WhatsApp Urgent Alerts</div>
+                          <div class="flex items-center gap-1.5 mt-0.5">
+                            <span v-if="whatsappPhone" class="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+                              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                              Connected: {{ whatsappPhone }}
+                            </span>
+                            <span v-else class="inline-flex items-center gap-1 text-[10px] text-nexo-text-muted">
+                              <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                              Not connected
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div class="text-xs font-semibold text-nexo-text-primary">WhatsApp Urgent Alerts</div>
-                        <div class="text-[10px] text-nexo-text-muted">Requires phone number verification</div>
-                      </div>
+                      <input
+                        type="checkbox"
+                        v-model="channels.whatsapp"
+                        :disabled="!whatsappPhone"
+                        class="h-4 w-4 rounded text-nexo-accent-cyan focus:ring-nexo-accent-cyan disabled:opacity-40"
+                        title="Toggle alert delivery to WhatsApp"
+                      />
                     </div>
-                    <input type="checkbox" v-model="channels.whatsapp" class="h-4 w-4 rounded text-nexo-accent-cyan focus:ring-nexo-accent-cyan" />
+
+                    <div class="flex items-center gap-2 pt-2 border-t border-nexo-border/60">
+                      <button
+                        v-if="!whatsappPhone"
+                        type="button"
+                        @click="openWhatsAppModal"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors shadow-xs"
+                      >
+                        <Plus class="w-3.5 h-3.5" /> Connect WhatsApp
+                      </button>
+                      <template v-else>
+                        <button
+                          type="button"
+                          @click="openWhatsAppModal"
+                          class="px-2.5 py-1 rounded-lg border border-nexo-border bg-white text-xs text-nexo-text-primary hover:bg-nexo-bg font-medium"
+                        >
+                          Change Number
+                        </button>
+                        <button
+                          type="button"
+                          @click="handleTestWhatsApp"
+                          :disabled="whatsappTesting"
+                          class="px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50/50 text-xs text-emerald-700 hover:bg-emerald-100 font-medium"
+                        >
+                          {{ whatsappTesting ? 'Sending...' : 'Test Alert' }}
+                        </button>
+                        <button
+                          type="button"
+                          @click="handleDisconnectWhatsApp"
+                          class="px-2.5 py-1 rounded-lg text-xs text-rose-600 hover:bg-rose-50 font-medium"
+                        >
+                          Disconnect
+                        </button>
+                      </template>
+                    </div>
                   </div>
                 </div>
 
@@ -524,5 +801,171 @@ onMounted(() => {
         </div>
       </main>
     </div>
+
+    <!-- Telegram Connection Modal -->
+    <Modal :is-open="isTelegramModalOpen" title="Connect Telegram Intelligence Alerts" @close="isTelegramModalOpen = false">
+      <div class="space-y-5 text-left text-xs p-1">
+        <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-900 space-y-1">
+          <p class="font-bold flex items-center gap-1.5">
+            <MessageSquare class="w-4 h-4 text-indigo-700" /> Nexovant Telegram Intelligence Bot
+          </p>
+          <p class="text-[11px] text-indigo-700 leading-relaxed">
+            Receive verified breaking technology alerts and early warnings directly in your private Telegram chat or executive channel.
+          </p>
+        </div>
+
+        <!-- Option 1: Deep Link with Linking Token -->
+        <div class="space-y-3 p-3.5 border border-nexo-border rounded-xl bg-nexo-bg/40">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-nexo-text-primary text-xs">Method 1: Instant Bot Deep Link (Recommended)</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">1-Click</span>
+          </div>
+
+          <div v-if="isTelegramLoadingToken" class="py-4 text-center text-nexo-text-muted">
+            Generating secure cryptographically signed linking token...
+          </div>
+          <div v-else-if="telegramTokenData" class="space-y-2.5">
+            <p class="text-[11px] text-nexo-text-secondary">
+              Open the bot and click <strong>Start</strong>, or copy the verification command:
+            </p>
+            <div class="flex items-center gap-2">
+              <input
+                type="text"
+                readonly
+                :value="`/start ${telegramTokenData.token}`"
+                class="flex-1 font-mono text-xs p-2 bg-white border border-nexo-border rounded-lg text-nexo-text-primary"
+              />
+              <button
+                type="button"
+                @click="copyTelegramCommand"
+                class="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-nexo-border bg-white hover:bg-nexo-bg text-nexo-text-primary text-xs font-medium cursor-pointer"
+              >
+                <Check v-if="telegramCopied" class="w-3.5 h-3.5 text-emerald-600" />
+                <Copy v-else class="w-3.5 h-3.5" />
+                <span>{{ telegramCopied ? 'Copied' : 'Copy' }}</span>
+              </button>
+            </div>
+            <a
+              :href="telegramTokenData.deep_link"
+              target="_blank"
+              class="inline-flex items-center justify-center gap-2 w-full p-2.5 bg-indigo-600 text-white font-semibold rounded-lg text-xs hover:bg-indigo-700 transition-colors shadow-xs"
+            >
+              <span>Open Telegram & Connect @{{ telegramTokenData.bot_username }}</span>
+              <ExternalLink class="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+
+        <!-- Option 2: Direct Chat ID or Username -->
+        <div class="space-y-3 p-3.5 border border-nexo-border rounded-xl bg-nexo-bg/40">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-nexo-text-primary text-xs">Method 2: Direct Chat ID or Username</span>
+            <span class="text-[10px] text-nexo-text-muted">Manual</span>
+          </div>
+          <p class="text-[11px] text-nexo-text-secondary">
+            Enter your Telegram Chat ID (numeric) or personal Telegram @username:
+          </p>
+          <div class="flex gap-2">
+            <Input
+              v-model="telegramInputChatId"
+              placeholder="e.g. 123456789 or @executive_intel"
+              class="flex-1"
+              @keydown.enter.prevent="handleConnectTelegram"
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              :disabled="telegramConnecting || !telegramInputChatId.trim()"
+              @click="handleConnectTelegram"
+            >
+              {{ telegramConnecting ? 'Connecting...' : 'Save & Link' }}
+            </Button>
+          </div>
+        </div>
+
+        <div class="flex justify-end pt-2 border-t border-nexo-border">
+          <Button variant="secondary" size="sm" @click="isTelegramModalOpen = false">
+            Close
+          </Button>
+        </div>
+      </div>
+    </Modal>
+
+    <!-- WhatsApp Connection Modal -->
+    <Modal :is-open="isWhatsAppModalOpen" title="Connect WhatsApp Urgent Intelligence" @close="isWhatsAppModalOpen = false">
+      <div class="space-y-5 text-left text-xs p-1">
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 space-y-1">
+          <div class="flex items-center justify-between">
+            <p class="font-bold flex items-center gap-1.5">
+              <Smartphone class="w-4 h-4 text-emerald-700" /> Meta WhatsApp Business Cloud API
+            </p>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-200/70 text-emerald-900 font-bold">Official Channel</span>
+          </div>
+          <p class="text-[11px] text-emerald-700 leading-relaxed">
+            Direct, encrypted delivery of time-critical breaking stories, sovereign policy shifts, and morning intelligence digests.
+          </p>
+        </div>
+
+        <div class="space-y-3 p-3.5 border border-nexo-border rounded-xl bg-nexo-bg/40">
+          <label class="block font-semibold text-nexo-text-primary text-xs">
+            Verified Mobile Phone Number (E.164 International Format)
+          </label>
+          <p class="text-[11px] text-nexo-text-secondary">
+            Enter your mobile number with the country code (e.g. +1 for United States, +44 for United Kingdom, +49 for Germany, +65 for Singapore, +81 for Japan):
+          </p>
+          <div class="space-y-2">
+            <Input
+              v-model="whatsappInputPhone"
+              placeholder="+14155552671"
+              class="w-full font-mono text-sm"
+              @keydown.enter.prevent="handleConnectWhatsApp"
+            />
+            <span class="text-[10px] text-nexo-text-muted block">
+              Format: <code>+[CountryCode][AreaCode][Number]</code> with no spaces or hyphens.
+            </span>
+          </div>
+
+          <div class="pt-2 flex items-center justify-between">
+            <span class="text-[11px] text-nexo-text-muted">
+              {{ whatsappPhone ? `Currently configured: ${whatsappPhone}` : 'No phone linked yet' }}
+            </span>
+            <Button
+              variant="primary"
+              size="sm"
+              :disabled="whatsappConnecting || !whatsappInputPhone.trim()"
+              @click="handleConnectWhatsApp"
+              class="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {{ whatsappConnecting ? 'Connecting...' : (whatsappPhone ? 'Update Number' : 'Connect & Enable') }}
+            </Button>
+          </div>
+        </div>
+
+        <div v-if="whatsappPhone" class="p-3 bg-white border border-nexo-border rounded-xl space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-xs text-nexo-text-primary">Dispatch Channel Verification</span>
+            <span class="text-[10px] text-emerald-600 font-medium">Ready</span>
+          </div>
+          <p class="text-[11px] text-nexo-text-secondary">
+            Send an instant test alert to verify delivery to <strong>{{ whatsappPhone }}</strong>:
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            :disabled="whatsappTesting"
+            @click="handleTestWhatsApp"
+            class="w-full border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+          >
+            {{ whatsappTesting ? 'Dispatching Test Message...' : 'Send Test Alert via WhatsApp' }}
+          </Button>
+        </div>
+
+        <div class="flex justify-end pt-2 border-t border-nexo-border">
+          <Button variant="secondary" size="sm" @click="isWhatsAppModalOpen = false">
+            Close
+          </Button>
+        </div>
+      </div>
+    </Modal>
   </div>
 </template>

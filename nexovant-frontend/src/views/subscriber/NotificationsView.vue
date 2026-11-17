@@ -270,6 +270,77 @@ const handleDisconnectTelegram = async () => {
 }
 
 // ---------------------------------------------------------------------
+// WhatsApp Integration Handlers
+// ---------------------------------------------------------------------
+const isWhatsAppModalOpen = ref(false)
+const isWhatsAppConnected = ref(false)
+const whatsappInputPhone = ref('')
+const isWhatsAppConnecting = ref(false)
+const isWhatsAppTesting = ref(false)
+const whatsappStatusData = ref<any>(null)
+
+const openWhatsAppModal = async () => {
+  isWhatsAppModalOpen.value = true
+  whatsappInputPhone.value = prefForm.value.whatsapp_phone || ''
+  try {
+    const res = await workspaceService.getWhatsAppStatus()
+    if (res.success) {
+      whatsappStatusData.value = res.data
+    }
+  } catch {
+    //
+  }
+}
+
+const handleConnectWhatsApp = async () => {
+  if (!whatsappInputPhone.value.trim()) return
+  isWhatsAppConnecting.value = true
+  errorMessage.value = ''
+  try {
+    const res = await workspaceService.connectWhatsApp(whatsappInputPhone.value.trim())
+    if (res.success) {
+      prefForm.value.whatsapp_phone = res.phone_number
+      prefForm.value.channels.whatsapp = true
+      isWhatsAppConnected.value = true
+      isWhatsAppModalOpen.value = false
+      statusMessage.value = `WhatsApp alerts connected for ${res.phone_number}!`
+    }
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || 'Failed to connect WhatsApp phone number.'
+  } finally {
+    isWhatsAppConnecting.value = false
+  }
+}
+
+const handleDisconnectWhatsApp = async () => {
+  try {
+    await workspaceService.disconnectWhatsApp()
+    isWhatsAppConnected.value = false
+    prefForm.value.whatsapp_phone = ''
+    prefForm.value.channels.whatsapp = false
+    statusMessage.value = 'WhatsApp integration disconnected.'
+  } catch (err: any) {
+    errorMessage.value = 'Failed to disconnect WhatsApp.'
+  }
+}
+
+const handleTestWhatsApp = async () => {
+  isWhatsAppTesting.value = true
+  try {
+    const res = await workspaceService.testWhatsApp()
+    if (res.success) {
+      statusMessage.value = res.message || 'Test intelligence alert dispatched via WhatsApp!'
+    } else {
+      statusMessage.value = res.message || 'WhatsApp test alert dispatched (channel evaluation status reported).'
+    }
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || 'Failed to dispatch test WhatsApp notification.'
+  } finally {
+    isWhatsAppTesting.value = false
+  }
+}
+
+// ---------------------------------------------------------------------
 // Preferences Handlers
 // ---------------------------------------------------------------------
 const openPrefModal = async () => {
@@ -317,6 +388,10 @@ onMounted(async () => {
     const prefRes = await workspaceService.getNotificationPreferences()
     if (prefRes.success && prefRes.preferences) {
       isTelegramConnected.value = !empty(prefRes.preferences.telegram_chat_id)
+      isWhatsAppConnected.value = !empty(prefRes.preferences.whatsapp_phone)
+      if (prefRes.preferences.whatsapp_phone) {
+        prefForm.value.whatsapp_phone = prefRes.preferences.whatsapp_phone
+      }
     }
   } catch {
     //
@@ -380,7 +455,7 @@ onMounted(async () => {
       </div>
 
       <!-- Active Channels Overview Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- Web Push Card -->
         <div class="card-editorial p-4 space-y-2">
           <div class="flex items-center justify-between">
@@ -456,6 +531,52 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- WhatsApp Urgent Alerts Card -->
+        <div class="card-editorial p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="p-1.5 rounded-[2px] bg-[#E3F1EA] text-[#17794D]">
+                <Smartphone class="w-4 h-4" />
+              </div>
+              <span class="font-medium text-xs sm:text-sm text-[#0E1A2B]">WhatsApp Alerts</span>
+            </div>
+            <span
+              class="px-2 py-0.5 rounded-[2px] text-[10px] font-mono font-bold uppercase"
+              :class="isWhatsAppConnected ? 'badge-verified' : 'badge-developing'"
+            >
+              {{ isWhatsAppConnected ? 'Linked' : 'Not Linked' }}
+            </span>
+          </div>
+          <p class="text-xs text-[#5F6875]">Critical market alerts and executive digests dispatched via WhatsApp Cloud API.</p>
+          <div class="pt-1 flex gap-2">
+            <button
+              v-if="!isWhatsAppConnected"
+              type="button"
+              @click="openWhatsAppModal"
+              class="w-full py-1.5 text-xs rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] font-semibold transition-colors"
+            >
+              Connect WhatsApp
+            </button>
+            <template v-else>
+              <button
+                type="button"
+                @click="handleTestWhatsApp"
+                :disabled="isWhatsAppTesting"
+                class="flex-1 py-1.5 text-xs rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] font-semibold transition-colors"
+              >
+                {{ isWhatsAppTesting ? 'Sending...' : 'Test Alert' }}
+              </button>
+              <button
+                type="button"
+                @click="handleDisconnectWhatsApp"
+                class="px-3 py-1.5 text-xs rounded-[4px] border border-[#B3261E]/30 bg-[#FBE4E1] text-[#B3261E] font-semibold transition-colors"
+              >
+                Disconnect
+              </button>
+            </template>
+          </div>
+        </div>
+
         <!-- Quiet Hours Card -->
         <div class="card-editorial p-4 space-y-2">
           <div class="flex items-center justify-between">
@@ -478,7 +599,7 @@ onMounted(async () => {
               @click="openPrefModal"
               class="w-full py-1.5 text-xs rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] font-semibold transition-colors"
             >
-              Configure Quiet Hours
+              Configure Cadence
             </button>
           </div>
         </div>
@@ -646,7 +767,7 @@ onMounted(async () => {
               />
               <button
                 type="button"
-                class="px-3 py-2 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B]"
+                class="px-3 py-2 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] cursor-pointer"
                 @click="copyTelegramCommand"
               >
                 <Copy class="w-3.5 h-3.5" />
@@ -667,6 +788,86 @@ onMounted(async () => {
           <p class="text-[11px] text-[#5F6875] text-center">
             Once sent, your chat will be verified instantly and will appear as connected.
           </p>
+        </div>
+      </div>
+    </Modal>
+
+    <!-- MODAL: WhatsApp Connection -->
+    <Modal :is-open="isWhatsAppModalOpen" title="Connect WhatsApp Urgent Intelligence" @close="isWhatsAppModalOpen = false">
+      <div class="space-y-4 text-left text-xs">
+        <div class="p-3 bg-[#E3F1EA] border border-[#17794D]/30 rounded-[2px] text-[#17794D] space-y-1">
+          <div class="flex items-center justify-between">
+            <p class="font-bold flex items-center gap-1.5">
+              <Smartphone class="w-4 h-4" /> Meta WhatsApp Business Cloud API
+            </p>
+            <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#17794D]/20 text-[#17794D] font-bold">Official Channel</span>
+          </div>
+          <p class="text-[11px] leading-relaxed">
+            Encrypted delivery of time-critical breaking stories, sovereign policy shifts, and morning intelligence digests.
+          </p>
+        </div>
+
+        <div class="space-y-2.5 p-3 bg-[#F8FAF7] border border-[#D0D9CF] rounded-[4px]">
+          <label class="block font-semibold text-[#0E1A2B] text-xs">
+            Verified Mobile Phone Number (E.164 Format)
+          </label>
+          <p class="text-[11px] text-[#5F6875]">
+            Enter your mobile number with country code (e.g. +1 for United States, +44 for UK, +49 for Germany):
+          </p>
+          <div class="space-y-1.5">
+            <input
+              type="text"
+              v-model="whatsappInputPhone"
+              placeholder="+14155552671"
+              class="w-full text-xs font-mono p-2 bg-white border border-[#D0D9CF] rounded-[4px] text-[#0E1A2B]"
+              @keydown.enter.prevent="handleConnectWhatsApp"
+            />
+            <span class="text-[10px] text-[#5F6875] block">
+              Format: <code>+[CountryCode][AreaCode][Number]</code>
+            </span>
+          </div>
+
+          <div class="pt-2 flex items-center justify-between">
+            <span class="text-[11px] text-[#5F6875]">
+              {{ prefForm.whatsapp_phone ? `Linked: ${prefForm.whatsapp_phone}` : 'No phone linked' }}
+            </span>
+            <button
+              type="button"
+              :disabled="isWhatsAppConnecting || !whatsappInputPhone.trim()"
+              @click="handleConnectWhatsApp"
+              class="px-3 py-1.5 rounded-[4px] bg-[#17794D] text-white text-xs font-bold hover:bg-[#0E1A2B] transition-colors disabled:opacity-50"
+            >
+              {{ isWhatsAppConnecting ? 'Connecting...' : (prefForm.whatsapp_phone ? 'Update Number' : 'Connect & Enable') }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="prefForm.whatsapp_phone" class="p-3 bg-white border border-[#D0D9CF] rounded-[4px] space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-xs text-[#0E1A2B]">Channel Verification</span>
+            <span class="text-[10px] text-[#17794D] font-mono font-bold">READY</span>
+          </div>
+          <p class="text-[11px] text-[#5F6875]">
+            Dispatch an immediate test alert to <strong>{{ prefForm.whatsapp_phone }}</strong>:
+          </p>
+          <button
+            type="button"
+            :disabled="isWhatsAppTesting"
+            @click="handleTestWhatsApp"
+            class="w-full py-1.5 text-xs rounded-[4px] border border-[#17794D]/40 bg-[#E3F1EA] text-[#17794D] font-semibold hover:bg-[#17794D] hover:text-white transition-colors"
+          >
+            {{ isWhatsAppTesting ? 'Dispatching Test Alert...' : 'Send Test Alert via WhatsApp' }}
+          </button>
+        </div>
+
+        <div class="flex justify-end pt-2 border-t border-[#D0D9CF]">
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] text-xs font-semibold"
+            @click="isWhatsAppModalOpen = false"
+          >
+            Close
+          </button>
         </div>
       </div>
     </Modal>

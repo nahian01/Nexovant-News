@@ -123,6 +123,11 @@ class Article extends Model
         return $this->belongsToMany(Category::class, 'article_categories');
     }
 
+    public function subcategories(): BelongsToMany
+    {
+        return $this->belongsToMany(Subcategory::class, 'article_subcategories');
+    }
+
     public function topics(): BelongsToMany
     {
         return $this->belongsToMany(Topic::class, 'article_topics');
