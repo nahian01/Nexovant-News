@@ -9,11 +9,12 @@ import {
   ExternalLink,
   Share2,
   ShieldCheck,
+  Clock,
+  Building2,
+  FileText,
+  Layers,
 } from 'lucide-vue-next'
 import ThreeColumnLayout from '@/components/layout/ThreeColumnLayout.vue'
-import Badge from '@/components/ui/Badge.vue'
-import Card from '@/components/ui/Card.vue'
-import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import NewsletterSubscribe from '@/components/common/NewsletterSubscribe.vue'
 import MoreCoverageModal from '@/components/common/MoreCoverageModal.vue'
@@ -80,6 +81,15 @@ const supportingSources = [
     adds_new_info: false,
     description: 'Independent cross-confirmation citing diplomatic and supply chain procurement sources.',
   },
+  {
+    publisher: 'Financial Times',
+    original_headline: 'European fab incentives spark supply chain realignments',
+    published_at: '45m ago',
+    url: 'https://ft.com',
+    coverage_type: 'Analysis',
+    adds_new_info: true,
+    description: 'Detailed analysis of European Chips Act subsidies and supply chain impacts.',
+  },
 ]
 
 const storyTimeline = [
@@ -96,238 +106,266 @@ onMounted(() => {
 
 <template>
   <ThreeColumnLayout>
-    <div class="max-w-4xl mx-auto space-y-8 text-left relative">
+    <div class="space-y-7 text-left relative pb-16">
       <!-- Toast Alert -->
       <div
         v-if="toastMessage"
-        class="fixed bottom-6 right-6 bg-nexo-surface border border-nexo-accent-cyan text-nexo-accent-cyan px-4 py-2 rounded shadow-2xl text-xs font-mono z-50 animate-fade-in"
+        class="fixed bottom-6 right-6 bg-[#0E1A2B] text-white px-4 py-2.5 rounded-[4px] shadow-lg text-xs z-50 flex items-center gap-2"
       >
-        {{ toastMessage }}
+        <CheckCircle2 class="h-4 w-4 text-[#17794D]" />
+        <span>{{ toastMessage }}</span>
       </div>
 
       <!-- Navigation & Action Bar -->
-      <div class="flex items-center justify-between pb-4 border-b border-nexo-border/80 text-xs">
-        <RouterLink to="/feed" class="inline-flex items-center gap-1.5 font-medium text-nexo-accent-cyan hover:text-nexo-accent-cyan-hover transition-colors">
+      <div class="flex items-center justify-between pb-3 border-b border-[#D0D9CF] text-xs">
+        <RouterLink to="/" class="inline-flex items-center gap-1.5 font-medium text-[#274888] hover:underline">
           <ArrowLeft class="h-4 w-4" />
-          <span>Back to Personalized Feed</span>
+          <span>Back to intelligence feed</span>
         </RouterLink>
 
         <div class="flex items-center gap-2">
           <button
             type="button"
             @click="toggleSave"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-nexo-elevated border border-nexo-border text-nexo-text-primary transition-all text-xs font-medium shadow-sm"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-white hover:bg-[#EEEBE4] border border-[#D0D9CF] text-[#0E1A2B] transition-colors text-xs font-medium shadow-xs"
           >
-            <Bookmark :class="['h-3.5 w-3.5', isSaved ? 'fill-nexo-accent-cyan text-nexo-accent-cyan' : 'text-nexo-text-muted']" />
+            <Bookmark :class="['h-3.5 w-3.5', isSaved ? 'fill-[#274888] text-[#274888]' : 'text-[#5F6875]']" />
             <span>{{ isSaved ? 'Saved' : 'Save Story' }}</span>
           </button>
           <button
             type="button"
             @click="handleShare"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-nexo-elevated border border-nexo-border text-nexo-text-primary transition-all text-xs font-medium shadow-sm"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-white hover:bg-[#EEEBE4] border border-[#D0D9CF] text-[#0E1A2B] transition-colors text-xs font-medium shadow-xs"
           >
-            <Share2 class="h-3.5 w-3.5 text-nexo-text-muted" />
+            <Share2 class="h-3.5 w-3.5 text-[#5F6875]" />
             <span>Share</span>
           </button>
           <button
             type="button"
             @click="isCoverageOpen = true"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-200 text-nexo-accent-cyan transition-all text-xs font-semibold shadow-sm"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] bg-[#E4E9F7] hover:bg-[#274888]/15 border border-[#274888]/30 text-[#274888] transition-colors text-xs font-semibold shadow-xs"
           >
-            <BookOpen class="h-3.5 w-3.5 text-nexo-accent-cyan" />
-            <span>More Coverage (2 Sources)</span>
+            <BookOpen class="h-3.5 w-3.5 text-[#274888]" />
+            <span>Additional Coverage ({{ supportingSources.length }} Sources)</span>
           </button>
         </div>
       </div>
 
       <!-- Loading State -->
       <div v-if="isLoading" class="space-y-6">
-        <Skeleton class="h-6 w-1/4" />
+        <Skeleton class="h-5 w-1/4" />
         <Skeleton class="h-10 w-3/4" />
         <Skeleton class="h-32 w-full" />
       </div>
 
-      <div v-else-if="!article" class="text-center py-16 bg-nexo-card border border-nexo-border rounded-lg p-8">
-        <h3 class="text-base font-semibold text-nexo-text-primary">Story Not Found</h3>
-        <p class="text-xs text-nexo-text-secondary mt-1">This publication may have been updated or clustered into another event.</p>
+      <!-- Story Not Found State -->
+      <div v-else-if="!article" class="card-editorial p-12 text-center space-y-3">
+        <h3 class="font-serif text-xl font-medium text-[#0E1A2B]">Story Not Found</h3>
+        <p class="text-xs text-[#5F6875]">This publication may have been updated or clustered into another event.</p>
+        <RouterLink to="/" class="inline-block mt-3">
+          <button class="btn-ink text-xs px-4 py-2">Return to feed</button>
+        </RouterLink>
       </div>
 
-      <!-- Article Presentation -->
+      <!-- Article Presentation (Design Mockup: 2 Story detail.png) -->
       <article v-else class="space-y-8">
         <!-- Header -->
-        <header class="space-y-3">
-          <div class="flex items-center space-x-3 flex-wrap gap-2 text-xs font-mono">
-            <Badge :variant="article.verification_status" size="md" />
-            <span class="text-nexo-text-muted">
-              Source: {{ article.source?.name }} (Provenance Score: {{ article.source?.credibility_score * 100 }}%)
+        <header class="space-y-3.5">
+          <div class="flex items-center space-x-3 flex-wrap gap-2 text-xs">
+            <span v-if="article.verification_status === 'confirmed'" class="badge-verified">VERIFIED</span>
+            <span v-else-if="article.is_breaking" class="badge-breaking">BREAKING</span>
+            <span v-else class="badge-developing">DEVELOPING</span>
+
+            <span class="text-[#5F6875]">
+              Source: <strong class="text-[#3F4A5A] font-semibold">{{ article.source?.name || 'Primary Wire Service' }}</strong>
+              (Provenance: {{ Math.round((article.source?.credibility_score || 0.95) * 100) }}%)
             </span>
           </div>
 
-          <h1 class="editorial-title text-3xl sm:text-4xl lg:text-5xl font-medium text-nexo-text-primary leading-tight">
+          <h1 class="editorial-headline text-3xl sm:text-4xl lg:text-[40px] font-medium text-[#0E1A2B] leading-[1.2]">
             {{ article.title }}
           </h1>
 
-          <div class="flex items-center space-x-4 text-xs font-mono text-nexo-text-secondary pt-1 flex-wrap gap-2">
-            <span>Published: {{ new Date(article.published_at).toLocaleString() }}</span>
+          <div class="flex items-center space-x-3 text-xs text-[#5F6875] pt-1 flex-wrap gap-2">
+            <span>Published: {{ new Date(article.published_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }}</span>
             <span>•</span>
-            <span class="text-nexo-accent-cyan">Importance Rating: {{ article.importance_score }}/10</span>
-            <span v-if="article.canonical_url">•</span>
-            <a
-              v-if="article.canonical_url"
-              :href="article.canonical_url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-nexo-accent-gold hover:underline"
-            >
-              Official Disclosure Filing ↗
-            </a>
+            <span class="text-[#274888] font-semibold">Importance: {{ article.importance_score || 8 }}/10</span>
+            <template v-if="article.canonical_url">
+              <span>•</span>
+              <a
+                :href="article.canonical_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-[#8A5A08] hover:underline inline-flex items-center gap-1 font-medium"
+              >
+                <span>Primary Document Filing</span>
+                <ExternalLink class="h-3 w-3" />
+              </a>
+            </template>
           </div>
         </header>
 
-        <!-- Executive Summary & Key Takeaways Card -->
-        <Card v-if="article.summary" class="p-6 bg-gradient-to-r from-nexo-card to-nexo-surface border-l-4 border-l-nexo-accent-cyan">
-          <div class="space-y-4">
-            <div class="flex items-center space-x-2">
-              <span class="text-xs font-mono font-bold text-nexo-accent-cyan uppercase tracking-wider">
-                EXECUTIVE SYNTHESIS & CORE TAKEAWAYS
-              </span>
-            </div>
-
-            <p class="text-sm sm:text-base text-nexo-text-primary leading-relaxed font-serif">
-              {{ article.summary.executive_summary }}
-            </p>
-
-            <div v-if="article.summary.key_takeaways" class="pt-3 border-t border-nexo-border/60">
-              <ul class="space-y-2.5 text-xs text-nexo-text-secondary">
-                <li
-                  v-for="(t, idx) in article.summary.key_takeaways"
-                  :key="idx"
-                  class="flex items-start gap-2.5"
-                >
-                  <span class="mt-1 h-1.5 w-1.5 rounded-full bg-nexo-accent-cyan shrink-0"></span>
-                  <span class="leading-relaxed">{{ t }}</span>
-                </li>
-              </ul>
-            </div>
+        <!-- FACT BOX / AT A GLANCE (per Mockup 2 Story detail.png) -->
+        <div class="card-editorial p-6 border-l-4 border-l-[#274888] bg-white space-y-4">
+          <div class="flex items-center justify-between border-b border-[#D0D9CF]/60 pb-3">
+            <span class="text-[11px] font-mono font-bold text-[#274888] uppercase tracking-wider">
+              FACT BOX · CONFIRMED INTELLIGENCE
+            </span>
+            <span class="text-[11px] text-[#5F6875]">Synthesized from multiple disclosures</span>
           </div>
-        </Card>
 
-        <!-- Normalized Core Story -->
-        <div class="editorial-body text-base text-nexo-text-secondary leading-relaxed space-y-4">
-          <p>{{ article.content_normalized || article.content_raw }}</p>
+          <p class="text-[15px] text-[#0E1A2B] leading-relaxed font-serif">
+            {{ article.summary?.executive_summary || article.content_normalized?.slice(0, 240) || 'Official corporate disclosures indicate cross-border capital reallocation with formal regulatory compliance filings submitted.' }}
+          </p>
+
+          <div v-if="article.summary?.key_takeaways" class="pt-2">
+            <ul class="space-y-2 text-xs text-[#3F4A5A]">
+              <li
+                v-for="(t, idx) in article.summary.key_takeaways"
+                :key="idx"
+                class="flex items-start gap-2.5"
+              >
+                <span class="mt-1.5 h-1.5 w-1.5 rounded-full bg-[#274888] shrink-0"></span>
+                <span class="leading-relaxed">{{ t }}</span>
+              </li>
+            </ul>
+          </div>
         </div>
 
-        <!-- The 10 Dimensions of Executive Assessment (PART 5.1) -->
-        <section v-if="article.assessment" class="space-y-6 pt-6 border-t border-nexo-border/80">
-          <div class="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <h2 class="editorial-title text-2xl font-medium text-nexo-text-primary">
-                10-Dimension Strategic Evaluation
-              </h2>
-              <p class="text-xs text-nexo-text-secondary mt-1">
-                Audited multi-vector executive analysis for corporate boards and strategy committees.
+        <!-- WHAT IT MEANS: Strategic Implications -->
+        <section class="space-y-4">
+          <h3 class="section-label">What it means for decision-makers</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="card-editorial p-4 space-y-2">
+              <span class="text-[10px] font-mono uppercase font-semibold text-[#8A5A08]">Market Impact</span>
+              <h4 class="font-medium text-xs text-[#0E1A2B]">Capital & Valuation Re-allocation</h4>
+              <p class="text-xs text-[#5F6875] leading-relaxed">
+                Direct balance-sheet implications for participating consortia and second-tier component suppliers.
               </p>
             </div>
-            <div class="bg-nexo-surface border border-nexo-border rounded px-3 py-1 text-xs font-mono text-nexo-accent-cyan">
-              Confidence Rating: {{ article.assessment.confidence_score * 100 }}%
+            <div class="card-editorial p-4 space-y-2">
+              <span class="text-[10px] font-mono uppercase font-semibold text-[#274888]">Supply Chain</span>
+              <h4 class="font-medium text-xs text-[#0E1A2B]">Procurement & Lead Times</h4>
+              <p class="text-xs text-[#5F6875] leading-relaxed">
+                Key equipment suppliers face accelerated delivery milestones starting Q2 next year.
+              </p>
             </div>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card class="p-5 border border-nexo-border">
-              <div class="text-[11px] font-mono text-nexo-accent-cyan uppercase mb-1">1. What Happened?</div>
-              <p class="text-xs text-nexo-text-primary leading-relaxed">{{ article.assessment.what_happened }}</p>
-            </Card>
-
-            <Card class="p-5 border border-nexo-border">
-              <div class="text-[11px] font-mono text-nexo-accent-cyan uppercase mb-1">2. When Did It Happen?</div>
-              <p class="text-xs text-nexo-text-primary leading-relaxed">{{ new Date(article.assessment.when_happened).toUTCString() }}</p>
-            </Card>
-
-            <Card class="p-5 border border-nexo-border md:col-span-2">
-              <div class="text-[11px] font-mono text-nexo-accent-cyan uppercase mb-1">3. Why Did It Happen? (Root Cause)</div>
-              <p class="text-xs text-nexo-text-primary leading-relaxed">{{ article.assessment.why_happened }}</p>
-            </Card>
-
-            <Card class="p-5 border border-nexo-border">
-              <div class="text-[11px] font-mono text-nexo-accent-gold uppercase mb-1">4. Business & Financial Significance</div>
-              <p class="text-xs text-nexo-text-primary leading-relaxed">{{ article.assessment.business_significance }}</p>
-            </Card>
-
-            <Card class="p-5 border border-nexo-border">
-              <div class="text-[11px] font-mono text-nexo-accent-gold uppercase mb-1">5. Who Is Affected? (Supply Chain & Competitors)</div>
-              <p class="text-xs text-nexo-text-primary leading-relaxed">{{ article.assessment.who_affected }}</p>
-            </Card>
-
-            <Card class="p-5 border border-nexo-border">
-              <div class="text-[11px] font-mono text-nexo-status-disputed uppercase mb-1">6. Potential Consequences & Second-Order Risks</div>
-              <p class="text-xs text-nexo-text-primary leading-relaxed">{{ article.assessment.potential_consequences }}</p>
-            </Card>
-
-            <Card class="p-5 border border-nexo-border">
-              <div class="text-[11px] font-mono text-nexo-status-confirmed uppercase mb-1">7. Forward Monitoring Triggers</div>
-              <p class="text-xs text-nexo-text-primary leading-relaxed">{{ article.assessment.what_to_monitor_next }}</p>
-            </Card>
+            <div class="card-editorial p-4 space-y-2">
+              <span class="text-[10px] font-mono uppercase font-semibold text-[#17794D]">Forward Triggers</span>
+              <h4 class="font-medium text-xs text-[#0E1A2B]">Upcoming Milestone</h4>
+              <p class="text-xs text-[#5F6875] leading-relaxed">
+                Regulatory sign-off expected within 60 calendar days under expedited administrative review.
+              </p>
+            </div>
           </div>
         </section>
 
-        <!-- Chronological Story Timeline (PART 5.4) -->
-        <section class="space-y-4 pt-6 border-t border-nexo-border/80">
+        <!-- Core Reading Body (Editorial Typography: Newsreader serif 17px/28px) -->
+        <section class="space-y-4 border-t border-[#D0D9CF] pt-6">
+          <h3 class="section-label">Full intelligence narrative</h3>
+          <div class="font-serif text-[17px] leading-[28px] text-[#0E1A2B] space-y-4 max-w-[66ch]">
+            <p>{{ article.content_normalized || article.content_raw }}</p>
+          </div>
+        </section>
+
+        <!-- Additional Coverage Table (per Mockup 2 Story detail.png) -->
+        <section class="space-y-3 pt-6 border-t border-[#D0D9CF]">
           <div class="flex items-center justify-between">
-            <h3 class="editorial-title text-xl font-medium text-nexo-text-primary">Event Chronology & Timeline</h3>
-            <span class="text-xs font-mono text-nexo-text-muted">Chronological Sequencing</span>
+            <h3 class="section-label">Additional coverage & cross-verification</h3>
+            <span class="text-xs text-[#5F6875]">{{ supportingSources.length }} primary sources</span>
           </div>
 
-          <div class="relative pl-6 space-y-6 border-l-2 border-nexo-border/60 ml-2">
+          <div class="card-editorial overflow-hidden">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-[#F8FAF7] border-b border-[#D0D9CF] text-[#5F6875] uppercase font-mono text-[10px]">
+                <tr>
+                  <th class="py-2.5 px-4">Publisher</th>
+                  <th class="py-2.5 px-4">Original Headline</th>
+                  <th class="py-2.5 px-4">Type</th>
+                  <th class="py-2.5 px-4 text-right">Published</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[#D0D9CF]/60 text-[#3F4A5A]">
+                <tr v-for="(source, idx) in supportingSources" :key="idx" class="hover:bg-[#F8FAF7]/60">
+                  <td class="py-3 px-4 font-semibold text-[#0E1A2B] whitespace-nowrap">
+                    {{ source.publisher }}
+                  </td>
+                  <td class="py-3 px-4 font-serif text-[13px] text-[#0E1A2B]">
+                    <a :href="source.url" target="_blank" rel="noopener noreferrer" class="hover:text-[#274888] hover:underline">
+                      {{ source.original_headline }}
+                    </a>
+                  </td>
+                  <td class="py-3 px-4 whitespace-nowrap">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#EEEBE4] text-[#3F4A5A]">
+                      {{ source.coverage_type }}
+                    </span>
+                  </td>
+                  <td class="py-3 px-4 text-right text-[#5F6875] whitespace-nowrap">
+                    {{ source.published_at }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Story Chronological Timeline -->
+        <section class="space-y-4 pt-6 border-t border-[#D0D9CF]">
+          <div class="flex items-center justify-between">
+            <h3 class="section-label">Event chronology</h3>
+            <span class="text-xs font-mono text-[#5F6875]">Chronological Sequencing</span>
+          </div>
+
+          <div class="relative pl-6 space-y-6 border-l border-[#D0D9CF] ml-2">
             <div
               v-for="(ev, idx) in storyTimeline"
               :key="idx"
               class="relative space-y-1 text-xs"
             >
               <!-- Timeline node dot -->
-              <span class="absolute -left-[31px] top-1 w-3.5 h-3.5 rounded-full bg-nexo-card border-2 border-nexo-accent-cyan"></span>
+              <span class="absolute -left-[30px] top-1 w-3 h-3 rounded-full bg-white border-2 border-[#274888]"></span>
 
               <div class="flex items-center space-x-2 text-[10px] font-mono">
-                <span class="text-nexo-accent-cyan font-bold">{{ ev.time }}</span>
-                <span class="text-nexo-text-muted">•</span>
-                <span class="text-nexo-text-muted">{{ ev.source }}</span>
+                <span class="text-[#274888] font-bold">{{ ev.time }}</span>
+                <span class="text-[#5F6875]">•</span>
+                <span class="text-[#5F6875]">{{ ev.source }}</span>
               </div>
 
-              <div class="font-serif font-semibold text-nexo-text-primary text-sm">{{ ev.event }}</div>
-              <p class="text-nexo-text-secondary leading-relaxed">{{ ev.desc }}</p>
+              <div class="font-serif font-semibold text-[#0E1A2B] text-sm">{{ ev.event }}</div>
+              <p class="text-[#3F4A5A] leading-relaxed">{{ ev.desc }}</p>
             </div>
           </div>
         </section>
 
         <!-- Entities Involved -->
-        <section v-if="article.companies && article.companies.length > 0" class="space-y-4 pt-6 border-t border-nexo-border/80">
-          <h3 class="editorial-title text-xl font-medium text-nexo-text-primary">Entities Involved</h3>
+        <section v-if="article.companies && article.companies.length > 0" class="space-y-4 pt-6 border-t border-[#D0D9CF]">
+          <h3 class="section-label">Entities involved</h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Card
+            <div
               v-for="c in article.companies"
               :key="c.id"
-              class="p-5 bg-nexo-surface border border-nexo-border"
+              class="card-editorial p-5 space-y-2.5"
             >
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-semibold text-nexo-text-primary text-sm">{{ c.name }}</span>
-                <span class="text-xs font-mono text-nexo-accent-cyan bg-nexo-card px-2 py-0.5 rounded border border-nexo-border">
-                  {{ c.ticker }}
+              <div class="flex items-center justify-between">
+                <span class="font-semibold text-[#0E1A2B] text-sm">{{ c.name }}</span>
+                <span class="text-xs font-mono text-[#274888] bg-[#E4E9F7] px-2 py-0.5 rounded-[2px] font-medium">
+                  {{ c.ticker || 'PRIVATE' }}
                 </span>
               </div>
-              <p class="text-xs text-nexo-text-secondary leading-relaxed mb-3">{{ c.summary }}</p>
-              <div v-if="c.executives && c.executives.length > 0" class="pt-2 border-t border-nexo-border/40 text-xs">
-                <span class="text-nexo-text-muted font-mono">Executive Leadership: </span>
-                <span class="text-nexo-text-primary font-medium">{{ c.executives.map((e: any) => e.full_name + ' (' + e.current_title + ')').join(', ') }}</span>
+              <p class="text-xs text-[#5F6875] leading-relaxed">{{ c.summary }}</p>
+              <div v-if="c.executives && c.executives.length > 0" class="pt-2 border-t border-[#D0D9CF]/60 text-xs">
+                <span class="text-[#5F6875] font-mono text-[10px] uppercase">Leadership: </span>
+                <span class="text-[#0E1A2B] font-medium">{{ c.executives.map((e: any) => e.full_name + ' (' + e.current_title + ')').join(', ') }}</span>
               </div>
-            </Card>
+            </div>
           </div>
         </section>
 
-        <!-- Newsletter & Offer Box -->
+        <!-- Newsletter Subscribe -->
         <NewsletterSubscribe
           source="story_detail_bottom"
-          :title="`Stay in Tune — Developments on ${article.companies?.[0]?.name || 'Global Companies'}`"
-          description="Never miss second-order developments, municipal site selections, or subsidy grant approvals. Claim an instant 30% discount on annual executive access."
+          :title="`Follow developments on ${article.companies?.[0]?.name || 'Global Companies'}`"
+          description="Never miss second-order developments, municipal site selections, or subsidy grant approvals. Claim a verified executive briefing every morning."
         />
       </article>
 

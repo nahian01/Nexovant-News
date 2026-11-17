@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -14,19 +14,17 @@
 
   body {
     @apply min-h-screen bg-nexo-bg overflow-x-hidden text-nexo-text-primary;
-    font-family: 'DM Sans', system-ui, sans-serif;
-    background-image: radial-gradient(circle at 1px 1px, rgba(23, 37, 31, 0.035) 1px, transparent 0);
-    background-size: 24px 24px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 
   /* Custom Focus Ring for WCAG 2.2 AA Compliance */
   *:focus-visible {
-    @apply outline-none ring-2 ring-nexo-accent-cyan ring-offset-2 ring-offset-nexo-bg;
+    @apply outline-none ring-2 ring-[#274888] ring-offset-2 ring-offset-[#F6F4EF];
   }
 
   ::selection {
     color: #fff;
-    background: #147a67;
+    background: #0E1A2B;
   }
 
   button,
@@ -50,10 +48,25 @@
 }
 
 @layer components {
-  /* Editorial Typography Styles */
+  /* Editorial Typography Styles (Design System v0.1) */
   .editorial-title {
     font-family: 'Newsreader', Georgia, serif;
-    @apply text-nexo-text-primary tracking-tight font-medium;
+    @apply text-nexo-text-primary tracking-tight font-semibold;
+  }
+
+  .editorial-headline {
+    font-family: 'Newsreader', Georgia, serif;
+    @apply text-nexo-ink tracking-tight font-semibold text-[20px] leading-[26px];
+  }
+
+  .editorial-body {
+    font-family: 'Newsreader', Georgia, serif;
+    @apply text-nexo-text-primary font-normal text-[17px] leading-[28px] max-w-[66ch];
+  }
+
+  .section-label {
+    font-family: 'Inter', sans-serif;
+    @apply text-[11px] font-bold uppercase tracking-[0.08em] text-nexo-text-secondary;
   }
 
   .data-ticker {
@@ -61,13 +74,55 @@
     @apply tracking-wider text-xs uppercase font-medium;
   }
 
-  /* Executive Glass/Card Surface */
+  /* Editorial Card & Surfaces */
+  .card-editorial {
+    @apply bg-white border border-nexo-border rounded-[2px] transition-colors;
+  }
+
+  .card-premium-dotted {
+    @apply border border-dashed border-nexo-brass/60 bg-[#FDFBF7] rounded-[2px] p-5;
+  }
+
   .executive-surface {
-    @apply bg-nexo-surface border border-nexo-border rounded-2xl shadow-executive transition-all duration-200;
+    @apply bg-white border border-nexo-border rounded-[2px] shadow-sm transition-all duration-200;
   }
 
   .executive-surface-hover {
-    @apply hover:-translate-y-0.5 hover:border-nexo-accent-cyan/40 hover:shadow-cyan-glow;
+    @apply hover:border-nexo-cobalt/40;
+  }
+
+  /* Status and Category Badges */
+  .badge-breaking {
+    @apply inline-flex items-center gap-1 rounded-full bg-[#FBE4E1] px-2.5 py-0.5 text-[11px] font-semibold text-[#B3261E];
+  }
+
+  .badge-verified {
+    @apply inline-flex items-center gap-1 rounded-full bg-[#E3F1EA] px-2.5 py-0.5 text-[11px] font-semibold text-[#17794D];
+  }
+
+  .badge-developing {
+    @apply inline-flex items-center gap-1 rounded-full bg-[#F6E7C8] px-2.5 py-0.5 text-[11px] font-semibold text-[#8A5A08];
+  }
+
+  .badge-sponsored {
+    @apply inline-flex items-center gap-1 rounded-full bg-[#F0EDF6] px-2.5 py-0.5 text-[11px] font-semibold text-[#58488A];
+  }
+
+  .badge-premium {
+    @apply inline-flex items-center gap-1 rounded-full bg-[#F6E7C8] px-2.5 py-0.5 text-[11px] font-semibold text-[#8A5A08];
+  }
+
+  .badge-accelerating {
+    @apply inline-flex items-center gap-1 rounded-full bg-[#DBEAFE] px-2.5 py-0.5 text-[11px] font-semibold text-[#1E40AF];
+  }
+
+  /* Button Tokens */
+  .btn-ink {
+    @apply inline-flex items-center justify-center rounded-[4px] bg-nexo-ink px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1A2C42] active:bg-[#070D16];
+  }
+
+  .btn-brass-outline {
+    @apply inline-flex items-center justify-center rounded-[4px] border border-nexo-brass bg-white px-3.5 py-1.5 text-xs font-semibold text-nexo-brass-text transition-colors hover:bg-nexo-brass-tint/30;
   }
 
   /* Shimmer Loading Animation */
@@ -77,18 +132,18 @@
   }
 
   .shimmer-bg {
-    background: linear-gradient(90deg, #e8eee9 25%, #f8faf8 50%, #e8eee9 75%);
+    background: linear-gradient(90deg, #EEEBE4 25%, #FFFFFF 50%, #EEEBE4 75%);
     background-size: 200% 100%;
     animation: shimmer 1.8s infinite;
   }
 
   .page-shell {
-    width: min(100%, 1600px);
+    width: min(100%, 1440px);
     margin-inline: auto;
   }
 
   .eyebrow {
-    @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-nexo-accent-cyan;
+    @apply text-[11px] font-bold uppercase tracking-[0.08em] text-nexo-text-secondary;
   }
 }
 

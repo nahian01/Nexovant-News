@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import {
   Bookmark,
   BookmarkCheck,
@@ -20,9 +20,6 @@ import {
   TrendingUp,
 } from 'lucide-vue-next'
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout.vue'
-import Badge from '@/components/ui/Badge.vue'
-import Card from '@/components/ui/Card.vue'
-import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { workspaceService, type FeedStreamParams } from '@/services/api/workspace.service'
 import { categoryService, type CategoryItem } from '@/services/api/categories.service'
@@ -118,15 +115,13 @@ const fetchFeed = async (resetPage = true) => {
           summary: it.summary,
           category: it.primary_category || 'Enterprise AI',
           verification_status: it.verification_status || 'verified',
-          published_at: it.published_at,
-          reading_time_minutes: it.reading_time || 4,
-          relevance_score: it.relevance_score || 92,
-          source: { name: it.source_name || 'Reuters', credibility_rating: 94 },
-          source_count: it.source_count || 3,
-          entities: it.entities || [],
-          is_saved: false,
-          is_following: false,
+          relevance_score: 92,
+          published_at: it.published_at || new Date().toISOString(),
+          reading_time_minutes: 3,
+          source: { name: 'Reuters Wire', credibility_rating: 96 },
+          source_count: 3,
         }))
+        totalItems.value = feedItems.value.length
       } catch {
         feedItems.value = []
       }
@@ -139,64 +134,48 @@ const fetchFeed = async (resetPage = true) => {
 
 const loadMore = () => {
   if (hasMorePages.value && !isLoadingMore.value) {
-    currentPage.value += 1
+    currentPage.value++
     fetchFeed(false)
   }
 }
 
-const toggleSaveArticle = async (article: any) => {
-  const current = savedItemIds.value[article.id]
-  savedItemIds.value[article.id] = !current
+const toggleSaveArticle = async (item: any) => {
+  const current = savedItemIds.value[item.id]
+  savedItemIds.value[item.id] = !current
   try {
-    if (savedItemIds.value[article.id]) {
+    if (!current) {
       await workspaceService.saveLibraryItem({
         item_type: 'article',
-        item_id: article.id,
-        title: article.headline || article.title,
+        item_id: item.id,
+        title: item.title,
       })
     } else {
-      // Find and remove
-      const libraryRes = await workspaceService.getLibraryItems()
-      const found = (libraryRes?.data || []).find((it: any) => it.item_id === article.id)
-      if (found) {
-        await workspaceService.deleteLibraryItem(found.id)
-      }
+      await workspaceService.deleteLibraryItem(item.id)
     }
   } catch {
-    // Revert state on error
-    savedItemIds.value[article.id] = current
+    savedItemIds.value[item.id] = current
   }
 }
 
 const toggleFollowEntity = async (entity: any) => {
-  const entityId = entity.id || entity.slug || entity.name
-  const entityName = entity.name || entity.entity_name || entity
-  const entityType = entity.type || 'company'
-  const key = `${entityType}:${entityId}`
-
-  followedEntityIds.value[key] = !followedEntityIds.value[key]
+  const entityId = entity.id || entity.name
+  const key = `company:${entityId}`
+  const current = followedEntityIds.value[key]
+  followedEntityIds.value[key] = !current
   try {
-    await workspaceService.toggleFollow(entityType, entityId, entityName)
+    await workspaceService.toggleFollow('company', entityId, entity.name)
   } catch {
-    followedEntityIds.value[key] = !followedEntityIds.value[key]
+    followedEntityIds.value[key] = current
   }
 }
 
-const handleShare = async (article: any) => {
-  const url = `${window.location.origin}/news/${article.slug || article.id}`
-  try {
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(url)
-      copySuccessId.value = article.id
-      setTimeout(() => {
-        if (copySuccessId.value === article.id) {
-          copySuccessId.value = null
-        }
-      }, 2500)
-    }
-  } catch {
-    //
-  }
+const handleShare = (item: any) => {
+  const url = `${window.location.origin}/news/${item.slug || item.id}`
+  navigator.clipboard.writeText(url)
+  copySuccessId.value = item.id
+  setTimeout(() => {
+    copySuccessId.value = null
+  }, 2000)
 }
 
 const handleFeedback = (articleId: string, type: 'up' | 'down') => {
@@ -237,61 +216,63 @@ onMounted(async () => {
 
 <template>
   <AuthenticatedLayout :show-right-panel="true">
-    <div class="mx-auto max-w-4xl space-y-6 text-left">
-      <!-- 1. Header & Executive Description -->
-      <header class="border-b border-nexo-border/80 pb-5">
-        <div class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-nexo-accent-cyan">
-          <Sparkles class="h-3.5 w-3.5" />
-          <span>Personalized Intelligence Hub</span>
+    <div class="space-y-6 text-left pb-16">
+      <!-- 1. Header & Executive Description (per Mockup P19 My feed (For You).png) -->
+      <header class="border-b border-[#D0D9CF] pb-5">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-[#274888]">
+            <Sparkles class="h-3.5 w-3.5 text-[#274888]" />
+            <span>PERSONALIZED INTELLIGENCE HUB</span>
+          </div>
+          <h1 class="editorial-headline text-3xl sm:text-4xl font-medium tracking-tight text-[#0E1A2B]">
+            For You
+          </h1>
+          <p class="text-xs sm:text-sm text-[#5F6875] max-w-2xl">
+            Intelligence shaped around the companies, technologies, and developments you follow.
+          </p>
         </div>
-        <h1 class="mt-2 font-serif text-3xl font-medium tracking-tight text-nexo-text-primary sm:text-4xl">
-          For You
-        </h1>
-        <p class="mt-2 text-sm text-nexo-text-secondary">
-          Intelligence shaped around the companies, technologies, and developments you follow.
-        </p>
 
         <!-- 2. Search & Controls Bar -->
-        <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <!-- Search within Feed -->
           <div class="relative flex-1 sm:max-w-md">
-            <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-nexo-text-muted" />
+            <Search class="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#5F6875]" />
             <input
               v-model="searchKeyword"
               @input="onSearchInput"
               type="text"
               placeholder="Filter intelligence by keyword, company, or event..."
-              class="w-full rounded-xl border border-nexo-border bg-white py-2 pl-9 pr-4 text-xs text-nexo-text-primary placeholder-nexo-text-muted transition focus:border-nexo-accent-cyan focus:outline-none focus:ring-1 focus:ring-nexo-accent-cyan"
+              class="w-full rounded-[4px] border border-[#D0D9CF] bg-white py-2 pl-9 pr-4 text-xs text-[#0E1A2B] placeholder-[#5F6875] transition-colors focus:border-[#274888] focus:outline-none shadow-xs"
             />
           </div>
 
           <!-- Sort Criteria Dropdown -->
           <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-nexo-text-muted">Sort:</span>
+            <span class="text-xs font-mono text-[#5F6875]">Sort:</span>
             <div class="relative">
               <select
                 v-model="selectedSort"
-                class="appearance-none rounded-xl border border-nexo-border bg-white py-2 pl-3 pr-8 text-xs font-medium text-nexo-text-primary transition focus:border-nexo-accent-cyan focus:outline-none"
+                class="appearance-none rounded-[4px] border border-[#D0D9CF] bg-white py-2 pl-3 pr-8 text-xs font-medium text-[#0E1A2B] transition-colors focus:border-[#274888] focus:outline-none"
               >
                 <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">
                   {{ opt.label }}
                 </option>
               </select>
-              <ChevronDown class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-nexo-text-muted" />
+              <ChevronDown class="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#5F6875]" />
             </div>
           </div>
         </div>
 
         <!-- 3. Category Filter Pills -->
-        <div class="mt-4 flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1">
+        <div class="mt-4 flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 text-xs">
           <button
             type="button"
             @click="selectedCategory = ''"
             :class="[
-              'rounded-lg px-3 py-1.5 text-xs font-medium transition',
+              'rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors',
               selectedCategory === ''
-                ? 'bg-nexo-accent-cyan text-white shadow-xs'
-                : 'border border-nexo-border bg-white text-nexo-text-secondary hover:border-nexo-accent-cyan/40 hover:text-nexo-text-primary'
+                ? 'bg-[#0E1A2B] text-white shadow-xs'
+                : 'border border-[#D0D9CF] bg-white text-[#3F4A5A] hover:bg-[#EEEBE4] hover:text-[#0E1A2B]'
             ]"
           >
             All Sectors
@@ -302,16 +283,12 @@ onMounted(async () => {
             type="button"
             @click="selectedCategory = cat.slug"
             :class="[
-              'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition',
+              'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors',
               selectedCategory === cat.slug
-                ? 'bg-nexo-accent-cyan text-white shadow-xs'
-                : 'border border-nexo-border bg-white text-nexo-text-secondary hover:border-nexo-accent-cyan/40 hover:text-nexo-text-primary'
+                ? 'bg-[#0E1A2B] text-white shadow-xs'
+                : 'border border-[#D0D9CF] bg-white text-[#3F4A5A] hover:bg-[#EEEBE4] hover:text-[#0E1A2B]'
             ]"
           >
-            <span
-              class="h-1.5 w-1.5 rounded-full"
-              :style="{ backgroundColor: selectedCategory === cat.slug ? '#ffffff' : cat.color || '#147A67' }"
-            ></span>
             <span>{{ cat.name }}</span>
           </button>
         </div>
@@ -319,77 +296,76 @@ onMounted(async () => {
 
       <!-- 4. Loading Skeleton -->
       <div v-if="isLoading" class="space-y-4">
-        <Card v-for="i in 3" :key="i" padding="lg">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <Skeleton class="h-4 w-32" />
-              <Skeleton class="h-4 w-20" />
-            </div>
-            <Skeleton class="h-7 w-5/6" />
-            <Skeleton class="h-14 w-full" />
-            <div class="flex gap-2 pt-2">
-              <Skeleton class="h-5 w-24" />
-              <Skeleton class="h-5 w-24" />
-            </div>
+        <div v-for="i in 3" :key="i" class="card-editorial p-6 space-y-3">
+          <div class="flex items-center justify-between">
+            <Skeleton class="h-4 w-32" />
+            <Skeleton class="h-4 w-20" />
           </div>
-        </Card>
+          <Skeleton class="h-7 w-5/6" />
+          <Skeleton class="h-14 w-full" />
+        </div>
       </div>
 
       <!-- 5. Empty State -->
       <div
         v-else-if="feedItems.length === 0"
-        class="rounded-2xl border border-dashed border-nexo-border bg-white p-12 text-center"
+        class="card-editorial p-12 text-center space-y-3"
       >
-        <Sparkles class="mx-auto h-10 w-10 text-nexo-text-muted" />
-        <h3 class="mt-3 font-serif text-lg font-medium text-nexo-text-primary">
+        <Sparkles class="mx-auto h-8 w-8 text-[#5F6875]" />
+        <h3 class="font-serif text-lg font-medium text-[#0E1A2B]">
           No intelligence matching your filters
         </h3>
-        <p class="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-nexo-text-secondary">
-          Try clearing your search query, switching category filters, or following additional companies and technologies.
+        <p class="mx-auto max-w-sm text-xs leading-relaxed text-[#5F6875]">
+          Try clearing your search query, switching category filters, or following additional companies.
         </p>
-        <div class="mt-4 flex justify-center gap-2">
-          <Button variant="secondary" size="sm" @click="selectedCategory = ''; searchKeyword = ''">
+        <div class="pt-2 flex justify-center gap-2">
+          <button
+            type="button"
+            class="px-3.5 py-2 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] text-xs font-semibold"
+            @click="selectedCategory = ''; searchKeyword = ''"
+          >
             Reset Filters
-          </Button>
+          </button>
           <RouterLink to="/following">
-            <Button variant="primary" size="sm">Explore Following</Button>
+            <button type="button" class="btn-ink text-xs px-3.5 py-2">
+              Explore Following
+            </button>
           </RouterLink>
         </div>
       </div>
 
       <!-- 6. Feed Item Cards -->
       <div v-else class="space-y-4">
-        <Card
+        <div
           v-for="item in feedItems"
           :key="item.id"
-          padding="lg"
-          class="group border-nexo-border/80 transition-all hover:border-nexo-accent-cyan/35 hover:shadow-md"
+          class="card-editorial p-5 sm:p-6 space-y-3 hover:border-[#274888]/40 transition-colors group"
         >
           <!-- Card Header: Verification + Category + Relevance Score + Time -->
-          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-nexo-border/60 pb-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#D0D9CF]/60 pb-3">
             <div class="flex flex-wrap items-center gap-2">
               <!-- Verification Status Badge -->
-              <Badge
-                :variant="item.verification_status === 'verified' || item.verification_status === 'confirmed' ? 'confirmed' : 'reported_reliable'"
-                size="sm"
+              <span
+                class="px-2 py-0.5 rounded-[2px] text-[10px] font-mono font-bold uppercase tracking-wider"
+                :class="item.verification_status === 'verified' || item.verification_status === 'confirmed' ? 'badge-verified' : 'badge-developing'"
               >
                 {{ (item.verification_status || 'verified').replace('_', ' ') }}
-              </Badge>
+              </span>
 
               <!-- Category Pill -->
-              <span class="rounded-md bg-nexo-bg px-2 py-0.5 text-[11px] font-semibold text-nexo-text-secondary">
+              <span class="rounded-[2px] bg-[#F8FAF7] border border-[#D0D9CF] px-2 py-0.5 text-[10px] font-mono font-medium text-[#3F4A5A]">
                 {{ typeof item.category === 'object' ? item.category?.name : item.category || 'Strategic Intelligence' }}
               </span>
 
               <!-- Personal Relevance Score Badge -->
-              <span class="inline-flex items-center gap-1 rounded-md bg-[#e9f3ed] px-2 py-0.5 font-mono text-[10px] font-semibold text-nexo-accent-cyan">
+              <span class="inline-flex items-center gap-1 rounded-[2px] bg-[#E4E9F7] px-2 py-0.5 font-mono text-[10px] font-semibold text-[#274888]">
                 <Sparkles class="h-2.5 w-2.5" />
                 <span>{{ item.relevance_score || 90 }}% Relevance</span>
               </span>
             </div>
 
             <!-- Reading Time & Timestamp -->
-            <div class="flex items-center gap-3 text-[11px] text-nexo-text-muted">
+            <div class="flex items-center gap-3 text-[11px] text-[#5F6875]">
               <span class="flex items-center gap-1">
                 <Clock class="h-3 w-3" />
                 <span>{{ item.reading_time_minutes || 3 }} min read</span>
@@ -400,14 +376,14 @@ onMounted(async () => {
           </div>
 
           <!-- Card Body: Headline & Summary -->
-          <div class="mt-3.5 space-y-2">
+          <div class="space-y-1.5">
             <RouterLink
               :to="`/news/${item.slug || item.id}`"
-              class="block font-serif text-xl font-medium leading-snug tracking-tight text-nexo-text-primary transition group-hover:text-nexo-accent-cyan sm:text-[22px]"
+              class="editorial-headline block text-xl sm:text-[22px] font-medium leading-snug tracking-tight text-[#0E1A2B] transition-colors group-hover:text-[#274888]"
             >
               {{ item.headline || item.title }}
             </RouterLink>
-            <p class="text-xs leading-relaxed text-nexo-text-secondary sm:text-[13px]">
+            <p class="text-xs sm:text-[13px] leading-relaxed text-[#3F4A5A]">
               {{ item.summary }}
             </p>
           </div>
@@ -415,22 +391,22 @@ onMounted(async () => {
           <!-- Personalization Reason (If Present) -->
           <div
             v-if="item.personalization_explanation"
-            class="mt-3 rounded-xl bg-[#f4f7f4] px-3 py-2 text-[11px] text-nexo-text-secondary"
+            class="rounded-[2px] bg-[#F8FAF7] border border-[#D0D9CF] px-3 py-2 text-[11px] text-[#5F6875]"
           >
-            <span class="font-semibold text-nexo-accent-cyan">Why you see this:</span>
+            <span class="font-semibold text-[#274888]">Why you see this:</span>
             {{ item.personalization_explanation }}
           </div>
 
           <!-- Corroboration & Detected Entities -->
-          <div class="mt-3.5 flex flex-wrap items-center justify-between gap-3 border-t border-nexo-border/60 pt-3">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[#D0D9CF]/60 pt-3">
             <!-- Source Attribution & Corroborating Count -->
-            <div class="flex items-center gap-2 text-xs text-nexo-text-secondary">
-              <span class="font-semibold text-nexo-text-primary">{{ item.source?.name || 'Primary Source' }}</span>
-              <span class="rounded bg-emerald-50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-emerald-800">
+            <div class="flex items-center gap-2 text-xs text-[#5F6875]">
+              <span class="font-semibold text-[#0E1A2B]">{{ item.source?.name || 'Primary Source' }}</span>
+              <span class="rounded-[2px] bg-[#E3F1EA] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[#17794D]">
                 Credibility {{ item.source?.credibility_rating || 95 }}%
               </span>
-              <span class="text-nexo-text-muted">•</span>
-              <span class="text-[11px] text-nexo-text-muted">
+              <span>•</span>
+              <span class="text-[11px]">
                 {{ item.source_count || 3 }} independent sources
               </span>
             </div>
@@ -443,35 +419,35 @@ onMounted(async () => {
                 type="button"
                 @click="toggleFollowEntity(typeof entity === 'string' ? { name: entity } : entity)"
                 :class="[
-                  'group/ent flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-medium transition',
+                  'group/ent flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors',
                   followedEntityIds[`company:${typeof entity === 'string' ? entity : entity.id || entity.name}`]
-                    ? 'border-nexo-accent-cyan/40 bg-[#e9f3ed] text-nexo-accent-cyan'
-                    : 'border-nexo-border bg-nexo-bg text-nexo-text-secondary hover:border-nexo-accent-cyan/40 hover:text-nexo-text-primary'
+                    ? 'border-[#17794D]/30 bg-[#E3F1EA] text-[#17794D]'
+                    : 'border-[#D0D9CF] bg-white text-[#3F4A5A] hover:bg-[#EEEBE4] hover:text-[#0E1A2B]'
                 ]"
               >
                 <span>{{ typeof entity === 'string' ? entity : entity.name }}</span>
                 <Check v-if="followedEntityIds[`company:${typeof entity === 'string' ? entity : entity.id || entity.name}`]" class="h-2.5 w-2.5" />
-                <Plus v-else class="h-2.5 w-2.5 text-nexo-text-muted group-hover/ent:text-nexo-accent-cyan" />
+                <Plus v-else class="h-2.5 w-2.5 text-[#5F6875] group-hover/ent:text-[#0E1A2B]" />
               </button>
             </div>
           </div>
 
           <!-- Card Actions: Save, Share, Feedback, Full Story -->
-          <div class="mt-3.5 flex flex-wrap items-center justify-between gap-2 border-t border-nexo-border/60 pt-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-t border-[#D0D9CF]/60 pt-3">
             <div class="flex items-center gap-2">
               <!-- Save to Library Action -->
               <button
                 type="button"
                 @click="toggleSaveArticle(item)"
                 :class="[
-                  'flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition',
+                  'flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-xs font-medium transition-colors border',
                   savedItemIds[item.id]
-                    ? 'bg-[#e9f3ed] text-nexo-accent-cyan'
-                    : 'text-nexo-text-secondary hover:bg-nexo-bg hover:text-nexo-text-primary'
+                    ? 'border-[#274888]/30 bg-[#E4E9F7] text-[#274888]'
+                    : 'border-[#D0D9CF] bg-white text-[#3F4A5A] hover:bg-[#EEEBE4] hover:text-[#0E1A2B]'
                 ]"
                 aria-label="Save intelligence"
               >
-                <BookmarkCheck v-if="savedItemIds[item.id]" class="h-3.5 w-3.5 text-nexo-accent-cyan" />
+                <BookmarkCheck v-if="savedItemIds[item.id]" class="h-3.5 w-3.5 text-[#274888]" />
                 <Bookmark v-else class="h-3.5 w-3.5" />
                 <span>{{ savedItemIds[item.id] ? 'Saved' : 'Save' }}</span>
               </button>
@@ -480,7 +456,7 @@ onMounted(async () => {
               <button
                 type="button"
                 @click="handleShare(item)"
-                class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-nexo-text-secondary transition hover:bg-nexo-bg hover:text-nexo-text-primary"
+                class="flex items-center gap-1.5 rounded-[4px] border border-[#D0D9CF] bg-white px-2.5 py-1 text-xs font-medium text-[#3F4A5A] transition-colors hover:bg-[#EEEBE4] hover:text-[#0E1A2B]"
                 aria-label="Share intelligence"
               >
                 <Share2 class="h-3.5 w-3.5" />
@@ -488,15 +464,15 @@ onMounted(async () => {
               </button>
 
               <!-- Relevance Feedback -->
-              <div class="flex items-center gap-1 border-l border-nexo-border/60 pl-2">
+              <div class="flex items-center gap-1 border-l border-[#D0D9CF] pl-2">
                 <button
                   type="button"
                   @click="handleFeedback(item.id, 'up')"
                   :class="[
-                    'rounded p-1 transition',
+                    'rounded p-1 transition-colors',
                     feedbackGiven[item.id] === 'up'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'text-nexo-text-muted hover:text-nexo-text-primary'
+                      ? 'bg-[#E3F1EA] text-[#17794D]'
+                      : 'text-[#5F6875] hover:text-[#0E1A2B]'
                   ]"
                   title="More like this"
                   aria-label="More like this"
@@ -507,10 +483,10 @@ onMounted(async () => {
                   type="button"
                   @click="handleFeedback(item.id, 'down')"
                   :class="[
-                    'rounded p-1 transition',
+                    'rounded p-1 transition-colors',
                     feedbackGiven[item.id] === 'down'
-                      ? 'bg-rose-50 text-rose-700'
-                      : 'text-nexo-text-muted hover:text-nexo-text-primary'
+                      ? 'bg-[#FBE4E1] text-[#B3261E]'
+                      : 'text-[#5F6875] hover:text-[#0E1A2B]'
                   ]"
                   title="Less like this"
                   aria-label="Less like this"
@@ -523,25 +499,25 @@ onMounted(async () => {
             <!-- Deep Dive Link -->
             <RouterLink
               :to="`/news/${item.slug || item.id}`"
-              class="inline-flex items-center gap-1 text-xs font-semibold text-nexo-accent-cyan transition hover:underline"
+              class="inline-flex items-center gap-1 text-xs font-semibold text-[#274888] hover:underline"
             >
               <span>Full Intelligence Dossier</span>
               <ExternalLink class="h-3 w-3" />
             </RouterLink>
           </div>
-        </Card>
+        </div>
 
         <!-- Load More Pagination -->
         <div v-if="hasMorePages" class="pt-4 text-center">
-          <Button
-            variant="secondary"
-            size="md"
+          <button
+            type="button"
+            class="px-6 py-2.5 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] text-xs font-semibold transition-colors disabled:opacity-50"
             :disabled="isLoadingMore"
             @click="loadMore"
           >
             <span v-if="isLoadingMore">Loading More Intelligence...</span>
             <span v-else>Load More Intelligence</span>
-          </Button>
+          </button>
         </div>
       </div>
     </div>

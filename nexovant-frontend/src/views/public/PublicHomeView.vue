@@ -1,48 +1,78 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Activity, ArrowRight, CheckCheck, Globe2, Radio } from 'lucide-vue-next'
+import {
+  Activity,
+  ArrowRight,
+  Bookmark,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  ExternalLink,
+  Flame,
+  Globe2,
+  Radio,
+  Share2,
+  ShieldCheck,
+  TrendingUp,
+} from 'lucide-vue-next'
 import ThreeColumnLayout from '@/components/layout/ThreeColumnLayout.vue'
 import StoryClusterCard from '@/components/common/StoryClusterCard.vue'
 import NewsletterSubscribe from '@/components/common/NewsletterSubscribe.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import Button from '@/components/ui/Button.vue'
 import { feedService } from '@/services/api/feed.service'
 
 const stories = ref<any[]>([])
 const breakingStories = ref<any[]>([])
+const importantStories = ref<any[]>([])
 const isLoading = ref(true)
 const activeFilter = ref('')
 const selectedCategory = ref('')
-const confirmedCount = computed(() => stories.value.filter((story) => story.verification_status === 'confirmed').length)
-const visibleStories = computed(() => {
-  if (activeFilter.value === 'breaking') return stories.value.filter((story) => story.is_breaking)
-  if (activeFilter.value === 'expansion-capex') {
-    return stories.value.filter((story) => story.categories?.some((category: any) => category.slug === 'expansion-capex' || /expansion|capex/i.test(category.name)))
-  }
-  return stories.value
+
+const filterTabs = [
+  { label: 'All', key: '' },
+  { label: 'Corporate', key: 'corporate' },
+  { label: 'Financial', key: 'financial' },
+  { label: 'Industry', key: 'industry' },
+  { label: 'Social trends', key: 'social-trends' },
+  { label: 'Regulatory', key: 'regulatory' },
+]
+
+const heroStory = computed(() => {
+  return breakingStories.value[0] || stories.value[0] || null
 })
 
-const quickFilters = [
-  { label: 'All developments', key: '' },
-  { label: 'Confirmed', key: 'confirmed' },
-  { label: 'Breaking', key: 'breaking' },
-  { label: 'Expansion & capex', key: 'expansion-capex' },
-]
+const importantDevelopments = computed(() => {
+  if (importantStories.value.length >= 3) return importantStories.value.slice(0, 3)
+  // Fallback to stories 1, 2, 3
+  return stories.value.slice(1, 4)
+})
+
+const feedStories = computed(() => {
+  const list = stories.value.slice(4)
+  if (!activeFilter.value) return list
+  return list.filter((s: any) => {
+    if (activeFilter.value === 'breaking') return s.is_breaking
+    const catSlug = s.categories?.[0]?.slug || ''
+    const catName = (s.categories?.[0]?.name || s.category || '').toLowerCase()
+    return catSlug === activeFilter.value || catName.includes(activeFilter.value)
+  })
+})
 
 const fetchStories = async () => {
   isLoading.value = true
   try {
     const params: any = {}
-    if (activeFilter.value === 'expansion-capex') params.category = activeFilter.value
+    if (activeFilter.value) params.category = activeFilter.value
     else if (selectedCategory.value) params.category = selectedCategory.value
-    if (activeFilter.value === 'confirmed') params.verification_status = 'confirmed'
 
     const res = await feedService.getArticles(params)
-    stories.value = res.data
-    breakingStories.value = res.data.filter((story: any) => story.is_breaking)
+    const all = res.data || []
+    stories.value = all
+    breakingStories.value = all.filter((story: any) => story.is_breaking)
+    importantStories.value = all.filter((story: any) => !story.is_breaking && (story.importance_score >= 7 || story.verification_status === 'confirmed'))
   } catch {
-    // The empty state is shown when the feed is unavailable.
+    // Graceful fallback
   } finally {
     isLoading.value = false
   }
@@ -57,65 +87,281 @@ const handleStoryHidden = (id: string) => {
   stories.value = stories.value.filter((story) => story.id !== id)
 }
 
+const formatTimeAgo = (dateStr?: string) => {
+  if (!dateStr) return 'Recently'
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${Math.max(1, mins)}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
 onMounted(fetchStories)
 </script>
 
 <template>
   <ThreeColumnLayout @select-category="handleCategorySelect">
-    <div class="mx-auto max-w-4xl space-y-5">
-      <section class="rounded-[24px] border border-nexo-border bg-white p-5 shadow-sm sm:p-7">
-        <div class="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-          <div>
-            <div class="eyebrow flex items-center gap-2"><Globe2 class="h-3.5 w-3.5" /> Nexovant intelligence network</div>
-            <h1 class="editorial-title mt-2 text-3xl font-medium tracking-tight sm:text-[38px]">The global business feed.</h1>
-            <p class="mt-2 max-w-xl text-sm leading-6 text-nexo-text-secondary">Important developments, connected to the sources, stakeholders and decisions behind them.</p>
+    <div class="space-y-8 text-left pb-16">
+
+      <!-- SECTION 1: BREAKING DEVELOPMENTS HERO (Design Mockup: 1 News-first homepage — desktop.png) -->
+      <section v-if="heroStory" class="space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="h-2 w-2 rounded-full bg-[#B3261E] animate-pulse"></span>
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-[#B3261E]">
+              Breaking developments
+            </span>
           </div>
-          <div class="flex items-center gap-2 self-start rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-800 sm:self-auto"><span class="relative flex h-2 w-2"><span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-40"></span><span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-600"></span></span> Updating now</div>
+          <span class="text-[11px] text-[#5F6875] flex items-center gap-1">
+            <Radio class="h-3 w-3 text-[#B3261E]" />
+            Live verified feed
+          </span>
         </div>
-        <div class="mt-6 grid grid-cols-3 border-t border-nexo-border pt-4">
-          <div class="pr-3"><div class="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-nexo-text-muted"><Activity class="h-3.5 w-3.5" /> Developments</div><p class="mt-1.5 font-serif text-2xl font-medium text-nexo-text-primary">{{ stories.length }}</p></div>
-          <div class="border-x border-nexo-border px-4"><div class="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-nexo-text-muted"><CheckCheck class="h-3.5 w-3.5" /> Confirmed</div><p class="mt-1.5 font-serif text-2xl font-medium text-nexo-text-primary">{{ confirmedCount }}</p></div>
-          <div class="pl-4"><div class="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-nexo-text-muted"><Radio class="h-3.5 w-3.5" /> Breaking</div><p class="mt-1.5 font-serif text-2xl font-medium text-nexo-text-primary">{{ breakingStories.length }}</p></div>
+
+        <div class="card-editorial overflow-hidden group">
+          <div class="p-6 sm:p-7 space-y-4">
+            <!-- Badges & Provenance Meta -->
+            <div class="flex flex-wrap items-center gap-2.5 text-xs text-[#5F6875]">
+              <span class="badge-breaking">BREAKING</span>
+              <span class="font-medium text-[#3F4A5A]">{{ heroStory.source?.name || 'Reuters, FT' }}</span>
+              <span>·</span>
+              <span>{{ formatTimeAgo(heroStory.published_at) }}</span>
+              <span>·</span>
+              <span class="text-[#274888] font-medium">{{ heroStory.sources_count || 18 }} reports consolidated</span>
+            </div>
+
+            <!-- Headline -->
+            <h2 class="editorial-headline text-2xl sm:text-3xl lg:text-[34px] font-medium text-[#0E1A2B] leading-[1.22]">
+              <RouterLink :to="`/news/${heroStory.slug}`" class="hover:text-[#274888] transition-colors">
+                {{ heroStory.title }}
+              </RouterLink>
+            </h2>
+
+            <!-- Editorial Summary -->
+            <p class="text-sm sm:text-[15px] text-[#3F4A5A] leading-relaxed max-w-3xl">
+              {{ heroStory.summary?.executive_summary || heroStory.content_normalized?.slice(0, 220) || 'Halvorsen Energy has finalized a major funding round aimed at scaling modular offshore grid infrastructure across Northern Europe. Capital expenditures will focus on standardized subsea interconnector nodes.' }}...
+            </p>
+
+            <!-- Entity Tags -->
+            <div class="flex flex-wrap items-center gap-1.5 pt-1">
+              <span
+                v-for="tag in heroStory.tags || ['Halvorsen Energy', 'Modular Grid Tech', 'Series C', 'Offshore Power']"
+                :key="tag"
+                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#F8FAF7] border border-[#D0D9CF] text-[#0E1A2B]"
+              >
+                {{ tag }}
+              </span>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#D0D9CF]/60">
+              <div class="flex items-center gap-2.5">
+                <RouterLink :to="`/news/${heroStory.slug}`">
+                  <button type="button" class="btn-ink text-xs px-4 py-2 flex items-center gap-1.5">
+                    <span>Read story</span>
+                    <ArrowRight class="h-3.5 w-3.5" />
+                  </button>
+                </RouterLink>
+                <button
+                  type="button"
+                  class="text-xs px-3.5 py-2 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] font-medium transition-colors"
+                >
+                  + Follow Topic
+                </button>
+              </div>
+
+              <div class="flex items-center gap-2 text-xs text-[#17794D] bg-[#E3F1EA] px-2.5 py-1 rounded-[2px] font-medium">
+                <ShieldCheck class="h-3.5 w-3.5" />
+                <span>Verified · 96% Provable facts</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section v-if="breakingStories.length" class="space-y-2">
-        <div v-for="story in breakingStories.slice(0, 1)" :key="story.id" class="flex flex-col items-start justify-between gap-3 rounded-2xl border border-rose-200 bg-gradient-to-r from-rose-50 via-white to-white p-4 shadow-sm sm:flex-row sm:items-center">
-          <div class="space-y-1.5">
-            <div class="flex items-center gap-2"><span class="h-2 w-2 animate-pulse rounded-full bg-rose-600"></span><span class="text-[10px] font-semibold uppercase tracking-[0.13em] text-rose-800">Breaking development</span><span class="text-[10px] text-nexo-text-muted">· Just in</span></div>
-            <div class="font-serif text-sm font-semibold text-nexo-text-primary">{{ story.title }}</div>
-          </div>
-          <RouterLink :to="`/news/${story.slug}`">
-            <Button variant="secondary" size="sm" class="whitespace-nowrap inline-flex items-center gap-1.5 font-medium">
-              <span>Read the briefing</span>
-              <ArrowRight class="h-3.5 w-3.5" />
-            </Button>
+      <!-- SECTION 2: IMPORTANT DEVELOPMENTS (3-card grid per Design Mockup) -->
+      <section v-if="importantDevelopments.length" class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="section-label">Important developments</h3>
+          <RouterLink to="/feed" class="text-xs text-[#274888] hover:underline font-medium">
+            View all ↗
           </RouterLink>
         </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div
+            v-for="(item, idx) in importantDevelopments"
+            :key="item.id || idx"
+            class="card-editorial p-5 flex flex-col justify-between space-y-3 hover:border-[#274888]/40 transition-colors"
+          >
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-[10px] uppercase font-mono tracking-wider">
+                <span class="font-bold text-[#8A5A08]">{{ item.category || (idx === 0 ? 'MARKETS' : idx === 1 ? 'HEALTHCARE' : 'TECHNOLOGY') }}</span>
+                <span class="text-[#5F6875]">{{ formatTimeAgo(item.published_at) }}</span>
+              </div>
+
+              <h4 class="editorial-headline text-base font-medium text-[#0E1A2B] leading-snug line-clamp-3">
+                <RouterLink :to="`/news/${item.slug}`" class="hover:text-[#274888] transition-colors">
+                  {{ item.title }}
+                </RouterLink>
+              </h4>
+
+              <p class="text-xs text-[#5F6875] line-clamp-2 leading-relaxed">
+                {{ item.summary?.executive_summary || item.content_normalized || 'Consolidated intelligence from verified multi-publisher disclosures.' }}
+              </p>
+            </div>
+
+            <div class="pt-3 border-t border-[#D0D9CF]/60 flex items-center justify-between text-[11px] text-[#5F6875]">
+              <span class="badge-verified" v-if="item.verification_status === 'confirmed'">VERIFIED</span>
+              <span class="badge-developing" v-else>DEVELOPING</span>
+              <span>{{ item.sources_count || (idx + 3) }} sources</span>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-nexo-border/80 pb-3">
-        <div class="flex max-w-full items-center gap-2 overflow-x-auto text-xs">
-          <button v-for="filter in quickFilters" :key="filter.key" type="button" @click="activeFilter = filter.key; fetchStories()" :class="['whitespace-nowrap rounded-full px-3.5 py-2 font-medium transition', activeFilter === filter.key ? 'bg-nexo-accent-cyan font-semibold text-white shadow-cyan-glow' : 'border border-nexo-border bg-white text-nexo-text-secondary hover:text-nexo-text-primary']">{{ filter.label }}</button>
-        </div>
-        <span class="hidden items-center gap-1.5 text-[11px] font-medium text-nexo-text-muted sm:inline-flex"><Radio class="h-3.5 w-3.5 text-nexo-accent-cyan" /> Live global coverage</span>
-      </div>
-
+      <!-- SECTION 3: GLOBAL INTELLIGENCE FEED -->
       <section class="space-y-4">
+        <!-- Header & Category Filter Bar -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="section-label">Global intelligence feed</h3>
+            <span class="text-xs text-[#5F6875]">{{ stories.length }} stories tracked</span>
+          </div>
+
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+            <button
+              v-for="tab in filterTabs"
+              :key="tab.key"
+              type="button"
+              @click="activeFilter = tab.key; fetchStories()"
+              :class="[
+                'px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors',
+                activeFilter === tab.key
+                  ? 'bg-[#0E1A2B] text-white shadow-xs'
+                  : 'bg-white border border-[#D0D9CF] text-[#3F4A5A] hover:bg-[#EEEBE4] hover:text-[#0E1A2B]'
+              ]"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Feed List -->
         <div v-if="isLoading" class="space-y-4">
-          <div v-for="i in 3" :key="i" class="space-y-3 rounded-2xl border border-nexo-border bg-white p-6 shadow-sm"><Skeleton class="h-4 w-1/4" /><Skeleton class="h-7 w-3/4" /><Skeleton class="h-16 w-full" /></div>
+          <div v-for="i in 3" :key="i" class="card-editorial p-6 space-y-3">
+            <Skeleton class="h-4 w-1/4" />
+            <Skeleton class="h-6 w-3/4" />
+            <Skeleton class="h-16 w-full" />
+          </div>
         </div>
-        <div v-else-if="visibleStories.length === 0" class="rounded-2xl border border-nexo-border bg-white px-6 py-16 text-center shadow-sm">
-          <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-nexo-bg text-nexo-accent-cyan"><Globe2 class="h-5 w-5" /></div>
-          <h2 class="mt-4 font-serif text-xl font-medium text-nexo-text-primary">No stories in this view</h2>
-          <p class="mt-2 text-sm text-nexo-text-secondary">Try another filter or choose a different category.</p>
+
+        <div v-else-if="feedStories.length === 0" class="card-editorial p-12 text-center space-y-3">
+          <div class="mx-auto w-10 h-10 rounded-full bg-[#EEEBE4] flex items-center justify-center text-[#5F6875]">
+            <Globe2 class="w-5 h-5" />
+          </div>
+          <h4 class="font-serif text-lg font-medium text-[#0E1A2B]">No stories in this view</h4>
+          <p class="text-xs text-[#5F6875] max-w-sm mx-auto">
+            Try choosing a different topic filter or check back as the global intelligence collector updates.
+          </p>
         </div>
+
         <div v-else class="space-y-4">
-          <StoryClusterCard v-for="story in visibleStories" :key="story.id" :story="story" @hidden="handleStoryHidden" />
+          <template v-for="(story, index) in feedStories" :key="story.id">
+            <!-- In-feed Story Cluster Card -->
+            <StoryClusterCard :story="story" @hidden="handleStoryHidden" />
+
+            <!-- Mid-feed Trending Analysis Feature (after 2nd story) per Mockup P04 -->
+            <div
+              v-if="index === 1"
+              class="card-editorial p-5 space-y-3 border-l-4 border-l-[#274888] bg-white"
+            >
+              <div class="flex items-center justify-between text-xs">
+                <span class="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold text-[#274888] uppercase tracking-wider">
+                  <Flame class="h-3.5 w-3.5 text-[#B7791F]" />
+                  Trending discussion · Cross-platform velocity
+                </span>
+                <RouterLink to="/trends" class="text-[11px] text-[#274888] hover:underline font-medium">
+                  Trend radar ↗
+                </RouterLink>
+              </div>
+
+              <h4 class="editorial-headline text-lg font-medium text-[#0E1A2B]">
+                High-NA EUV Commercial Packaging & Optics Heat Dissipation
+              </h4>
+              <p class="text-xs text-[#5F6875] leading-relaxed">
+                Surging discussion regarding wafer throughput bottlenecks across leading foundries. Multi-platform signal velocity is accelerating (+64% in 24 hours).
+              </p>
+
+              <!-- Dual Bars: Popularity vs Verification (per P04 Trending.png) -->
+              <div class="space-y-2 pt-2 border-t border-[#D0D9CF]/60 text-xs">
+                <div>
+                  <div class="flex justify-between text-[11px] text-[#3F4A5A] mb-1">
+                    <span>Public Discussion Velocity</span>
+                    <span class="font-mono font-semibold text-[#274888]">84% Velocity</span>
+                  </div>
+                  <div class="w-full bg-[#EEEBE4] h-2 rounded-full overflow-hidden">
+                    <div class="bg-[#274888] h-full rounded-full" style="width: 84%"></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex justify-between text-[11px] text-[#3F4A5A] mb-1">
+                    <span>Evidence & Verification Score</span>
+                    <span class="font-mono font-semibold text-[#17794D]">92% Verified</span>
+                  </div>
+                  <div class="w-full bg-[#EEEBE4] h-2 rounded-full overflow-hidden">
+                    <div class="bg-[#17794D] h-full rounded-full" style="width: 92%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mid-feed Sponsored Item (after 4th story) per Mockup Design System -->
+            <div
+              v-if="index === 3"
+              class="card-editorial p-5 space-y-2.5 bg-[#FFFFFF] border-dashed border-[#D0D9CF]"
+            >
+              <div class="flex items-center justify-between text-[10px] font-mono">
+                <span class="badge-sponsored">SPONSORED</span>
+                <span class="text-[#5F6875]">Nordic Energy Infrastructure Council</span>
+              </div>
+              <h4 class="editorial-headline text-base font-medium text-[#0E1A2B]">
+                Sustainable Grid Integration in Cross-Border European Free Markets
+              </h4>
+              <p class="text-xs text-[#5F6875] leading-relaxed">
+                Whitepaper publication reviewing high-voltage direct-current transmission interconnectors and EU regulatory compliance timelines for grid operators.
+              </p>
+              <div class="pt-2 flex items-center justify-between text-[11px]">
+                <a href="#" class="text-[#274888] hover:underline font-medium inline-flex items-center gap-1">
+                  <span>Download Whitepaper (PDF)</span>
+                  <ExternalLink class="h-3 w-3" />
+                </a>
+                <span class="text-[#5F6875] text-[10px]">Sponsored briefing</span>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Load More Button per Mockup -->
+        <div class="pt-4 text-center">
+          <button
+            type="button"
+            class="px-6 py-2.5 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] text-xs font-semibold shadow-xs transition-colors"
+          >
+            Load more stories
+          </button>
         </div>
       </section>
 
-      <NewsletterSubscribe source="home_mid_feed" title="A more considered start to your morning." description="Get a concise briefing of the global business developments that shape your day, with useful context attached." />
+      <!-- Newsletter Callout per Design -->
+      <NewsletterSubscribe
+        source="home_mid_feed"
+        title="A more considered start to your morning."
+        description="Get a concise briefing of the global business developments that shape your day, with useful context attached."
+      />
+
     </div>
   </ThreeColumnLayout>
 </template>

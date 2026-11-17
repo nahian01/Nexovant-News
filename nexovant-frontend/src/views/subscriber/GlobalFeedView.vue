@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import Sidebar from '@/components/layout/Sidebar.vue'
-import AppHeader from '@/components/layout/AppHeader.vue'
-import Card from '@/components/ui/Card.vue'
-import Badge from '@/components/ui/Badge.vue'
-import Button from '@/components/ui/Button.vue'
-import Input from '@/components/ui/Input.vue'
+import { Globe2, Search, ShieldCheck } from 'lucide-vue-next'
+import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
 import { apiClient } from '@/services/api/client'
 
 const articles = ref<any[]>([])
@@ -26,7 +23,7 @@ const categories = [
 const verificationFilters = [
   { name: 'All Provenance', value: '' },
   { name: 'Confirmed', value: 'confirmed' },
-  { name: 'Reported (Reliable)', value: 'reported_reliable' },
+  { name: 'Reported Reliable', value: 'reported_reliable' },
   { name: 'Developing', value: 'developing' },
   { name: 'Disputed', value: 'disputed' },
 ]
@@ -40,9 +37,9 @@ const fetchArticles = async () => {
     if (selectedStatus.value) params.verification_status = selectedStatus.value
 
     const res = await apiClient.get('/articles', { params })
-    articles.value = res.data.data
+    articles.value = res.data?.data || []
   } catch {
-    // Graceful fallback
+    articles.value = []
   } finally {
     isLoading.value = false
   }
@@ -54,113 +51,135 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-nexo-bg flex text-left">
-    <Sidebar />
-
-    <div class="flex-1 flex flex-col min-w-0">
-      <AppHeader />
-
-      <main class="flex-1 p-6 lg:p-8 space-y-6 overflow-y-auto max-w-7xl">
-        <!-- Title & Search Bar -->
-        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-nexo-border/60 pb-6">
-          <div>
-            <h1 class="editorial-title text-2xl sm:text-3xl font-medium text-nexo-text-primary">
-              Global Intelligence Feed
-            </h1>
-            <p class="text-xs text-nexo-text-secondary mt-1">
-              Real-time corporate developments filtered by verified provenance and business significance.
-            </p>
+  <AuthenticatedLayout :show-right-panel="true">
+    <div class="space-y-6 text-left pb-16">
+      <!-- Title & Search Bar -->
+      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-[#D0D9CF] pb-5">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-[#274888]">
+            <Globe2 class="h-3.5 w-3.5" />
+            <span>GLOBAL INTELLIGENCE NETWORK</span>
           </div>
-
-          <div class="w-full md:w-72">
-            <Input
-              v-model="searchQuery"
-              placeholder="Search entities, events, keywords..."
-              @input="fetchArticles"
-            />
-          </div>
+          <h1 class="editorial-headline text-3xl sm:text-4xl font-medium text-[#0E1A2B]">
+            Global Intelligence Feed
+          </h1>
+          <p class="text-xs sm:text-sm text-[#5F6875]">
+            Real-time developments filtered by verified provenance, entity relationships, and strategic impact.
+          </p>
         </div>
 
-        <!-- Filter Pills Bar -->
-        <div class="flex flex-wrap items-center gap-2 pb-2">
-          <!-- Categories -->
-          <button
-            v-for="cat in categories"
-            :key="cat.slug"
-            :class="[
-              'px-3 py-1.5 rounded-full text-xs font-mono transition-all',
-              selectedCategory === cat.slug
-                ? 'bg-nexo-accent-cyan text-nexo-bg font-semibold'
-                : 'bg-nexo-surface text-nexo-text-secondary border border-nexo-border hover:text-nexo-text-primary'
-            ]"
-            @click="selectedCategory = cat.slug; fetchArticles()"
-          >
-            {{ cat.name }}
-          </button>
-
-          <span class="text-nexo-text-muted px-1">|</span>
-
-          <!-- Verification Status -->
-          <button
-            v-for="st in verificationFilters"
-            :key="st.value"
-            :class="[
-              'px-3 py-1.5 rounded-full text-xs font-mono transition-all',
-              selectedStatus === st.value
-                ? 'bg-nexo-elevated text-nexo-accent-cyan border border-nexo-accent-cyan/60 font-semibold'
-                : 'bg-nexo-surface text-nexo-text-secondary border border-nexo-border hover:text-nexo-text-primary'
-            ]"
-            @click="selectedStatus = st.value; fetchArticles()"
-          >
-            {{ st.name }}
-          </button>
+        <div class="relative w-full md:w-72">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#5F6875]" />
+          <input
+            v-model="searchQuery"
+            placeholder="Search entities, events..."
+            @input="fetchArticles"
+            class="w-full pl-9 pr-3 py-2 text-xs rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] placeholder-[#5F6875] focus:outline-none focus:border-[#274888]"
+          />
         </div>
+      </div>
 
-        <!-- Feed List -->
-        <div class="space-y-4">
-          <Card
-            v-for="art in articles"
-            :key="art.id"
-            padding="md"
-            class="hover:border-nexo-accent-cyan/40"
-          >
-            <div class="flex flex-col space-y-3">
-              <div class="flex items-center justify-between flex-wrap gap-2 text-xs">
-                <div class="flex items-center space-x-2">
-                  <Badge :variant="art.verification_status" size="sm" />
-                  <span
-                    v-for="cat in art.categories"
-                    :key="cat.id"
-                    class="font-mono text-nexo-text-secondary"
-                  >
-                    {{ cat.name }}
-                  </span>
-                </div>
-                <span class="font-mono text-nexo-text-muted">
-                  Score: {{ art.importance_score }} / 10
-                </span>
-              </div>
+      <!-- Filter Pills Bar -->
+      <div class="flex flex-wrap items-center gap-1.5 pb-1 text-xs">
+        <button
+          v-for="cat in categories"
+          :key="cat.slug"
+          :class="[
+            'px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors',
+            selectedCategory === cat.slug
+              ? 'bg-[#0E1A2B] text-white shadow-xs'
+              : 'border border-[#D0D9CF] bg-white text-[#3F4A5A] hover:bg-[#EEEBE4] hover:text-[#0E1A2B]'
+          ]"
+          @click="selectedCategory = cat.slug; fetchArticles()"
+        >
+          {{ cat.name }}
+        </button>
 
-              <RouterLink :to="`/news/${art.slug}`">
-                <h3 class="font-serif text-lg font-semibold text-nexo-text-primary leading-snug hover:text-nexo-accent-cyan transition-colors">
-                  {{ art.title }}
-                </h3>
-              </RouterLink>
+        <span class="text-[#D0D9CF] px-1">|</span>
 
-              <div class="flex items-center space-x-2 text-xs text-nexo-text-secondary">
-                <span class="text-nexo-text-muted font-mono uppercase text-[10px]">Source:</span>
-                <span>{{ art.source?.name }}</span>
-                <span class="text-nexo-text-muted">|</span>
-                <span class="text-nexo-accent-cyan font-mono text-[11px]">Audited Provenance</span>
-              </div>
+        <button
+          v-for="st in verificationFilters"
+          :key="st.value"
+          :class="[
+            'px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors',
+            selectedStatus === st.value
+              ? 'bg-[#274888] text-white shadow-xs'
+              : 'border border-[#D0D9CF] bg-white text-[#3F4A5A] hover:bg-[#EEEBE4] hover:text-[#0E1A2B]'
+          ]"
+          @click="selectedStatus = st.value; fetchArticles()"
+        >
+          {{ st.name }}
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="isLoading" class="space-y-4">
+        <div v-for="i in 3" :key="i" class="card-editorial p-6 space-y-3">
+          <Skeleton class="h-4 w-32" />
+          <Skeleton class="h-6 w-3/4" />
+          <Skeleton class="h-12 w-full" />
+        </div>
+      </div>
+
+      <!-- Feed List -->
+      <div v-else-if="articles.length === 0" class="card-editorial p-12 text-center text-[#5F6875] text-xs">
+        No intelligence developments matching your active filter criteria.
+      </div>
+
+      <div v-else class="space-y-4">
+        <div
+          v-for="art in articles"
+          :key="art.id"
+          class="card-editorial p-5 sm:p-6 space-y-3 hover:border-[#274888]/40 transition-colors group"
+        >
+          <div class="flex items-center justify-between flex-wrap gap-2 text-xs">
+            <div class="flex items-center space-x-2">
+              <span
+                class="px-2 py-0.5 rounded-[2px] text-[10px] font-mono font-bold uppercase tracking-wider"
+                :class="art.verification_status === 'confirmed' || art.verification_status === 'verified' ? 'badge-verified' : 'badge-developing'"
+              >
+                {{ (art.verification_status || 'verified').replace('_', ' ') }}
+              </span>
+              <span
+                v-for="cat in art.categories"
+                :key="cat.id"
+                class="font-mono text-[10px] uppercase text-[#5F6875] bg-[#F8FAF7] border border-[#D0D9CF] px-2 py-0.5 rounded-[2px]"
+              >
+                {{ cat.name }}
+              </span>
             </div>
-          </Card>
+            <span class="font-mono text-[11px] text-[#274888] font-semibold">
+              Importance: {{ art.importance_score || 8 }} / 10
+            </span>
+          </div>
 
-          <div v-if="articles.length === 0 && !isLoading" class="p-12 text-center text-nexo-text-secondary text-sm">
-            No intelligence developments matching your active filter criteria.
+          <RouterLink :to="`/news/${art.slug}`">
+            <h3 class="editorial-headline text-xl font-medium text-[#0E1A2B] leading-snug group-hover:text-[#274888] transition-colors">
+              {{ art.title }}
+            </h3>
+          </RouterLink>
+
+          <p v-if="art.summary" class="text-xs sm:text-[13px] text-[#3F4A5A] leading-relaxed">
+            {{ typeof art.summary === 'object' ? art.summary.executive_summary : art.summary }}
+          </p>
+
+          <div class="flex items-center justify-between text-xs text-[#5F6875] pt-2 border-t border-[#D0D9CF]/60">
+            <div class="flex items-center space-x-2">
+              <span class="font-mono uppercase text-[10px] text-[#5F6875]">Source:</span>
+              <span class="font-semibold text-[#0E1A2B]">{{ art.source?.name || 'Primary Wire' }}</span>
+              <span>•</span>
+              <span class="text-[#17794D] font-medium flex items-center gap-1">
+                <ShieldCheck class="w-3.5 h-3.5" />
+                Audited Provenance
+              </span>
+            </div>
+
+            <RouterLink :to="`/news/${art.slug}`" class="text-[#274888] font-semibold hover:underline">
+              Read story &rarr;
+            </RouterLink>
           </div>
         </div>
-      </main>
+      </div>
     </div>
-  </div>
+  </AuthenticatedLayout>
 </template>

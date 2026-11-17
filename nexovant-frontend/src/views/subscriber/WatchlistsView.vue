@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import Sidebar from '@/components/layout/Sidebar.vue'
-import AppHeader from '@/components/layout/AppHeader.vue'
-import Card from '@/components/ui/Card.vue'
-import Button from '@/components/ui/Button.vue'
-import Input from '@/components/ui/Input.vue'
+import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout.vue'
 import Modal from '@/components/ui/Modal.vue'
 import { workspaceService } from '@/services/api/workspace.service'
 import {
@@ -100,44 +96,37 @@ const loadWatchlists = async () => {
   }
 }
 
-// Select Watchlist & Load Context
+// Select Watchlist and load timeline & graph
 const selectWatchlist = async (wl: WatchlistRecord) => {
   selectedWatchlist.value = wl
-  timeline.value = []
-  connectedEntities.value = []
+  errorMessage.value = ''
   try {
-    const full = await workspaceService.getWatchlist(wl.id)
-    if (full.success) {
-      selectedWatchlist.value = full.watchlist
-    }
-
-    const tlRes = await workspaceService.getWatchlistTimeline(wl.id)
-    if (tlRes.success) {
-      timeline.value = tlRes.timeline
-    }
-
-    const conRes = await workspaceService.getWatchlistConnectedEntities(wl.id)
-    if (conRes.success) {
-      connectedEntities.value = conRes.connected_entities
+    const res = await workspaceService.getWatchlist(wl.id)
+    if (res.success) {
+      selectedWatchlist.value = res.watchlist
+      timeline.value = res.timeline || []
+      connectedEntities.value = res.connected_entities || []
     }
   } catch (err: any) {
-    //
+    console.error('Failed to load watchlist details', err)
   }
 }
 
 // Create Watchlist
 const handleCreateWatchlist = async () => {
+  if (!createForm.value.name.trim()) return
   isSubmitting.value = true
   errorMessage.value = ''
-  statusMessage.value = ''
   try {
     const res = await workspaceService.createWatchlist(createForm.value)
     if (res.success) {
-      statusMessage.value = `Watchlist "${res.watchlist.name}" created.`
+      statusMessage.value = 'Watchlist created successfully.'
       isCreateModalOpen.value = false
       createForm.value = { name: '', description: '', notification_frequency: 'daily', is_default: false }
       await loadWatchlists()
-      await selectWatchlist(res.watchlist)
+      if (res.watchlist) {
+        await selectWatchlist(res.watchlist)
+      }
     }
   } catch (err: any) {
     errorMessage.value = err.response?.data?.message || err.response?.data?.errors?.name?.[0] || 'Failed to create watchlist.'
@@ -201,227 +190,248 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-nexo-bg flex text-left">
-    <Sidebar />
+  <AuthenticatedLayout :show-right-panel="true">
+    <div class="space-y-6 text-left pb-16">
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#D0D9CF] pb-5">
+        <div class="space-y-1">
+          <div class="flex items-center space-x-2 text-[11px] font-mono text-[#274888] uppercase">
+            <span>Personal Workspace</span>
+            <span>/</span>
+            <span>Entity Watchlists & Graph</span>
+          </div>
+          <h1 class="editorial-headline text-3xl sm:text-4xl font-medium text-[#0E1A2B]">
+            Custom Intelligence Watchlists
+          </h1>
+          <p class="text-xs sm:text-sm text-[#5F6875]">
+            Curate monitored companies, technologies, executives, and topics. Track historical event timelines and graph relationships.
+          </p>
+        </div>
 
-    <div class="flex-1 flex flex-col min-w-0">
-      <AppHeader />
+        <button
+          type="button"
+          class="btn-ink text-xs px-4 py-2 flex items-center gap-1.5"
+          @click="isCreateModalOpen = true"
+        >
+          <Plus class="w-3.5 h-3.5" />
+          <span>New Watchlist</span>
+        </button>
+      </div>
 
-      <main class="flex-1 p-6 lg:p-8 space-y-6 overflow-y-auto max-w-7xl">
-        <!-- Header -->
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-nexo-border/60 pb-6">
-          <div>
-            <div class="flex items-center space-x-2 text-xs font-mono text-nexo-accent-cyan uppercase mb-1">
-              <span>Personal Workspace</span>
-              <span>/</span>
-              <span>Entity Watchlists & Graph</span>
-            </div>
-            <h1 class="editorial-title text-2xl sm:text-3xl font-serif font-bold text-nexo-text-primary">
-              Custom Intelligence Watchlists
-            </h1>
-            <p class="text-xs text-nexo-text-secondary mt-1">
-              Curate monitored companies, technologies, executives, and topics. Track historical event timelines and graph relationships.
-            </p>
+      <!-- Feedback Alerts -->
+      <div v-if="statusMessage" class="p-3 bg-[#E3F1EA] border border-[#17794D]/30 text-[#17794D] text-xs font-mono rounded-[2px] flex items-center justify-between">
+        <span>✓ {{ statusMessage }}</span>
+        <button @click="statusMessage = ''" class="text-[#17794D] font-bold ml-2">✕</button>
+      </div>
+
+      <div v-if="errorMessage" class="p-3 bg-[#FBE4E1] border border-[#B3261E]/30 text-[#B3261E] text-xs font-mono rounded-[2px] flex items-center justify-between">
+        <span>✕ {{ errorMessage }}</span>
+        <button @click="errorMessage = ''" class="text-[#B3261E] font-bold ml-2">✕</button>
+      </div>
+
+      <!-- Main Grid Layout (Roster on left, details on right) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- Left Column: Watchlists Roster -->
+        <div class="lg:col-span-4 space-y-3">
+          <div class="flex items-center justify-between text-xs font-mono text-[#5F6875] uppercase px-1">
+            <span>Your Watchlists ({{ watchlists.length }})</span>
           </div>
 
-          <div class="flex items-center gap-2">
-            <Button variant="primary" size="sm" @click="isCreateModalOpen = true">
-              <Plus class="w-3.5 h-3.5 mr-1" /> New Watchlist
-            </Button>
+          <div v-if="isLoading" class="text-xs text-[#5F6875] py-6 text-center">
+            Loading watchlists...
+          </div>
+
+          <div v-else-if="watchlists.length === 0" class="card-editorial p-6 text-center text-xs space-y-2">
+            <p class="text-[#5F6875]">No watchlists created yet.</p>
+            <button
+              type="button"
+              class="px-3.5 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] text-xs font-semibold"
+              @click="isCreateModalOpen = true"
+            >
+              Create First Watchlist
+            </button>
+          </div>
+
+          <div v-else class="space-y-2">
+            <div
+              v-for="wl in watchlists"
+              :key="wl.id"
+              @click="selectWatchlist(wl)"
+              class="card-editorial p-4 cursor-pointer transition-colors"
+              :class="selectedWatchlist?.id === wl.id ? 'border-[#0E1A2B] shadow-xs' : 'hover:border-[#274888]/40'"
+            >
+              <div class="flex items-start justify-between">
+                <h3 class="editorial-headline font-medium text-[#0E1A2B] text-base flex items-center gap-1.5">
+                  {{ wl.name }}
+                </h3>
+                <span v-if="wl.is_default" class="text-[9px] font-mono px-1.5 py-0.5 rounded-[2px] bg-[#F6E7C8] text-[#8A5A08] font-bold">
+                  Default
+                </span>
+              </div>
+              <p v-if="wl.description" class="text-xs text-[#5F6875] mt-1 line-clamp-1">
+                {{ wl.description }}
+              </p>
+              <div class="mt-3 pt-2.5 border-t border-[#D0D9CF]/60 flex items-center justify-between text-[11px] font-mono text-[#5F6875]">
+                <span>{{ wl.items_count || wl.items?.length || 0 }} Entities</span>
+                <span class="capitalize">{{ wl.notification_frequency }} alerts</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Alerts -->
-        <div v-if="statusMessage" class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono rounded flex items-center justify-between">
-          <span>✓ {{ statusMessage }}</span>
-          <button @click="statusMessage = ''" class="text-emerald-600 font-bold ml-2">✕</button>
-        </div>
-
-        <div v-if="errorMessage" class="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-mono rounded flex items-center justify-between">
-          <span>✕ {{ errorMessage }}</span>
-          <button @click="errorMessage = ''" class="text-rose-600 font-bold ml-2">✕</button>
-        </div>
-
-        <!-- Main Grid Layout -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <!-- Left Column: Watchlists Roster -->
-          <div class="lg:col-span-4 space-y-3">
-            <div class="flex items-center justify-between text-xs font-mono text-nexo-text-muted uppercase px-1">
-              <span>Your Watchlists ({{ watchlists.length }})</span>
-            </div>
-
-            <div v-if="isLoading" class="text-xs text-nexo-text-muted py-6 text-center">
-              Loading watchlists...
-            </div>
-
-            <div v-else-if="watchlists.length === 0" class="p-6 bg-white rounded-lg border border-nexo-border text-center text-xs">
-              <p class="text-nexo-text-secondary">No watchlists created yet.</p>
-              <Button variant="outline" size="sm" class="mt-3" @click="isCreateModalOpen = true">
-                Create First Watchlist
-              </Button>
-            </div>
-
-            <div v-else class="space-y-2">
-              <div
-                v-for="wl in watchlists"
-                :key="wl.id"
-                @click="selectWatchlist(wl)"
-                class="p-4 rounded-lg border transition-all cursor-pointer bg-white"
-                :class="selectedWatchlist?.id === wl.id ? 'border-amber-400 shadow-xs ring-1 ring-amber-300' : 'border-nexo-border hover:border-slate-300'"
-              >
-                <div class="flex items-start justify-between">
-                  <h3 class="font-serif font-bold text-nexo-text-primary text-sm flex items-center gap-1.5">
-                    {{ wl.name }}
-                  </h3>
-                  <span v-if="wl.is_default" class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 font-bold border border-amber-200">
-                    Default
+        <!-- Right Column: Selected Watchlist Workspace -->
+        <div v-if="selectedWatchlist" class="lg:col-span-8 space-y-6">
+          <!-- Watchlist Header Card -->
+          <div class="card-editorial p-5 sm:p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h2 class="editorial-headline text-xl sm:text-2xl font-medium text-[#0E1A2B]">{{ selectedWatchlist.name }}</h2>
+                  <span class="px-2 py-0.5 rounded-[2px] text-[10px] font-mono bg-[#E4E9F7] text-[#274888] uppercase font-bold">
+                    {{ selectedWatchlist.notification_frequency }} cadence
                   </span>
                 </div>
-                <p v-if="wl.description" class="text-xs text-nexo-text-secondary mt-1 line-clamp-1">
-                  {{ wl.description }}
+                <p v-if="selectedWatchlist.description" class="text-xs text-[#5F6875] mt-1">
+                  {{ selectedWatchlist.description }}
                 </p>
-                <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-nexo-text-muted">
-                  <span>{{ wl.items_count || wl.items?.length || 0 }} Entities</span>
-                  <span class="capitalize">{{ wl.notification_frequency }} alerts</span>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="btn-ink text-xs px-3.5 py-1.5 flex items-center gap-1"
+                  @click="isAddItemModalOpen = true"
+                >
+                  <Plus class="w-3.5 h-3.5" />
+                  <span>Add Entity</span>
+                </button>
+                <button
+                  type="button"
+                  class="p-2 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#FBE4E1] hover:border-[#B3261E]/40 text-[#5F6875] hover:text-[#B3261E] transition-colors"
+                  @click="handleDeleteWatchlist(selectedWatchlist.id)"
+                  title="Delete watchlist"
+                >
+                  <Trash2 class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Monitored Entities Grid -->
+            <div class="pt-2 border-t border-[#D0D9CF]/60">
+              <h4 class="text-[11px] font-mono uppercase text-[#5F6875] mb-2">Monitored Entities in Watchlist</h4>
+              <div v-if="!selectedWatchlist.items || selectedWatchlist.items.length === 0" class="text-xs text-[#5F6875] py-4 italic">
+                No entities added yet. Click "Add Entity" to monitor companies, executives, or technologies.
+              </div>
+              <div v-else class="flex flex-wrap gap-2">
+                <div
+                  v-for="item in selectedWatchlist.items"
+                  :key="item.id"
+                  class="inline-flex items-center gap-2 px-3 py-1.5 rounded-[2px] bg-[#F8FAF7] border border-[#D0D9CF] text-xs font-medium text-[#0E1A2B]"
+                >
+                  <component :is="item.entity_type === 'technology' ? Cpu : Building2" class="w-3.5 h-3.5 text-[#274888]" />
+                  <span>{{ item.entity_name }}</span>
+                  <span class="text-[10px] font-mono uppercase text-[#5F6875]">({{ item.entity_type }})</span>
+                  <button
+                    @click="handleRemoveItem(item.id)"
+                    class="text-[#5F6875] hover:text-[#B3261E] font-bold ml-1 text-xs"
+                    title="Remove entity"
+                  >
+                    ✕
+                  </button>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Right Column: Selected Watchlist Workspace -->
-          <div v-if="selectedWatchlist" class="lg:col-span-8 space-y-6">
-            <!-- Watchlist Header Card -->
-            <Card class="p-5 bg-white border border-nexo-border shadow-xs space-y-4">
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <h2 class="font-serif font-bold text-xl text-nexo-text-primary">{{ selectedWatchlist.name }}</h2>
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-blue-50 text-blue-800 uppercase font-bold">
-                      {{ selectedWatchlist.notification_frequency }} cadence
-                    </span>
-                  </div>
-                  <p v-if="selectedWatchlist.description" class="text-xs text-nexo-text-secondary mt-1">
-                    {{ selectedWatchlist.description }}
-                  </p>
-                </div>
-
-                <div class="flex items-center gap-2">
-                  <Button variant="primary" size="sm" @click="isAddItemModalOpen = true">
-                    <Plus class="w-3.5 h-3.5 mr-1" /> Add Entity
-                  </Button>
-                  <Button variant="outline" size="sm" @click="handleDeleteWatchlist(selectedWatchlist.id)">
-                    <Trash2 class="w-3.5 h-3.5 text-rose-500" />
-                  </Button>
-                </div>
-              </div>
-
-              <!-- Monitored Entities Grid -->
-              <div>
-                <h4 class="text-[11px] font-mono uppercase text-nexo-text-muted mb-2">Monitored Entities in Watchlist</h4>
-                <div v-if="!selectedWatchlist.items || selectedWatchlist.items.length === 0" class="text-xs text-nexo-text-muted py-4 italic">
-                  No entities added yet. Click "Add Entity" to monitor companies, executives, or technologies.
-                </div>
-                <div v-else class="flex flex-wrap gap-2">
-                  <div
-                    v-for="item in selectedWatchlist.items"
-                    :key="item.id"
-                    class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-nexo-text-primary"
-                  >
-                    <component :is="item.entity_type === 'technology' ? Cpu : Building2" class="w-3.5 h-3.5 text-slate-500" />
-                    <span>{{ item.entity_name }}</span>
-                    <span class="text-[10px] font-mono uppercase text-slate-400">({{ item.entity_type }})</span>
-                    <button
-                      @click="handleRemoveItem(item.id)"
-                      class="text-slate-400 hover:text-rose-600 font-bold ml-1 text-xs"
-                      title="Remove entity"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            <!-- Connected Relationship Graph Discovery -->
-            <Card v-if="connectedEntities.length > 0" class="p-5 bg-white border border-nexo-border shadow-xs space-y-3">
-              <div class="flex items-center justify-between">
-                <h3 class="font-serif font-bold text-nexo-text-primary text-sm flex items-center gap-1.5">
-                  <Network class="w-4 h-4 text-emerald-700" /> Connected Ecosystem Entities (Graph Discovery)
-                </h3>
-                <span class="text-[11px] font-mono text-nexo-text-muted">Discovered via verified relationships</span>
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                <div
-                  v-for="ce in connectedEntities"
-                  :key="ce.id"
-                  class="p-2.5 bg-slate-50/75 rounded border border-slate-200 text-xs space-y-1"
-                >
-                  <div class="font-bold text-nexo-text-primary truncate">{{ ce.name }}</div>
-                  <div class="text-[10px] font-mono text-emerald-800 flex items-center justify-between">
-                    <span>{{ ce.relationship.replace('_', ' ') }}</span>
-                    <span>{{ Math.round(ce.confidence_score * 100) }}% match</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            <!-- Historical Milestone Timeline -->
-            <Card class="p-5 bg-white border border-nexo-border shadow-xs space-y-4">
-              <h3 class="font-serif font-bold text-nexo-text-primary text-sm flex items-center gap-1.5">
-                <Clock class="w-4 h-4 text-amber-700" /> Monitored Historical Events Timeline
+          <!-- Connected Relationship Graph Discovery -->
+          <div v-if="connectedEntities.length > 0" class="card-editorial p-5 space-y-3">
+            <div class="flex items-center justify-between border-b border-[#D0D9CF]/60 pb-2.5">
+              <h3 class="editorial-headline text-base font-medium text-[#0E1A2B] flex items-center gap-1.5">
+                <Network class="w-4 h-4 text-[#17794D]" />
+                <span>Connected Ecosystem Entities (Graph Discovery)</span>
               </h3>
+              <span class="text-[11px] font-mono text-[#5F6875]">Verified multi-hop graph</span>
+            </div>
 
-              <div v-if="timeline.length === 0" class="text-xs text-nexo-text-muted py-4 italic">
-                No recent historical events logged for these entities.
-              </div>
-
-              <div v-else class="space-y-3 border-l-2 border-slate-200 pl-4 ml-2">
-                <div v-for="ev in timeline" :key="ev.id" class="relative text-xs space-y-0.5">
-                  <span class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-4 ring-white"></span>
-                  <div class="flex items-center gap-2">
-                    <span class="font-mono text-[10px] text-nexo-text-muted">
-                      {{ new Date(ev.occurred_at).toLocaleDateString() }}
-                    </span>
-                    <span class="font-mono text-[10px] uppercase text-emerald-800 bg-emerald-50 px-1 rounded">
-                      {{ ev.event_category?.replace('_', ' ') }}
-                    </span>
-                  </div>
-                  <div class="font-bold text-nexo-text-primary">{{ ev.title }}</div>
-                  <p v-if="ev.summary" class="text-nexo-text-secondary text-[11px] leading-relaxed">
-                    {{ ev.summary }}
-                  </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+              <div
+                v-for="ce in connectedEntities"
+                :key="ce.id"
+                class="p-2.5 bg-[#F8FAF7] rounded-[2px] border border-[#D0D9CF] text-xs space-y-1"
+              >
+                <div class="font-semibold text-[#0E1A2B] truncate">{{ ce.name }}</div>
+                <div class="text-[10px] font-mono text-[#17794D] flex items-center justify-between">
+                  <span>{{ ce.relationship.replace('_', ' ') }}</span>
+                  <span>{{ Math.round(ce.confidence_score * 100) }}% match</span>
                 </div>
               </div>
-            </Card>
+            </div>
+          </div>
+
+          <!-- Historical Milestone Timeline -->
+          <div class="card-editorial p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-[#D0D9CF]/60 pb-2.5">
+              <h3 class="editorial-headline text-base font-medium text-[#0E1A2B] flex items-center gap-1.5">
+                <Clock class="w-4 h-4 text-[#8A5A08]" />
+                <span>Monitored Historical Events Timeline</span>
+              </h3>
+              <span class="text-[11px] font-mono text-[#5F6875]">Chronological Sequencing</span>
+            </div>
+
+            <div v-if="timeline.length === 0" class="text-xs text-[#5F6875] py-4 italic">
+              No recent historical events logged for these entities.
+            </div>
+
+            <div v-else class="space-y-4 border-l border-[#D0D9CF] pl-4 ml-2">
+              <div v-for="ev in timeline" :key="ev.id" class="relative text-xs space-y-1">
+                <span class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-[#274888] ring-4 ring-white"></span>
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-[10px] text-[#5F6875]">
+                    {{ new Date(ev.occurred_at).toLocaleDateString() }}
+                  </span>
+                  <span class="font-mono text-[10px] uppercase text-[#17794D] bg-[#E3F1EA] px-1 rounded-[2px]">
+                    {{ ev.event_category?.replace('_', ' ') }}
+                  </span>
+                </div>
+                <div class="font-semibold text-[#0E1A2B] text-sm">{{ ev.title }}</div>
+                <p v-if="ev.summary" class="text-[#3F4A5A] text-xs leading-relaxed">
+                  {{ ev.summary }}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
 
     <!-- MODAL 1: Create Watchlist -->
     <Modal :is-open="isCreateModalOpen" title="Create New Intelligence Watchlist" @close="isCreateModalOpen = false">
       <form @submit.prevent="handleCreateWatchlist" class="space-y-4 text-left">
         <div>
-          <label class="block text-xs font-medium text-nexo-text-primary mb-1">Watchlist Name</label>
-          <Input v-model="createForm.name" placeholder="e.g. Semiconductor Foundry Leaders" required />
+          <label class="block text-xs font-mono uppercase text-[#5F6875] mb-1">Watchlist Name</label>
+          <input
+            v-model="createForm.name"
+            placeholder="e.g. Semiconductor Foundry Leaders"
+            required
+            class="w-full text-xs border border-[#D0D9CF] rounded-[4px] p-2.5 bg-white text-[#0E1A2B] focus:border-[#274888] focus:outline-none"
+          />
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-nexo-text-primary mb-1">Description / Strategic Scope</label>
+          <label class="block text-xs font-mono uppercase text-[#5F6875] mb-1">Description / Strategic Scope</label>
           <textarea
             v-model="createForm.description"
             rows="2"
-            class="w-full text-xs border border-nexo-border rounded p-2.5 text-nexo-text-primary focus:outline-hidden"
+            class="w-full text-xs border border-[#D0D9CF] rounded-[4px] p-2.5 bg-white text-[#0E1A2B] focus:border-[#274888] focus:outline-none"
             placeholder="Focusing on sub-2nm nodes, wafer fabs, and packaging joint ventures..."
           ></textarea>
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-nexo-text-primary mb-1">Notification Cadence</label>
+          <label class="block text-xs font-mono uppercase text-[#5F6875] mb-1">Notification Cadence</label>
           <select
             v-model="createForm.notification_frequency"
-            class="w-full text-xs bg-white border border-nexo-border rounded px-3 py-2 text-nexo-text-primary focus:outline-hidden"
+            class="w-full text-xs bg-white border border-[#D0D9CF] rounded-[4px] p-2.5 text-[#0E1A2B] focus:outline-none"
           >
             <option value="real_time">Real-Time (Immediate Alert)</option>
             <option value="daily">Daily Morning Digest</option>
@@ -431,15 +441,27 @@ onMounted(() => {
         </div>
 
         <div class="flex items-center gap-2 pt-1">
-          <input type="checkbox" id="is_default" v-model="createForm.is_default" class="rounded border-slate-300" />
-          <label for="is_default" class="text-xs text-nexo-text-secondary">
+          <input type="checkbox" id="is_default" v-model="createForm.is_default" class="rounded-[2px] border-[#D0D9CF]" />
+          <label for="is_default" class="text-xs text-[#5F6875]">
             Set as default workspace watchlist
           </label>
         </div>
 
-        <div class="flex justify-end gap-2 pt-3 border-t border-nexo-border">
-          <Button variant="outline" size="sm" type="button" @click="isCreateModalOpen = false">Cancel</Button>
-          <Button variant="primary" size="sm" type="submit" :disabled="isSubmitting">Create Watchlist</Button>
+        <div class="flex justify-end gap-2 pt-3 border-t border-[#D0D9CF]">
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] text-xs font-semibold"
+            @click="isCreateModalOpen = false"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="btn-ink text-xs px-4 py-1.5"
+            :disabled="isSubmitting"
+          >
+            Create Watchlist
+          </button>
         </div>
       </form>
     </Modal>
@@ -448,10 +470,10 @@ onMounted(() => {
     <Modal :is-open="isAddItemModalOpen" title="Add Monitored Entity to Watchlist" @close="isAddItemModalOpen = false">
       <form @submit.prevent="handleAddItem" class="space-y-4 text-left">
         <div>
-          <label class="block text-xs font-medium text-nexo-text-primary mb-1">Entity Category</label>
+          <label class="block text-xs font-mono uppercase text-[#5F6875] mb-1">Entity Category</label>
           <select
             v-model="itemForm.entity_type"
-            class="w-full text-xs bg-white border border-nexo-border rounded px-3 py-2 text-nexo-text-primary focus:outline-hidden"
+            class="w-full text-xs bg-white border border-[#D0D9CF] rounded-[4px] p-2.5 text-[#0E1A2B] focus:outline-none"
           >
             <option value="company">Company (e.g. ASML, TSMC)</option>
             <option value="executive">Executive / Leader</option>
@@ -464,18 +486,35 @@ onMounted(() => {
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-nexo-text-primary mb-1">Entity Name / Identifier</label>
-          <Input v-model="itemForm.entity_name" placeholder="e.g. Taiwan Semiconductor Manufacturing Co." required />
-          <p class="text-[10px] text-nexo-text-muted mt-1">
+          <label class="block text-xs font-mono uppercase text-[#5F6875] mb-1">Entity Name / Identifier</label>
+          <input
+            v-model="itemForm.entity_name"
+            placeholder="e.g. Taiwan Semiconductor Manufacturing Co."
+            required
+            class="w-full text-xs border border-[#D0D9CF] rounded-[4px] p-2.5 bg-white text-[#0E1A2B] focus:border-[#274888] focus:outline-none"
+          />
+          <p class="text-[10px] text-[#5F6875] mt-1">
             Aliases and common tickers are automatically resolved against our canonical entity knowledge graph.
           </p>
         </div>
 
-        <div class="flex justify-end gap-2 pt-3 border-t border-nexo-border">
-          <Button variant="outline" size="sm" type="button" @click="isAddItemModalOpen = false">Cancel</Button>
-          <Button variant="primary" size="sm" type="submit" :disabled="isSubmitting">Add to Watchlist</Button>
+        <div class="flex justify-end gap-2 pt-3 border-t border-[#D0D9CF]">
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] text-xs font-semibold"
+            @click="isAddItemModalOpen = false"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="btn-ink text-xs px-4 py-1.5"
+            :disabled="isSubmitting"
+          >
+            Add to Watchlist
+          </button>
         </div>
       </form>
     </Modal>
-  </div>
+  </AuthenticatedLayout>
 </template>

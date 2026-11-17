@@ -25,11 +25,7 @@ import {
   AlertTriangle,
 } from 'lucide-vue-next'
 import ThreeColumnLayout from '@/components/layout/ThreeColumnLayout.vue'
-import Input from '@/components/ui/Input.vue'
-import Badge from '@/components/ui/Badge.vue'
-import Card from '@/components/ui/Card.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import Button from '@/components/ui/Button.vue'
 import SourceComparisonModal from '@/components/discovery/SourceComparisonModal.vue'
 import SaveSearchModal from '@/components/discovery/SaveSearchModal.vue'
 import RelevanceFeedbackModal from '@/components/discovery/RelevanceFeedbackModal.vue'
@@ -138,40 +134,38 @@ const executeSearch = async () => {
 }
 
 const handleInput = () => {
-  clearTimeout(debounceTimeout)
-  if (searchQuery.value.trim().length >= 2) {
-    debounceTimeout = setTimeout(async () => {
-      try {
-        suggestions.value = await searchService.getSuggestions(searchQuery.value)
-        showSuggestions.value = suggestions.value.length > 0
-      } catch {
-        suggestions.value = []
-      }
-    }, 250)
-  } else {
+  if (debounceTimeout) clearTimeout(debounceTimeout)
+  if (!searchQuery.value.trim() || searchQuery.value.length < 2) {
     suggestions.value = []
     showSuggestions.value = false
+    return
   }
+
+  debounceTimeout = setTimeout(async () => {
+    try {
+      const res = await searchService.getSuggestions(searchQuery.value.trim())
+      suggestions.value = res || []
+      showSuggestions.value = suggestions.value.length > 0
+    } catch {
+      suggestions.value = []
+      showSuggestions.value = false
+    }
+  }, 250)
 }
 
-const selectSuggestion = (item: any) => {
-  searchQuery.value = item.text || item.slug || ''
+const selectSuggestion = (s: any) => {
+  searchQuery.value = s.text || s.title || s
   showSuggestions.value = false
   executeSearch()
 }
 
 const clearFilter = (key: keyof SearchFilters) => {
-  filters.value[key] = undefined
+  delete filters.value[key]
   executeSearch()
 }
 
 const clearAllFilters = () => {
-  filters.value = {
-    date_preset: '',
-    verification_status: '',
-    min_credibility: undefined,
-    region: '',
-  }
+  filters.value = {}
   sortBy.value = 'relevance'
   executeSearch()
 }
@@ -190,12 +184,16 @@ const openFeedback = (item: SearchResultItem) => {
   showFeedbackModal.value = true
 }
 
-const handleResultClick = (item: SearchResultItem) => {
-  searchService.recordClick({
-    query: searchQuery.value,
-    result_id: item.id,
-    result_type: item.content_type,
-  }).catch(() => {})
+const handleResultClick = async (item: SearchResultItem) => {
+  try {
+    await searchService.recordClick({
+      query: searchQuery.value,
+      result_id: item.id,
+      result_type: item.content_type,
+    })
+  } catch {
+    // Non-blocking telemetry
+  }
 }
 
 onMounted(() => {
@@ -215,92 +213,96 @@ watch(
 
 <template>
   <ThreeColumnLayout>
-    <div class="max-w-5xl mx-auto space-y-6 pb-16">
-      <!-- Search Header & Omnibar -->
+    <div class="space-y-6 pb-16 text-left">
+      <!-- Search Header & Omnibar (per Mockup Search results.png) -->
       <div class="space-y-4">
         <div class="flex items-center justify-between">
           <div>
-            <h1 class="text-2xl font-serif text-white tracking-tight flex items-center gap-2.5">
+            <h1 class="editorial-headline text-2xl sm:text-3xl font-medium text-[#0E1A2B] tracking-tight flex items-center gap-2.5">
               <span>Intelligence Discovery</span>
-              <span class="text-xs px-2 py-0.5 rounded-full font-sans font-medium bg-primary-500/10 text-primary-400 border border-primary-500/20">
-                Hybrid Retrieval
+              <span class="text-[11px] font-mono px-2 py-0.5 rounded-[2px] bg-[#E4E9F7] text-[#274888] font-bold">
+                HYBRID VECTOR
               </span>
             </h1>
-            <p class="text-xs text-neutral-400 mt-1">
-              Cross-entity verified intelligence, story clusters, research reports, and historical events.
+            <p class="text-xs text-[#5F6875] mt-1">
+              Cross-entity verified intelligence, story clusters, research briefs, and historical events.
             </p>
           </div>
 
           <div class="flex items-center gap-2">
-            <Button
+            <button
               v-if="searchQuery.trim()"
-              variant="outline"
-              size="sm"
-              class="gap-1.5 text-xs border-primary-500/30 text-primary-300 hover:bg-primary-500/10"
+              type="button"
+              class="px-3 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
               @click="showSaveSearchModal = true"
             >
-              <Bookmark class="w-3.5 h-3.5" />
+              <Bookmark class="w-3.5 h-3.5 text-[#274888]" />
               <span>Save & Monitor</span>
-            </Button>
+            </button>
           </div>
         </div>
 
-        <!-- Search Bar with Suggestions Dropdown -->
+        <!-- Search Omnibar with Suggestions Dropdown -->
         <div class="relative">
           <div class="relative flex items-center">
-            <Search class="absolute left-3.5 w-4 h-4 text-neutral-400 pointer-events-none" />
+            <Search class="absolute left-3.5 w-4 h-4 text-[#5F6875] pointer-events-none" />
             <input
               v-model="searchQuery"
               type="text"
-              class="w-full pl-10 pr-24 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all shadow-lg"
+              class="w-full pl-10 pr-28 py-2.5 rounded-[4px] bg-white border border-[#D0D9CF] text-xs sm:text-sm text-[#0E1A2B] placeholder-[#5F6875] focus:outline-none focus:border-[#274888] transition-colors shadow-xs"
               placeholder="Search companies, executives, technologies, reports, or research topics..."
               @input="handleInput"
               @keydown.enter="executeSearch"
               @focus="showSuggestions = suggestions.length > 0"
             />
-            <div class="absolute right-3 flex items-center gap-2">
+            <div class="absolute right-2 flex items-center gap-1.5">
               <button
                 type="button"
-                class="px-2 py-1 rounded text-xs transition-colors"
-                :class="isHybrid ? 'bg-primary-500/15 text-primary-300 border border-primary-500/30' : 'bg-neutral-800 text-neutral-400'"
+                class="px-2 py-1 rounded-[2px] text-xs transition-colors"
+                :class="isHybrid ? 'bg-[#E4E9F7] text-[#274888] font-semibold' : 'bg-[#EEEBE4] text-[#5F6875]'"
                 :title="isHybrid ? 'Semantic vector + keyword hybrid retrieval enabled' : 'Keyword only'"
                 @click="isHybrid = !isHybrid; executeSearch()"
               >
-                <span class="flex items-center gap-1 font-mono text-[11px]">
-                  <Sparkles class="w-3 h-3 text-primary-400" />
+                <span class="flex items-center gap-1 font-mono text-[10px]">
+                  <Sparkles class="w-3 h-3 text-[#274888]" />
                   {{ isHybrid ? 'Hybrid' : 'Keyword' }}
                 </span>
               </button>
-              <Button size="sm" class="h-8 px-3 text-xs" :loading="isLoading" @click="executeSearch">
-                Search
-              </Button>
+              <button
+                type="button"
+                class="btn-ink text-xs px-3 py-1.5"
+                :disabled="isLoading"
+                @click="executeSearch"
+              >
+                {{ isLoading ? 'Searching...' : 'Search' }}
+              </button>
             </div>
           </div>
 
           <!-- Live Autocomplete Suggestions Dropdown -->
           <div
             v-if="showSuggestions && suggestions.length"
-            class="absolute top-full left-0 right-0 mt-1.5 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-neutral-800/60"
+            class="absolute top-full left-0 right-0 mt-1.5 bg-white border border-[#D0D9CF] rounded-[2px] shadow-lg z-50 overflow-hidden divide-y divide-[#D0D9CF]/60"
           >
-            <div class="p-2 text-[11px] font-mono uppercase tracking-wider text-neutral-500 bg-neutral-950/60">
+            <div class="p-2 text-[10px] font-mono uppercase tracking-wider text-[#5F6875] bg-[#F8FAF7]">
               Verified Suggestions
             </div>
             <button
               v-for="(item, idx) in suggestions"
               :key="idx"
               type="button"
-              class="w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between hover:bg-neutral-800/70 transition-colors"
+              class="w-full px-3.5 py-2 text-left text-xs flex items-center justify-between hover:bg-[#EEEBE4]/60 transition-colors"
               @click="selectSuggestion(item)"
             >
-              <div class="flex items-center gap-2.5 text-neutral-200">
-                <Building2 v-if="item.type === 'company'" class="w-3.5 h-3.5 text-primary-400" />
-                <Users v-else-if="item.type === 'executive'" class="w-3.5 h-3.5 text-blue-400" />
-                <FileText v-else-if="item.type === 'article'" class="w-3.5 h-3.5 text-neutral-400" />
-                <Globe v-else-if="item.type === 'source'" class="w-3.5 h-3.5 text-emerald-400" />
-                <TrendingUp v-else class="w-3.5 h-3.5 text-amber-400" />
+              <div class="flex items-center gap-2.5 text-[#0E1A2B]">
+                <Building2 v-if="item.type === 'company'" class="w-3.5 h-3.5 text-[#274888]" />
+                <Users v-else-if="item.type === 'executive'" class="w-3.5 h-3.5 text-[#8A5A08]" />
+                <FileText v-else-if="item.type === 'article'" class="w-3.5 h-3.5 text-[#5F6875]" />
+                <Globe v-else-if="item.type === 'source'" class="w-3.5 h-3.5 text-[#17794D]" />
+                <TrendingUp v-else class="w-3.5 h-3.5 text-[#B7791F]" />
                 <span>{{ item.text }}</span>
               </div>
-              <span class="text-[10px] uppercase font-mono text-neutral-500 bg-neutral-800 px-1.5 py-0.5 rounded">
+              <span class="text-[10px] uppercase font-mono text-[#5F6875] bg-[#EEEBE4] px-1.5 py-0.5 rounded-[2px]">
                 {{ item.type }}
               </span>
             </button>
@@ -308,14 +310,14 @@ watch(
         </div>
 
         <!-- Content Type Tabs -->
-        <div class="flex items-center justify-between border-b border-neutral-800 pt-1">
+        <div class="flex items-center justify-between border-b border-[#D0D9CF] pt-1">
           <div class="flex overflow-x-auto gap-4 no-scrollbar">
             <button
               v-for="tab in contentTypeTabs"
               :key="tab.key"
               type="button"
               class="pb-2.5 text-xs font-medium border-b-2 whitespace-nowrap transition-colors"
-              :class="activeContentType === tab.key ? 'border-primary-500 text-primary-400' : 'border-transparent text-neutral-400 hover:text-white'"
+              :class="activeContentType === tab.key ? 'border-[#0E1A2B] text-[#0E1A2B] font-semibold' : 'border-transparent text-[#5F6875] hover:text-[#0E1A2B]'"
               @click="activeContentType = tab.key"
             >
               {{ tab.label }}
@@ -324,27 +326,27 @@ watch(
 
           <button
             type="button"
-            class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors mb-2"
-            :class="showFilters || activeFilterCount > 0 ? 'bg-primary-500/10 border-primary-500/30 text-primary-300' : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'"
+            class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-[4px] border transition-colors mb-2"
+            :class="showFilters || activeFilterCount > 0 ? 'bg-[#E4E9F7] border-[#274888]/40 text-[#274888]' : 'bg-white border-[#D0D9CF] text-[#5F6875] hover:text-[#0E1A2B]'"
             @click="showFilters = !showFilters"
           >
             <SlidersHorizontal class="w-3.5 h-3.5" />
             <span>Filters</span>
-            <span v-if="activeFilterCount > 0" class="w-4 h-4 rounded-full bg-primary-500 text-black text-[10px] font-bold flex items-center justify-center">
+            <span v-if="activeFilterCount > 0" class="w-4 h-4 rounded-full bg-[#0E1A2B] text-white text-[10px] font-bold flex items-center justify-center">
               {{ activeFilterCount }}
             </span>
           </button>
         </div>
 
         <!-- Advanced Filters Collapsible Drawer -->
-        <div v-if="showFilters" class="p-4 rounded-xl bg-neutral-900/80 border border-neutral-800 space-y-4">
+        <div v-if="showFilters" class="card-editorial p-4 bg-white border border-[#D0D9CF] space-y-4">
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
             <!-- Date Preset -->
             <div>
-              <label class="block text-neutral-400 mb-1 text-[11px]">Time Horizon</label>
+              <label class="block text-[#5F6875] mb-1 text-[11px] font-mono uppercase">Time Horizon</label>
               <select
                 v-model="filters.date_preset"
-                class="w-full rounded-lg bg-neutral-800 border border-neutral-700 text-xs text-white p-2 focus:outline-none"
+                class="w-full rounded-[4px] bg-white border border-[#D0D9CF] text-xs text-[#0E1A2B] p-2 focus:outline-none"
                 @change="executeSearch"
               >
                 <option value="">All Time</option>
@@ -357,10 +359,10 @@ watch(
 
             <!-- Verification Status -->
             <div>
-              <label class="block text-neutral-400 mb-1 text-[11px]">Verification Status</label>
+              <label class="block text-[#5F6875] mb-1 text-[11px] font-mono uppercase">Verification Status</label>
               <select
                 v-model="filters.verification_status"
-                class="w-full rounded-lg bg-neutral-800 border border-neutral-700 text-xs text-white p-2 focus:outline-none"
+                class="w-full rounded-[4px] bg-white border border-[#D0D9CF] text-xs text-[#0E1A2B] p-2 focus:outline-none"
                 @change="executeSearch"
               >
                 <option value="">All Statuses</option>
@@ -373,10 +375,10 @@ watch(
 
             <!-- Min Credibility -->
             <div>
-              <label class="block text-neutral-400 mb-1 text-[11px]">Source Credibility</label>
+              <label class="block text-[#5F6875] mb-1 text-[11px] font-mono uppercase">Source Credibility</label>
               <select
                 v-model="filters.min_credibility"
-                class="w-full rounded-lg bg-neutral-800 border border-neutral-700 text-xs text-white p-2 focus:outline-none"
+                class="w-full rounded-[4px] bg-white border border-[#D0D9CF] text-xs text-[#0E1A2B] p-2 focus:outline-none"
                 @change="executeSearch"
               >
                 <option :value="undefined">Any Reliability</option>
@@ -388,10 +390,10 @@ watch(
 
             <!-- Sort By -->
             <div>
-              <label class="block text-neutral-400 mb-1 text-[11px]">Rank Strategy</label>
+              <label class="block text-[#5F6875] mb-1 text-[11px] font-mono uppercase">Rank Strategy</label>
               <select
                 v-model="sortBy"
-                class="w-full rounded-lg bg-neutral-800 border border-neutral-700 text-xs text-white p-2 focus:outline-none"
+                class="w-full rounded-[4px] bg-white border border-[#D0D9CF] text-xs text-[#0E1A2B] p-2 focus:outline-none"
                 @change="executeSearch"
               >
                 <option value="relevance">Most Relevant (Hybrid)</option>
@@ -406,26 +408,26 @@ watch(
 
         <!-- Active Filter Chips -->
         <div v-if="activeFilterCount > 0" class="flex flex-wrap items-center gap-2 pt-1 text-xs">
-          <span class="text-neutral-500 text-[11px]">Active filters:</span>
+          <span class="text-[#5F6875] text-[11px]">Active filters:</span>
 
-          <span v-if="filters.date_preset" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-200 border border-neutral-700 text-[11px]">
+          <span v-if="filters.date_preset" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#EEEBE4] text-[#0E1A2B] border border-[#D0D9CF] text-[11px]">
             <span>Time: {{ filters.date_preset }}</span>
-            <X class="w-3 h-3 cursor-pointer hover:text-white" @click="clearFilter('date_preset')" />
+            <X class="w-3 h-3 cursor-pointer hover:text-[#B3261E]" @click="clearFilter('date_preset')" />
           </span>
 
-          <span v-if="filters.verification_status" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-200 border border-neutral-700 text-[11px]">
+          <span v-if="filters.verification_status" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#EEEBE4] text-[#0E1A2B] border border-[#D0D9CF] text-[11px]">
             <span>Status: {{ filters.verification_status }}</span>
-            <X class="w-3 h-3 cursor-pointer hover:text-white" @click="clearFilter('verification_status')" />
+            <X class="w-3 h-3 cursor-pointer hover:text-[#B3261E]" @click="clearFilter('verification_status')" />
           </span>
 
-          <span v-if="filters.min_credibility" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-200 border border-neutral-700 text-[11px]">
+          <span v-if="filters.min_credibility" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#EEEBE4] text-[#0E1A2B] border border-[#D0D9CF] text-[11px]">
             <span>Credibility: {{ filters.min_credibility }}%+</span>
-            <X class="w-3 h-3 cursor-pointer hover:text-white" @click="clearFilter('min_credibility')" />
+            <X class="w-3 h-3 cursor-pointer hover:text-[#B3261E]" @click="clearFilter('min_credibility')" />
           </span>
 
           <button
             type="button"
-            class="text-[11px] text-primary-400 hover:underline ml-1"
+            class="text-[11px] text-[#274888] hover:underline ml-1 font-medium"
             @click="clearAllFilters"
           >
             Clear all
@@ -434,13 +436,13 @@ watch(
       </div>
 
       <!-- Telemetry Meta Bar -->
-      <div v-if="!isLoading && searchQuery.trim()" class="flex items-center justify-between text-xs text-neutral-500 px-1">
+      <div v-if="!isLoading && searchQuery.trim()" class="flex items-center justify-between text-xs text-[#5F6875] px-1">
         <div>
-          Found <span class="text-white font-medium">{{ totalResults }}</span> records
+          Found <span class="text-[#0E1A2B] font-semibold">{{ totalResults }}</span> records
           <span v-if="searchMeta.latency_ms"> ({{ searchMeta.latency_ms }}ms)</span>
         </div>
         <div class="flex items-center gap-2 font-mono text-[11px]">
-          <span class="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800">
+          <span class="px-2 py-0.5 rounded-[2px] bg-white border border-[#D0D9CF]">
             Engine: {{ searchMeta.retrieval_method || 'hybrid_vector' }}
           </span>
         </div>
@@ -448,29 +450,37 @@ watch(
 
       <!-- Loading Skeletons -->
       <div v-if="isLoading" class="space-y-4">
-        <Skeleton class="h-28 w-full rounded-xl" />
-        <Skeleton class="h-28 w-full rounded-xl" />
-        <Skeleton class="h-28 w-full rounded-xl" />
+        <Skeleton class="h-28 w-full rounded-[2px]" />
+        <Skeleton class="h-28 w-full rounded-[2px]" />
+        <Skeleton class="h-28 w-full rounded-[2px]" />
       </div>
 
       <!-- Empty State -->
       <div
         v-else-if="results.length === 0 && searchQuery.trim()"
-        class="py-16 text-center space-y-3 rounded-xl bg-neutral-900/40 border border-neutral-800/80 p-6"
+        class="card-editorial p-12 text-center space-y-3"
       >
-        <Search class="w-10 h-10 text-neutral-600 mx-auto" />
-        <h3 class="text-base font-serif text-white">No intelligence matches found</h3>
-        <p class="text-xs text-neutral-400 max-w-md mx-auto">
-          No verified documents, entities, or reports matched "<span class="text-primary-400">{{ searchQuery }}</span>". Try broadening your search or clearing active filters.
+        <Search class="w-8 h-8 text-[#5F6875] mx-auto" />
+        <h3 class="font-serif text-lg font-medium text-[#0E1A2B]">No intelligence matches found</h3>
+        <p class="text-xs text-[#5F6875] max-w-md mx-auto">
+          No verified documents, entities, or reports matched "<span class="text-[#274888] font-semibold">{{ searchQuery }}</span>". Try broadening your search or clearing active filters.
         </p>
         <div class="pt-2 flex justify-center gap-2">
-          <Button variant="outline" size="sm" @click="clearAllFilters">
+          <button
+            type="button"
+            class="px-3.5 py-2 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] text-xs font-semibold"
+            @click="clearAllFilters"
+          >
             Clear Filters
-          </Button>
-          <Button size="sm" class="gap-1.5" @click="showSaveSearchModal = true">
+          </button>
+          <button
+            type="button"
+            class="btn-ink text-xs px-3.5 py-2 flex items-center gap-1.5"
+            @click="showSaveSearchModal = true"
+          >
             <Bookmark class="w-3.5 h-3.5" />
             <span>Create Automated Monitor</span>
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -479,44 +489,44 @@ watch(
         <div
           v-for="item in results"
           :key="item.id"
-          class="p-4 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:border-neutral-700 transition-all space-y-3 group"
+          class="card-editorial p-5 space-y-3 hover:border-[#274888]/40 transition-colors group"
         >
           <!-- Top Row: Type Badge, Verification Status, Score, Date -->
           <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
             <div class="flex items-center gap-2">
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider font-semibold bg-neutral-800 text-neutral-300 border border-neutral-700">
+              <span class="px-2 py-0.5 rounded-[2px] text-[10px] font-mono uppercase tracking-wider font-semibold bg-[#EEEBE4] text-[#0E1A2B]">
                 {{ item.content_type }}
               </span>
 
               <span
-                class="px-2 py-0.5 rounded text-[10px] uppercase font-mono font-medium flex items-center gap-1"
-                :class="item.verification_status === 'verified' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'"
+                class="px-2 py-0.5 rounded-[2px] text-[10px] uppercase font-mono font-bold flex items-center gap-1"
+                :class="item.verification_status === 'verified' || item.verification_status === 'confirmed' ? 'badge-verified' : 'badge-developing'"
               >
-                <CheckCircle2 v-if="item.verification_status === 'verified'" class="w-3 h-3" />
+                <CheckCircle2 v-if="item.verification_status === 'verified' || item.verification_status === 'confirmed'" class="w-3 h-3" />
                 <AlertTriangle v-else class="w-3 h-3" />
                 <span>{{ item.verification_status.replace('_', ' ') }}</span>
               </span>
 
-              <!-- Machine Translation Label (Stage 14.1 Requirement 7 & 16) -->
+              <!-- Machine Translation Label -->
               <span
                 v-if="item.original_language && item.original_language !== 'en'"
-                class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center gap-1"
+                class="px-2 py-0.5 rounded-[2px] text-[10px] font-mono font-medium bg-[#E4E9F7] text-[#274888] border border-[#274888]/30 flex items-center gap-1"
                 title="Machine translated from original source text"
               >
                 <span>Translated ({{ item.original_language.toUpperCase() }} &rarr; EN)</span>
               </span>
 
-              <span v-if="item.source" class="text-[11px] text-neutral-400">
+              <span v-if="item.source" class="text-[11px] text-[#5F6875]">
                 {{ item.source.name }}
-                <span v-if="item.source.credibility_score" class="text-primary-400 font-mono">
-                  ({{ Math.round(item.source.credibility_score) }}%)
+                <span v-if="item.source.credibility_score" class="text-[#274888] font-mono">
+                  ({{ Math.round(item.source.credibility_score * 100) }}%)
                 </span>
               </span>
             </div>
 
-            <div class="flex items-center gap-3 text-neutral-500 text-[11px]">
-              <span v-if="item.corroboration_count > 1" class="text-emerald-400 font-medium">
-                {{ item.corroboration_count }} corroborators
+            <div class="flex items-center gap-3 text-[#5F6875] text-[11px]">
+              <span v-if="item.corroboration_count > 1" class="text-[#17794D] font-medium">
+                {{ item.corroboration_count }} corroborating sources
               </span>
               <span v-if="item.published_at">{{ new Date(item.published_at).toLocaleDateString() }}</span>
             </div>
@@ -526,37 +536,37 @@ watch(
           <div>
             <RouterLink
               :to="item.url"
-              class="text-base font-serif font-medium text-white group-hover:text-primary-300 transition-colors flex items-center justify-between"
+              class="editorial-headline text-lg font-medium text-[#0E1A2B] group-hover:text-[#274888] transition-colors flex items-center justify-between"
               @click="handleResultClick(item)"
             >
               <span>{{ item.title }}</span>
-              <ArrowRight class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-primary-400 shrink-0" />
+              <ArrowRight class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-[#274888] shrink-0" />
             </RouterLink>
-            <p class="text-xs text-neutral-300 leading-relaxed mt-1">
+            <p class="text-xs text-[#3F4A5A] leading-relaxed mt-1">
               {{ item.excerpt }}
             </p>
           </div>
 
           <!-- Relevance Explanation Pill -->
-          <div v-if="item.relevance_explanation" class="p-2 rounded-lg bg-neutral-950/70 border border-neutral-800/60 text-[11px] text-neutral-400 flex items-center gap-2">
-            <Sparkles class="w-3.5 h-3.5 text-primary-400 shrink-0" />
+          <div v-if="item.relevance_explanation" class="p-2.5 rounded-[2px] bg-[#F8FAF7] border border-[#D0D9CF] text-[11px] text-[#5F6875] flex items-center gap-2">
+            <Sparkles class="w-3.5 h-3.5 text-[#274888] shrink-0" />
             <span>{{ item.relevance_explanation }}</span>
           </div>
 
           <!-- Bottom Row: Matched Entity & Topic Chips + Actions -->
-          <div class="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-neutral-800/50">
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#D0D9CF]/60">
             <div class="flex flex-wrap items-center gap-1.5">
               <span
                 v-for="ent in item.matched_entities"
                 :key="ent.id"
-                class="px-2 py-0.5 rounded text-[10px] bg-primary-500/10 text-primary-300 border border-primary-500/20"
+                class="px-2 py-0.5 rounded-full text-[10px] bg-[#F8FAF7] text-[#0E1A2B] border border-[#D0D9CF]"
               >
                 {{ ent.name }}
               </span>
               <span
                 v-for="topic in item.matched_topics"
                 :key="topic"
-                class="px-2 py-0.5 rounded text-[10px] bg-neutral-800 text-neutral-400"
+                class="px-2 py-0.5 rounded-full text-[10px] bg-[#EEEBE4] text-[#3F4A5A]"
               >
                 {{ topic }}
               </span>
@@ -565,16 +575,16 @@ watch(
             <div class="flex items-center gap-2 text-xs">
               <button
                 type="button"
-                class="px-2 py-1 rounded text-[11px] text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors flex items-center gap-1"
+                class="px-2.5 py-1 rounded-[4px] border border-[#D0D9CF] bg-white text-[#3F4A5A] hover:text-[#0E1A2B] hover:bg-[#EEEBE4] transition-colors flex items-center gap-1 text-[11px]"
                 @click="openCorroboration(item)"
               >
-                <ShieldCheck class="w-3.5 h-3.5 text-emerald-400" />
+                <ShieldCheck class="w-3.5 h-3.5 text-[#17794D]" />
                 <span>Corroboration</span>
               </button>
 
               <button
                 type="button"
-                class="px-2 py-1 rounded text-[11px] text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors flex items-center gap-1"
+                class="px-2.5 py-1 rounded-[4px] border border-[#D0D9CF] bg-white text-[#3F4A5A] hover:text-[#0E1A2B] hover:bg-[#EEEBE4] transition-colors flex items-center gap-1 text-[11px]"
                 @click="openFeedback(item)"
               >
                 <ThumbsUp class="w-3 h-3" />
@@ -585,27 +595,27 @@ watch(
         </div>
 
         <!-- Pagination -->
-        <div v-if="totalPages > 1" class="flex items-center justify-between pt-4 border-t border-neutral-800 text-xs text-neutral-400">
+        <div v-if="totalPages > 1" class="flex items-center justify-between pt-4 border-t border-[#D0D9CF] text-xs text-[#5F6875]">
           <div>
             Page {{ currentPage }} of {{ totalPages }}
           </div>
           <div class="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] text-xs disabled:opacity-50"
               :disabled="currentPage <= 1"
               @click="currentPage--; executeSearch()"
             >
               Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
+            </button>
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] text-xs disabled:opacity-50"
               :disabled="currentPage >= totalPages"
               @click="currentPage++; executeSearch()"
             >
               Next
-            </Button>
+            </button>
           </div>
         </div>
       </div>

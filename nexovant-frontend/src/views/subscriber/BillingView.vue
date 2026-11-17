@@ -447,22 +447,22 @@ onMounted(() => {
 
 <template>
   <AuthenticatedLayout :show-right-panel="false">
-    <div class="max-w-7xl mx-auto space-y-6 text-left">
+    <div class="max-w-7xl mx-auto space-y-6 text-left pb-16">
 
       <!-- Header & Currency Switcher -->
-      <div class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-nexo-border gap-4">
-        <div>
-          <div class="flex items-center gap-2 mb-1.5">
-            <span class="text-[10px] font-mono uppercase tracking-widest font-semibold px-2 py-0.5 rounded bg-primary-950/60 text-primary-400 border border-primary-800/40">
+      <div class="flex flex-col md:flex-row md:items-center justify-between pb-5 border-b border-[#D0D9CF] gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] font-mono uppercase tracking-widest font-semibold px-2 py-0.5 rounded-[2px] bg-[#E4E9F7] text-[#274888]">
               Stage 9 Intelligence Telemetry
             </span>
-            <span class="text-xs text-nexo-muted font-sans">Dual-Currency & Multi-Tenant Entitlements</span>
+            <span class="text-xs text-[#5F6875] font-sans">Dual-Currency & Multi-Tenant Entitlements</span>
           </div>
-          <h1 class="text-2xl md:text-3xl font-serif font-bold tracking-tight text-white flex items-center gap-2.5">
-            <CreditCard class="w-7 h-7 text-primary-400" />
-            Subscription & Quota Management
+          <h1 class="text-2xl md:text-3xl font-serif font-medium tracking-tight text-[#0E1A2B] flex items-center gap-2.5">
+            <CreditCard class="w-6 h-6 text-[#274888]" />
+            <span>Subscription & Billing</span>
           </h1>
-          <p class="text-xs md:text-sm text-nexo-muted mt-1 max-w-2xl">
+          <p class="text-xs md:text-sm text-[#5F6875] max-w-2xl">
             Monitor real-time intelligence telemetry, evaluate plan tiers, manage trial periods, access PDF receipts, and update multi-regional payment methods.
           </p>
         </div>
@@ -471,19 +471,19 @@ onMounted(() => {
         <div class="flex items-center gap-2 self-start md:self-auto">
           <router-link
             to="/checkout"
-            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-primary-600/20 text-primary-400 border border-primary-500/30 hover:bg-primary-600/30 transition-colors shadow-sm"
+            class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-[4px] bg-[#E4E9F7] text-[#274888] border border-[#274888]/30 hover:bg-[#274888]/15 transition-colors shadow-xs"
           >
             <Sparkles class="w-3.5 h-3.5" />
             Intelligent Checkout
           </router-link>
-          <div class="flex items-center bg-nexo-surface border border-nexo-border rounded-xl p-1 shadow-sm">
+          <div class="flex items-center bg-white border border-[#D0D9CF] rounded-[4px] p-0.5 shadow-xs">
             <button
               @click="selectedCurrency = 'USD'"
               :class="[
-                'px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all',
+                'px-3 py-1 text-xs font-medium rounded-[2px] transition-colors',
                 selectedCurrency === 'USD'
-                  ? 'bg-primary-600 text-white shadow-sm font-semibold'
-                  : 'text-nexo-muted hover:text-white'
+                  ? 'bg-[#0E1A2B] text-white shadow-xs font-semibold'
+                  : 'text-[#5F6875] hover:text-[#0E1A2B]'
               ]"
             >
               USD ($) Global
@@ -491,10 +491,10 @@ onMounted(() => {
             <button
               @click="selectedCurrency = 'BDT'"
               :class="[
-                'px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all',
+                'px-3 py-1 text-xs font-medium rounded-[2px] transition-colors',
                 selectedCurrency === 'BDT'
-                  ? 'bg-primary-600 text-white shadow-sm font-semibold'
-                  : 'text-nexo-muted hover:text-white'
+                  ? 'bg-[#0E1A2B] text-white shadow-xs font-semibold'
+                  : 'text-[#5F6875] hover:text-[#0E1A2B]'
               ]"
             >
               BDT (৳) Bangladesh
@@ -507,144 +507,133 @@ onMounted(() => {
       <!-- 1. Trial Expiration Banner -->
       <div
         v-if="currentSub?.status === 'trialing' || currentSub?.is_trialing"
-        class="p-4 rounded-xl border border-amber-500/30 bg-amber-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        class="p-4 rounded-[2px] border border-[#B7791F]/40 bg-[#F6E7C8]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
       >
         <div class="flex items-start sm:items-center gap-3">
-          <Clock class="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5 sm:mt-0" />
+          <Clock class="w-5 h-5 text-[#8A5A08] flex-shrink-0 mt-0.5 sm:mt-0" />
           <div>
-            <span class="text-xs font-semibold text-amber-300 uppercase tracking-wide block">Complimentary Evaluation Period Active</span>
-            <p class="text-xs text-amber-200/80 mt-0.5">
-              You have <strong class="text-amber-300 font-mono">{{ currentSub?.days_left_in_trial ?? 14 }} days remaining</strong> in your complimentary evaluation of Nexovant {{ currentSub?.plan?.name }}. Upgrade now to retain continuous intelligence alerts.
+            <span class="font-semibold text-[#8A5A08] uppercase tracking-wide block">Complimentary Evaluation Period Active</span>
+            <p class="text-[#3F4A5A] mt-0.5">
+              You have <strong class="text-[#8A5A08] font-mono">{{ currentSub?.days_left_in_trial ?? 14 }} days remaining</strong> in your complimentary evaluation of Nexovant {{ currentSub?.plan?.name }}. Upgrade now to retain continuous intelligence alerts.
             </p>
           </div>
         </div>
-        <Button
+        <button
           @click="setActiveTab('plans')"
-          size="sm"
-          class="bg-amber-600 hover:bg-amber-500 text-white border-none flex-shrink-0"
+          class="btn-ink text-xs px-3.5 py-1.5 flex-shrink-0 flex items-center gap-1.5"
         >
-          <Sparkles class="w-3.5 h-3.5 mr-1.5" />
-          Convert Trial to Permanent Tier
-        </Button>
+          <Sparkles class="w-3.5 h-3.5 text-[#B7791F]" />
+          <span>Convert Trial to Permanent Tier</span>
+        </button>
       </div>
 
       <!-- 2. Past Due Warning Banner -->
       <div
         v-if="currentSub?.status === 'past_due'"
-        class="p-4 rounded-xl border border-rose-500/30 bg-rose-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        class="p-4 rounded-[2px] border border-[#B3261E]/40 bg-[#FBE4E1] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
       >
         <div class="flex items-start sm:items-center gap-3">
-          <AlertCircle class="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5 sm:mt-0" />
+          <AlertCircle class="w-5 h-5 text-[#B3261E] flex-shrink-0 mt-0.5 sm:mt-0" />
           <div>
-            <span class="text-xs font-semibold text-rose-300 uppercase tracking-wide block">Payment Renewal Unsuccessful</span>
-            <p class="text-xs text-rose-200/80 mt-0.5">
+            <span class="font-semibold text-[#B3261E] uppercase tracking-wide block">Payment Renewal Unsuccessful</span>
+            <p class="text-[#3F4A5A] mt-0.5">
               Your subscription renewal payment was declined. You are currently within the 3-day grace period. Settle the balance to prevent workspace suspension.
             </p>
           </div>
         </div>
-        <Button
+        <button
           @click="setActiveTab('history')"
-          size="sm"
-          class="bg-rose-600 hover:bg-rose-500 text-white border-none flex-shrink-0"
+          class="px-3.5 py-1.5 rounded-[4px] bg-[#B3261E] text-white font-semibold text-xs flex-shrink-0"
         >
           Settle Unpaid Balance
-        </Button>
+        </button>
       </div>
 
       <!-- 3. Cancellation Scheduled Notice -->
       <div
         v-if="currentSub?.status === 'cancel_at_period_end'"
-        class="p-4 rounded-xl border border-indigo-500/30 bg-indigo-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        class="p-4 rounded-[2px] border border-[#58488A]/30 bg-[#F0EDF6] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
       >
         <div class="flex items-start sm:items-center gap-3">
-          <Clock class="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5 sm:mt-0" />
+          <Clock class="w-5 h-5 text-[#58488A] flex-shrink-0 mt-0.5 sm:mt-0" />
           <div>
-            <span class="text-xs font-semibold text-indigo-300 uppercase tracking-wide block">Cancellation Scheduled at Period End</span>
-            <p class="text-xs text-indigo-200/80 mt-0.5">
-              Auto-renewal has been stopped. You will retain unrestricted intelligence access until <strong class="text-white">{{ currentSub?.ends_at ? new Date(currentSub.ends_at).toLocaleDateString() : 'period end' }}</strong>.
+            <span class="font-semibold text-[#58488A] uppercase tracking-wide block">Cancellation Scheduled at Period End</span>
+            <p class="text-[#3F4A5A] mt-0.5">
+              Auto-renewal has been stopped. You will retain unrestricted intelligence access until <strong class="text-[#0E1A2B]">{{ currentSub?.ends_at ? new Date(currentSub.ends_at).toLocaleDateString() : 'period end' }}</strong>.
             </p>
           </div>
         </div>
-        <Button
+        <button
           @click="handleReactivateSubscription"
           :disabled="isReactivating"
-          size="sm"
-          class="bg-emerald-600 hover:bg-emerald-500 text-white border-none flex-shrink-0"
+          class="px-3.5 py-1.5 rounded-[4px] bg-[#17794D] text-white font-semibold text-xs flex-shrink-0 flex items-center gap-1.5"
         >
-          <RefreshCw :class="{ 'animate-spin': isReactivating }" class="w-3.5 h-3.5 mr-1.5" />
-          Reactivate Auto-Renewal
-        </Button>
+          <RefreshCw :class="{ 'animate-spin': isReactivating }" class="w-3.5 h-3.5" />
+          <span>Reactivate Auto-Renewal</span>
+        </button>
       </div>
 
-      <!-- Success / Error Global Feedback -->
-      <Alert v-if="trialSuccessMessage" type="success" class="mb-4" @close="trialSuccessMessage = ''">
-        {{ trialSuccessMessage }}
-      </Alert>
-      <Alert v-if="trialErrorMessage" type="error" class="mb-4" @close="trialErrorMessage = ''">
-        {{ trialErrorMessage }}
-      </Alert>
-
       <!-- Navigation Tabs -->
-      <div class="flex items-center gap-2 border-b border-nexo-border overflow-x-auto no-scrollbar text-xs md:text-sm">
+      <div class="flex items-center gap-2 border-b border-[#D0D9CF] overflow-x-auto no-scrollbar text-xs sm:text-sm">
         <button
           @click="setActiveTab('overview')"
           :class="[
             'pb-3 pt-1 px-3 font-medium transition-colors border-b-2 flex items-center gap-2 flex-shrink-0',
             activeTab === 'overview'
-              ? 'border-primary-500 text-primary-400 font-semibold'
-              : 'border-transparent text-nexo-muted hover:text-white'
+              ? 'border-[#0E1A2B] text-[#0E1A2B] font-semibold'
+              : 'border-transparent text-[#5F6875] hover:text-[#0E1A2B]'
           ]"
         >
-          <Shield class="w-4 h-4" />
-          Overview & Telemetry
+          <Shield class="w-4 h-4 text-[#274888]" />
+          <span>Overview & Telemetry</span>
         </button>
         <button
           @click="setActiveTab('plans')"
           :class="[
             'pb-3 pt-1 px-3 font-medium transition-colors border-b-2 flex items-center gap-2 flex-shrink-0',
             activeTab === 'plans'
-              ? 'border-primary-500 text-primary-400 font-semibold'
-              : 'border-transparent text-nexo-muted hover:text-white'
+              ? 'border-[#0E1A2B] text-[#0E1A2B] font-semibold'
+              : 'border-transparent text-[#5F6875] hover:text-[#0E1A2B]'
           ]"
         >
-          <Sparkles class="w-4 h-4" />
-          Compare Plans & Pricing
+          <Sparkles class="w-4 h-4 text-[#8A5A08]" />
+          <span>Compare Plans & Pricing</span>
         </button>
         <button
           @click="setActiveTab('history')"
           :class="[
             'pb-3 pt-1 px-3 font-medium transition-colors border-b-2 flex items-center gap-2 flex-shrink-0',
             activeTab === 'history'
-              ? 'border-primary-500 text-primary-400 font-semibold'
-              : 'border-transparent text-nexo-muted hover:text-white'
+              ? 'border-[#0E1A2B] text-[#0E1A2B] font-semibold'
+              : 'border-transparent text-[#5F6875] hover:text-[#0E1A2B]'
           ]"
         >
-          <FileText class="w-4 h-4" />
-          Billing History & Invoices ({{ invoices.length }})
+          <FileText class="w-4 h-4 text-[#274888]" />
+          <span>Billing History & Invoices ({{ invoices.length }})</span>
         </button>
         <button
           @click="setActiveTab('methods')"
           :class="[
             'pb-3 pt-1 px-3 font-medium transition-colors border-b-2 flex items-center gap-2 flex-shrink-0',
             activeTab === 'methods'
-              ? 'border-primary-500 text-primary-400 font-semibold'
-              : 'border-transparent text-nexo-muted hover:text-white'
+              ? 'border-[#0E1A2B] text-[#0E1A2B] font-semibold'
+              : 'border-transparent text-[#5F6875] hover:text-[#0E1A2B]'
           ]"
         >
-          <CreditCard class="w-4 h-4" />
-          Payment Gateways
+          <CreditCard class="w-4 h-4 text-[#274888]" />
+          <span>Payment Gateways</span>
         </button>
         <button
           @click="setActiveTab('organization')"
           :class="[
             'pb-3 pt-1 px-3 font-medium transition-colors border-b-2 flex items-center gap-2 flex-shrink-0',
             activeTab === 'organization'
-              ? 'border-primary-500 text-primary-400 font-semibold'
-              : 'border-transparent text-nexo-muted hover:text-white'
+              ? 'border-[#0E1A2B] text-[#0E1A2B] font-semibold'
+              : 'border-transparent text-[#5F6875] hover:text-[#0E1A2B]'
           ]"
         >
-          <Building2 class="w-4 h-4" />
-          Organization Billing
+          <Building2 class="w-4 h-4 text-[#274888]" />
+          <span>Organization Billing</span>
         </button>
       </div>
 
@@ -659,240 +648,240 @@ onMounted(() => {
 
         <!-- TAB 1: OVERVIEW & TELEMETRY -->
         <div v-if="activeTab === 'overview'" class="space-y-6">
-          <!-- Active Subscription Cockpit Card -->
-          <Card class="p-6 md:p-8 bg-gradient-to-br from-nexo-surface via-nexo-surface to-nexo-surface/80 border border-nexo-border relative overflow-hidden">
+          <!-- Active Subscription Cockpit Card (per Mockup P27 Subscription and billing.png) -->
+          <div class="card-editorial p-6 md:p-8 bg-white border border-[#D0D9CF] space-y-4">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div class="space-y-3">
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="text-[10px] font-mono uppercase tracking-wider text-nexo-muted">Active Tier</span>
+                  <span class="text-[10px] font-mono uppercase tracking-wider text-[#5F6875]">Active Tier</span>
                   <span
                     :class="[
-                      'px-2.5 py-0.5 rounded text-[11px] font-mono border font-semibold',
-                      currentSub?.status === 'active' ? 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40' :
-                      currentSub?.status === 'trialing' ? 'bg-amber-950/80 text-amber-400 border-amber-800/40' :
-                      currentSub?.status === 'cancel_at_period_end' ? 'bg-indigo-950/80 text-indigo-400 border-indigo-800/40' :
-                      currentSub?.status === 'past_due' ? 'bg-rose-950/80 text-rose-400 border-rose-800/40' :
-                      'bg-nexo-bg text-nexo-muted border-nexo-border'
+                      'px-2.5 py-0.5 rounded-[2px] text-[11px] font-mono font-bold uppercase tracking-wider',
+                      currentSub?.status === 'active' ? 'badge-verified' :
+                      currentSub?.status === 'trialing' ? 'badge-developing' :
+                      currentSub?.status === 'cancel_at_period_end' ? 'badge-sponsored' :
+                      currentSub?.status === 'past_due' ? 'badge-breaking' :
+                      'bg-[#EEEBE4] text-[#3F4A5A]'
                     ]"
                   >
                     {{ currentSub?.status ? currentSub.status.toUpperCase().replace(/_/g, ' ') : 'FREE TIER' }}
                   </span>
-                  <span v-if="currentSub?.auto_renew" class="px-2 py-0.5 rounded text-[10px] font-mono border bg-primary-950/60 text-primary-400 border-primary-800/40">
+                  <span v-if="currentSub?.auto_renew" class="px-2 py-0.5 rounded-[2px] text-[10px] font-mono bg-[#E4E9F7] text-[#274888] font-bold">
                     Auto-Renew ON
                   </span>
-                  <span v-if="organization?.is_pooled" class="px-2 py-0.5 rounded text-[10px] font-mono border bg-cyan-950/60 text-cyan-400 border-cyan-800/40">
+                  <span v-if="organization?.is_pooled" class="px-2 py-0.5 rounded-[2px] text-[10px] font-mono bg-[#EEEBE4] text-[#0E1A2B] font-bold">
                     Organization Pooled ({{ organization.name }})
                   </span>
                 </div>
 
-                <h2 class="text-3xl font-serif font-bold text-white tracking-tight">
+                <h2 class="editorial-headline text-3xl font-medium text-[#0E1A2B] tracking-tight">
                   {{ currentSub?.plan?.name || entitlements?.plan_name || 'Free Tier Public Intelligence' }}
                 </h2>
 
-                <p class="text-xs md:text-sm text-nexo-muted max-w-2xl leading-relaxed">
+                <p class="text-xs md:text-sm text-[#5F6875] max-w-2xl leading-relaxed">
                   {{ currentSub?.plan?.description || 'Essential baseline access to public news briefings, basic company watchlists, and standard entity timelines.' }}
                 </p>
 
-                <div class="pt-2 flex flex-wrap items-center gap-4 text-xs font-mono text-nexo-muted">
+                <div class="pt-2 flex flex-wrap items-center gap-4 text-xs font-mono text-[#5F6875]">
                   <div v-if="currentSub?.billing_cycle" class="flex items-center gap-1.5">
-                    <span class="text-white capitalize">{{ currentSub.billing_cycle }} Cycle</span>
+                    <span class="text-[#0E1A2B] capitalize font-medium">{{ currentSub.billing_cycle }} Cycle</span>
                   </div>
                   <div v-if="currentSub?.next_renewal_at" class="flex items-center gap-1.5">
                     <span>Next Renewal:</span>
-                    <span class="text-white font-semibold">{{ new Date(currentSub.next_renewal_at).toLocaleDateString() }}</span>
+                    <span class="text-[#0E1A2B] font-semibold">{{ new Date(currentSub.next_renewal_at).toLocaleDateString() }}</span>
                   </div>
                   <div v-if="currentSub?.starts_at" class="flex items-center gap-1.5">
                     <span>Member Since:</span>
-                    <span class="text-white">{{ new Date(currentSub.starts_at).toLocaleDateString() }}</span>
+                    <span class="text-[#0E1A2B]">{{ new Date(currentSub.starts_at).toLocaleDateString() }}</span>
                   </div>
                 </div>
               </div>
 
               <!-- Quick Action Buttons -->
               <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <Button
+                <button
                   @click="setActiveTab('plans')"
-                  variant="primary"
-                  class="shadow-lg shadow-primary-950/50 justify-center"
+                  type="button"
+                  class="btn-ink text-xs px-4 py-2 flex items-center justify-center gap-1.5"
                 >
-                  <Sparkles class="w-4 h-4 mr-2" />
-                  Upgrade or Change Tier
-                </Button>
-                <Button
+                  <Sparkles class="w-4 h-4 text-[#B7791F]" />
+                  <span>Upgrade or Change Tier</span>
+                </button>
+                <button
                   v-if="!currentSub?.is_active || currentSub?.plan?.slug === 'free'"
                   @click="handleStartTrial(plans.find(p => p.slug === 'pro') || plans[1])"
                   :disabled="isStartingTrial"
-                  variant="outline"
-                  class="border-amber-500/50 text-amber-400 hover:bg-amber-950/30 justify-center"
+                  type="button"
+                  class="px-3.5 py-2 rounded-[4px] border border-[#B7791F]/40 bg-[#F6E7C8]/40 hover:bg-[#F6E7C8] text-[#8A5A08] text-xs font-semibold flex items-center justify-center gap-1.5"
                 >
-                  <Clock class="w-4 h-4 mr-2" />
-                  Start 14-Day Free Trial
-                </Button>
-                <Button
+                  <Clock class="w-4 h-4 text-[#8A5A08]" />
+                  <span>Start 14-Day Free Trial</span>
+                </button>
+                <button
                   v-if="currentSub?.status === 'cancel_at_period_end'"
                   @click="handleReactivateSubscription"
-                  variant="outline"
-                  class="border-emerald-500/50 text-emerald-400 hover:bg-emerald-950/30 justify-center"
+                  type="button"
+                  class="px-3.5 py-2 rounded-[4px] bg-[#17794D] text-white text-xs font-semibold flex items-center justify-center gap-1.5"
                 >
-                  <RefreshCw class="w-4 h-4 mr-2" />
-                  Reactivate Auto-Renewal
-                </Button>
-                <Button
+                  <RefreshCw class="w-4 h-4" />
+                  <span>Reactivate Auto-Renewal</span>
+                </button>
+                <button
                   v-if="currentSub?.is_active && currentSub?.status !== 'cancel_at_period_end' && currentSub?.plan?.slug !== 'free'"
                   @click="isCancelModalOpen = true"
-                  variant="ghost"
-                  class="text-rose-400 hover:bg-rose-950/20 hover:text-rose-300 justify-center text-xs"
+                  type="button"
+                  class="text-[#B3261E] hover:underline text-xs font-medium py-1 px-2"
                 >
                   Cancel Plan
-                </Button>
+                </button>
               </div>
             </div>
-          </Card>
+          </div>
 
           <!-- Real-Time Entitlement Quotas & Usage Grid -->
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <h3 class="text-sm font-semibold uppercase tracking-wider text-white flex items-center gap-2">
-                <Sliders class="w-4 h-4 text-primary-400" />
-                Live Entitlement & Quota Telemetry
+              <h3 class="section-label flex items-center gap-2">
+                <Sliders class="w-4 h-4 text-[#274888]" />
+                <span>Live Entitlement & Quota Telemetry</span>
               </h3>
-              <span class="text-xs text-nexo-muted">Server-Authoritative Enforcement via EntitlementService</span>
+              <span class="text-xs text-[#5F6875]">Server-Authoritative Enforcement via EntitlementService</span>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <!-- Meter 1: Monitored Watchlists -->
-              <Card class="p-5 bg-nexo-surface border border-nexo-border space-y-3">
+              <div class="card-editorial p-5 space-y-3">
                 <div class="flex items-center justify-between text-xs">
-                  <span class="font-medium text-white flex items-center gap-1.5">
-                    <Shield class="w-4 h-4 text-primary-400" />
-                    Custom Watchlists
+                  <span class="font-medium text-[#0E1A2B] flex items-center gap-1.5">
+                    <Shield class="w-4 h-4 text-[#274888]" />
+                    <span>Custom Watchlists</span>
                   </span>
-                  <span class="font-mono font-semibold text-white">
+                  <span class="font-mono font-semibold text-[#0E1A2B]">
                     {{ usage?.watchlists.used ?? 0 }} / {{ usage?.watchlists.limit ?? 3 }}
                   </span>
                 </div>
-                <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div class="w-full h-2 rounded-full bg-[#EEEBE4] overflow-hidden">
                   <div
                     class="h-full rounded-full transition-all duration-500"
                     :class="getMeterBarColor(getUsagePercentage(usage?.watchlists.used ?? 0, usage?.watchlists.limit ?? 3))"
                     :style="{ width: `${getUsagePercentage(usage?.watchlists.used ?? 0, usage?.watchlists.limit ?? 3)}%` }"
                   />
                 </div>
-                <div class="flex items-center justify-between text-[11px] text-nexo-muted">
+                <div class="flex items-center justify-between text-[11px] text-[#5F6875]">
                   <span>{{ getUsagePercentage(usage?.watchlists.used ?? 0, usage?.watchlists.limit ?? 3) }}% Quota Utilized</span>
                   <button
                     v-if="getUsagePercentage(usage?.watchlists.used ?? 0, usage?.watchlists.limit ?? 3) >= 80"
                     @click="setActiveTab('plans')"
-                    class="text-primary-400 hover:underline font-semibold"
+                    class="text-[#274888] hover:underline font-semibold"
                   >
                     Upgrade Limit &rarr;
                   </button>
                 </div>
-              </Card>
+              </div>
 
               <!-- Meter 2: Active Monitors -->
-              <Card class="p-5 bg-nexo-surface border border-nexo-border space-y-3">
+              <div class="card-editorial p-5 space-y-3">
                 <div class="flex items-center justify-between text-xs">
-                  <span class="font-medium text-white flex items-center gap-1.5">
-                    <Zap class="w-4 h-4 text-amber-400" />
-                    Active Intelligence Monitors
+                  <span class="font-medium text-[#0E1A2B] flex items-center gap-1.5">
+                    <Zap class="w-4 h-4 text-[#8A5A08]" />
+                    <span>Active Intelligence Monitors</span>
                   </span>
-                  <span class="font-mono font-semibold text-white">
+                  <span class="font-mono font-semibold text-[#0E1A2B]">
                     {{ usage?.monitors.used ?? 0 }} / {{ usage?.monitors.limit ?? 3 }}
                   </span>
                 </div>
-                <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div class="w-full h-2 rounded-full bg-[#EEEBE4] overflow-hidden">
                   <div
                     class="h-full rounded-full transition-all duration-500"
                     :class="getMeterBarColor(getUsagePercentage(usage?.monitors.used ?? 0, usage?.monitors.limit ?? 3))"
                     :style="{ width: `${getUsagePercentage(usage?.monitors.used ?? 0, usage?.monitors.limit ?? 3)}%` }"
                   />
                 </div>
-                <div class="flex items-center justify-between text-[11px] text-nexo-muted">
+                <div class="flex items-center justify-between text-[11px] text-[#5F6875]">
                   <span>{{ getUsagePercentage(usage?.monitors.used ?? 0, usage?.monitors.limit ?? 3) }}% Quota Utilized</span>
                   <button
                     v-if="getUsagePercentage(usage?.monitors.used ?? 0, usage?.monitors.limit ?? 3) >= 80"
                     @click="setActiveTab('plans')"
-                    class="text-primary-400 hover:underline font-semibold"
+                    class="text-[#274888] hover:underline font-semibold"
                   >
                     Upgrade Limit &rarr;
                   </button>
                 </div>
-              </Card>
+              </div>
 
               <!-- Meter 3: Daily Research Queries -->
-              <Card class="p-5 bg-nexo-surface border border-nexo-border space-y-3">
+              <div class="card-editorial p-5 space-y-3">
                 <div class="flex items-center justify-between text-xs">
-                  <span class="font-medium text-white flex items-center gap-1.5">
-                    <Sparkles class="w-4 h-4 text-cyan-400" />
-                    Daily Research & RAG Queries
+                  <span class="font-medium text-[#0E1A2B] flex items-center gap-1.5">
+                    <Sparkles class="w-4 h-4 text-[#274888]" />
+                    <span>Daily Research Queries</span>
                   </span>
-                  <span class="font-mono font-semibold text-white">
+                  <span class="font-mono font-semibold text-[#0E1A2B]">
                     {{ usage?.daily_queries.used ?? 0 }} / {{ usage?.daily_queries.limit ?? 10 }}
                   </span>
                 </div>
-                <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div class="w-full h-2 rounded-full bg-[#EEEBE4] overflow-hidden">
                   <div
                     class="h-full rounded-full transition-all duration-500"
                     :class="getMeterBarColor(getUsagePercentage(usage?.daily_queries.used ?? 0, usage?.daily_queries.limit ?? 10))"
                     :style="{ width: `${getUsagePercentage(usage?.daily_queries.used ?? 0, usage?.daily_queries.limit ?? 10)}%` }"
                   />
                 </div>
-                <div class="flex items-center justify-between text-[11px] text-nexo-muted">
+                <div class="flex items-center justify-between text-[11px] text-[#5F6875]">
                   <span>{{ getUsagePercentage(usage?.daily_queries.used ?? 0, usage?.daily_queries.limit ?? 10) }}% Used Today</span>
-                  <span class="text-nexo-muted">Resets midnight UTC</span>
+                  <span class="text-[#5F6875]">Resets midnight UTC</span>
                 </div>
-              </Card>
+              </div>
             </div>
           </div>
 
           <!-- Feature Entitlement Capabilities Checklist -->
-          <Card class="p-6 bg-nexo-surface border border-nexo-border space-y-4">
-            <h3 class="text-sm font-semibold uppercase tracking-wider text-white">
+          <div class="card-editorial p-6 space-y-4">
+            <h3 class="section-label">
               Entitlement Access Privileges
             </h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-              <div class="flex items-center gap-2.5 p-3 rounded-lg bg-nexo-bg/60 border border-nexo-border/40">
+              <div class="flex items-center gap-2.5 p-3 rounded-[2px] bg-[#F8FAF7] border border-[#D0D9CF]">
                 <CheckCircle2
-                  :class="entitlements?.features.ai_deep_research ? 'text-emerald-400' : 'text-nexo-muted/40'"
+                  :class="entitlements?.features.ai_deep_research ? 'text-[#17794D]' : 'text-[#5F6875]/40'"
                   class="w-4 h-4 flex-shrink-0"
                 />
                 <div>
-                  <span class="font-medium text-white block">AI Deep Research Engine</span>
-                  <span class="text-[11px] text-nexo-muted">Autonomous entity synthesis</span>
+                  <span class="font-medium text-[#0E1A2B] block">AI Deep Research Engine</span>
+                  <span class="text-[11px] text-[#5F6875]">Autonomous entity synthesis</span>
                 </div>
               </div>
-              <div class="flex items-center gap-2.5 p-3 rounded-lg bg-nexo-bg/60 border border-nexo-border/40">
+              <div class="flex items-center gap-2.5 p-3 rounded-[2px] bg-[#F8FAF7] border border-[#D0D9CF]">
                 <CheckCircle2
-                  :class="entitlements?.features.pdf_downloads ? 'text-emerald-400' : 'text-nexo-muted/40'"
+                  :class="entitlements?.features.pdf_downloads ? 'text-[#17794D]' : 'text-[#5F6875]/40'"
                   class="w-4 h-4 flex-shrink-0"
                 />
                 <div>
-                  <span class="font-medium text-white block">Executive PDF Dossiers</span>
-                  <span class="text-[11px] text-nexo-muted">Download publication briefs</span>
+                  <span class="font-medium text-[#0E1A2B] block">Executive PDF Dossiers</span>
+                  <span class="text-[11px] text-[#5F6875]">Download publication briefs</span>
                 </div>
               </div>
-              <div class="flex items-center gap-2.5 p-3 rounded-lg bg-nexo-bg/60 border border-nexo-border/40">
+              <div class="flex items-center gap-2.5 p-3 rounded-[2px] bg-[#F8FAF7] border border-[#D0D9CF]">
                 <CheckCircle2
-                  :class="entitlements?.features.publication_access ? 'text-emerald-400' : 'text-nexo-muted/40'"
+                  :class="entitlements?.features.publication_access ? 'text-[#17794D]' : 'text-[#5F6875]/40'"
                   class="w-4 h-4 flex-shrink-0"
                 />
                 <div>
-                  <span class="font-medium text-white block">Institutional Publications</span>
-                  <span class="text-[11px] text-nexo-muted">Subscriber-only research</span>
+                  <span class="font-medium text-[#0E1A2B] block">Institutional Publications</span>
+                  <span class="text-[11px] text-[#5F6875]">Subscriber-only research</span>
                 </div>
               </div>
-              <div class="flex items-center gap-2.5 p-3 rounded-lg bg-nexo-bg/60 border border-nexo-border/40">
+              <div class="flex items-center gap-2.5 p-3 rounded-[2px] bg-[#F8FAF7] border border-[#D0D9CF]">
                 <CheckCircle2
-                  class="w-4 h-4 flex-shrink-0 text-emerald-400"
+                  class="w-4 h-4 flex-shrink-0 text-[#17794D]"
                 />
                 <div>
-                  <span class="font-medium text-white block">Timeline Intelligence</span>
-                  <span class="text-[11px] text-nexo-muted">{{ entitlements?.limits.historical_timeline_days ?? 90 }} days historical depth</span>
+                  <span class="font-medium text-[#0E1A2B] block">Timeline Intelligence</span>
+                  <span class="text-[11px] text-[#5F6875]">{{ entitlements?.limits.historical_timeline_days ?? 90 }} days historical depth</span>
                 </div>
               </div>
             </div>
-          </Card>
+          </div>
         </div>
 
         <!-- TAB 2: PLANS COMPARISON & UPGRADES -->

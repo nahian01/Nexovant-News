@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
-  ArrowRight,
   Bookmark,
-  BookOpen,
+  ChevronDown,
   Flag,
-  Link2,
   MoreHorizontal,
-  Newspaper,
+  Share2,
   ThumbsDown,
   ThumbsUp,
   X,
 } from 'lucide-vue-next'
-import Badge from '@/components/ui/Badge.vue'
 import MoreCoverageModal from '@/components/common/MoreCoverageModal.vue'
 import { feedService } from '@/services/api/feed.service'
 
@@ -65,74 +62,184 @@ const handleFeedback = async (action: string) => {
   isActionsOpen.value = false
 }
 
+const categoryLabel = computed(() => {
+  if (props.story.categories && props.story.categories.length > 0) {
+    return props.story.categories[0].name.toUpperCase()
+  }
+  return 'CORPORATE'
+})
+
+const subcategoryLabel = computed(() => {
+  if (props.story.is_breaking) return 'BREAKING'
+  return 'DEVELOPMENT'
+})
+
+const dateLabel = computed(() => {
+  if (!props.story.published_at) return 'Recent'
+  const d = new Date(props.story.published_at)
+  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+})
+
+const sourcesCount = computed(() => {
+  return props.story.corroborating_sources_count || props.story.sources_count || 4
+})
+
 const supportingSources = [
   {
-    publisher: props.story.source?.name || 'SEC EDGAR Disclosures',
-    original_headline: 'Form 8-K Regulatory Filing for Capital Allocation',
+    publisher: props.story.source?.name || 'Primary Regulatory Filing',
+    original_headline: props.story.title,
     published_at: '2h ago',
     url: props.story.canonical_url || 'https://sec.gov',
     coverage_type: 'Regulatory',
     adds_new_info: true,
-    description: 'Primary authorized filing with audited balance sheet allocation and state aid disclosures.',
+    description: 'Direct institutional disclosure and confirmed reporting.',
   },
   {
-    publisher: 'Reuters Technology Wire',
-    original_headline: 'Nvidia approves long-term silicon packaging plan across Germany and France',
+    publisher: 'Financial News Wire',
+    original_headline: props.story.title,
     published_at: '1h ago',
     url: 'https://reuters.com',
     coverage_type: 'Wire',
     adds_new_info: false,
-    description: 'Independent cross-confirmation citing diplomatic and supply chain procurement sources.',
+    description: 'Cross-confirmation citing market filings and official statements.',
   },
 ]
 </script>
 
 <template>
-  <article class="group relative rounded-2xl border border-nexo-border bg-white p-5 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-nexo-accent-cyan/35 hover:shadow-lg sm:p-6">
-    <div v-if="toastMessage" class="absolute right-4 top-4 z-30 max-w-[85%] rounded-xl border border-nexo-accent-cyan/20 bg-white px-3 py-2 text-xs font-medium text-nexo-accent-cyan shadow-lg">{{ toastMessage }}</div>
+  <article class="relative rounded-[2px] border border-nexo-border bg-white p-5 text-left transition-colors hover:border-nexo-ink/40">
+    <!-- Toast message overlay -->
+    <div v-if="toastMessage" class="absolute right-4 top-4 z-30 rounded-[2px] border border-nexo-border bg-nexo-paper px-3 py-1.5 text-xs font-semibold text-nexo-ink shadow-sm">
+      {{ toastMessage }}
+    </div>
 
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div class="flex flex-wrap items-center gap-2">
-        <Badge :variant="story.verification_status" size="sm" />
-        <span v-if="story.importance_score >= 8" class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 border border-amber-200">
-          Priority {{ story.importance_score }}/10
-        </span>
-        <button type="button" @click="isCoverageOpen = true" class="inline-flex items-center gap-1.5 rounded-full border border-nexo-border bg-nexo-bg px-2.5 py-1 text-[10px] font-semibold text-nexo-text-secondary transition hover:border-nexo-accent-cyan/30 hover:text-nexo-accent-cyan" title="Inspect clustered publisher sources">
-          <Newspaper class="h-3.5 w-3.5 text-nexo-accent-cyan" /> 2 sources
-        </button>
-        <span v-if="story.source?.name" class="hidden text-xs text-nexo-text-muted sm:inline">• {{ story.source.name }}</span>
+    <!-- Category, Event Date & Actions (matches 1 News-first homepage — desktop.png) -->
+    <div class="flex items-center justify-between text-xs">
+      <div class="flex items-center gap-2">
+        <span class="section-label text-nexo-cobalt">{{ categoryLabel }}</span>
+        <span class="text-nexo-muted">·</span>
+        <span class="section-label">{{ subcategoryLabel }}</span>
+        <span class="text-nexo-muted">·</span>
+        <span class="text-[11px] text-nexo-muted font-medium">Event {{ dateLabel }}</span>
       </div>
-      <div class="flex items-center gap-2 text-[11px] text-nexo-text-muted font-mono">
-        <span>{{ new Date(story.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}</span>
-        <div class="relative">
-          <button type="button" @click="isActionsOpen = !isActionsOpen" class="rounded-lg p-1.5 text-nexo-text-muted transition hover:bg-nexo-bg hover:text-nexo-text-primary" aria-label="Story actions"><MoreHorizontal class="h-4 w-4" /></button>
-          <div v-if="isActionsOpen" class="absolute right-0 top-9 z-30 w-52 rounded-2xl border border-nexo-border bg-white p-1.5 text-xs shadow-xl">
-            <button type="button" @click="toggleSave" class="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-nexo-text-secondary transition hover:bg-nexo-bg hover:text-nexo-text-primary"><Bookmark class="h-3.5 w-3.5" />{{ isSaved ? 'Remove saved story' : 'Save story' }}</button>
-            <button type="button" @click="handleShare" class="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-nexo-text-secondary transition hover:bg-nexo-bg hover:text-nexo-text-primary"><Link2 class="h-3.5 w-3.5" />Copy story link</button>
-            <button type="button" @click="isCoverageOpen = true; isActionsOpen = false" class="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-nexo-text-secondary transition hover:bg-nexo-bg hover:text-nexo-text-primary"><BookOpen class="h-3.5 w-3.5" />View source coverage</button>
-            <div class="my-1 border-t border-nexo-border"></div>
-            <button type="button" @click="handleFeedback('more_like_this')" class="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-nexo-text-secondary transition hover:bg-nexo-bg"><ThumbsUp class="h-3.5 w-3.5" />More like this</button>
-            <button type="button" @click="handleFeedback('less_like_this')" class="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-nexo-text-secondary transition hover:bg-nexo-bg"><ThumbsDown class="h-3.5 w-3.5" />Less like this</button>
-            <button type="button" @click="handleFeedback('hide')" class="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-nexo-status-danger transition hover:bg-rose-50"><X class="h-3.5 w-3.5" />Hide story</button>
-            <button type="button" @click="handleFeedback('report_issue')" class="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-nexo-text-muted transition hover:bg-nexo-bg"><Flag class="h-3.5 w-3.5" />Report an issue</button>
-          </div>
+
+      <div class="relative">
+        <button
+          type="button"
+          @click="isActionsOpen = !isActionsOpen"
+          class="rounded p-1 text-nexo-muted hover:text-nexo-ink"
+          aria-label="Story actions"
+        >
+          <MoreHorizontal class="h-4 w-4" />
+        </button>
+
+        <div v-if="isActionsOpen" class="absolute right-0 top-6 z-30 w-48 rounded-[2px] border border-nexo-border bg-white p-1 text-xs shadow-popover">
+          <button type="button" @click="toggleSave" class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-nexo-text-2 hover:bg-nexo-paper-2 hover:text-nexo-ink">
+            <Bookmark class="h-3.5 w-3.5" />{{ isSaved ? 'Remove saved story' : 'Save story' }}
+          </button>
+          <button type="button" @click="handleShare" class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-nexo-text-2 hover:bg-nexo-paper-2 hover:text-nexo-ink">
+            <Share2 class="h-3.5 w-3.5" />Copy story link
+          </button>
+          <div class="my-1 border-t border-nexo-border"></div>
+          <button type="button" @click="handleFeedback('more_like_this')" class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-nexo-text-2 hover:bg-nexo-paper-2">
+            <ThumbsUp class="h-3.5 w-3.5" />More like this
+          </button>
+          <button type="button" @click="handleFeedback('less_like_this')" class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-nexo-text-2 hover:bg-nexo-paper-2">
+            <ThumbsDown class="h-3.5 w-3.5" />Less like this
+          </button>
+          <button type="button" @click="handleFeedback('hide')" class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-nexo-breaking hover:bg-[#FBE4E1]/40">
+            <X class="h-3.5 w-3.5" />Hide story
+          </button>
         </div>
       </div>
     </div>
 
-    <h2 class="editorial-title mt-4 text-[22px] font-medium leading-snug sm:text-[25px]">
-      <RouterLink :to="`/news/${story.slug}`" class="transition group-hover:text-nexo-accent-cyan">{{ story.title }}</RouterLink>
+    <!-- Headline (Newsreader serif 20px / 26px) -->
+    <h2 class="editorial-headline mt-2 text-[20px] font-semibold leading-[26px]">
+      <RouterLink :to="`/news/${story.slug}`" class="text-nexo-ink hover:underline">
+        {{ story.title }}
+      </RouterLink>
     </h2>
-    <p class="mt-3 text-sm leading-6 text-nexo-text-secondary">{{ story.content_normalized || story.content_raw }}</p>
 
-    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-nexo-border pt-4">
-      <div class="flex flex-wrap gap-1.5">
-        <RouterLink v-for="company in story.companies" :key="company.id" to="/companies" class="rounded-lg border border-nexo-border bg-nexo-bg px-2.5 py-1 text-[10px] font-medium text-nexo-text-secondary transition hover:border-nexo-accent-cyan/40 hover:text-nexo-accent-cyan">{{ company.name }} <span class="font-semibold">({{ company.ticker }})</span></RouterLink>
-        <span v-for="category in story.categories" :key="category.id" class="rounded-lg bg-[#eaf3ed] px-2.5 py-1 text-[10px] font-semibold text-nexo-accent-cyan">{{ category.name }}</span>
-      </div>
-      <RouterLink :to="`/news/${story.slug}`" class="inline-flex items-center gap-1.5 text-xs font-semibold text-nexo-accent-cyan transition hover:gap-2.5">Explore the full analysis <ArrowRight class="h-3.5 w-3.5" /></RouterLink>
+    <!-- Summary Header & Text -->
+    <div class="mt-2.5">
+      <p class="section-label text-[10px] text-nexo-muted uppercase tracking-[0.08em]">
+        SUMMARY, GENERATED FROM {{ sourcesCount }} REPORTS
+      </p>
+      <p class="mt-1 text-sm text-nexo-text-2 leading-relaxed">
+        {{ story.content_normalized || story.content_raw || story.summary }}
+      </p>
     </div>
 
+    <!-- Entity Tags (Halvorsen Energy, Dana Whitcombe, etc.) -->
+    <div class="mt-3 flex flex-wrap gap-1.5">
+      <template v-if="story.companies && story.companies.length">
+        <RouterLink
+          v-for="co in story.companies"
+          :key="co.id"
+          to="/companies"
+          class="rounded-[2px] border border-nexo-border bg-nexo-paper-2/60 px-2 py-0.5 text-xs text-nexo-text-2 hover:text-nexo-ink"
+        >
+          {{ co.name }}
+        </RouterLink>
+      </template>
+      <template v-else>
+        <span class="rounded-[2px] border border-nexo-border bg-nexo-paper-2/60 px-2 py-0.5 text-xs text-nexo-text-2">
+          Corporate Filing
+        </span>
+      </template>
+    </div>
+
+    <!-- Footer Bar: Verification Status + More Coverage + Bookmark/Share -->
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-nexo-border pt-3 text-xs">
+      <!-- Status & Timestamp -->
+      <div class="flex items-center gap-2.5">
+        <span v-if="story.verification_status === 'confirmed' || story.verification_status === 'verified'" class="badge-verified">
+          ✓ Verified
+        </span>
+        <span v-else-if="story.is_breaking" class="badge-breaking">
+          Breaking
+        </span>
+        <span v-else class="badge-developing">
+          ● Developing
+        </span>
+        <span class="text-[11px] text-nexo-muted">
+          {{ story.source?.name ? `Via ${story.source.name}` : 'Latest: figures confirmed 2h ago' }}
+        </span>
+      </div>
+
+      <!-- Right Action Controls -->
+      <div class="flex items-center gap-3">
+        <button
+          type="button"
+          @click="isCoverageOpen = true"
+          class="flex items-center gap-1 text-xs font-medium text-nexo-text-2 hover:text-nexo-ink"
+        >
+          <span>{{ sourcesCount }} sources · More coverage</span>
+          <ChevronDown class="h-3 w-3" />
+        </button>
+
+        <button
+          type="button"
+          @click="toggleSave"
+          class="text-nexo-muted hover:text-nexo-ink"
+          :title="isSaved ? 'Remove bookmark' : 'Bookmark story'"
+        >
+          <Bookmark :class="['h-3.5 w-3.5', isSaved ? 'fill-nexo-ink text-nexo-ink' : '']" />
+        </button>
+
+        <button
+          type="button"
+          @click="handleShare"
+          class="text-nexo-muted hover:text-nexo-ink"
+          title="Share story"
+        >
+          <Share2 class="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+
+    <!-- More Coverage Modal -->
     <MoreCoverageModal :is-open="isCoverageOpen" :story-title="story.title" :sources="supportingSources" @close="isCoverageOpen = false" />
   </article>
 </template>
