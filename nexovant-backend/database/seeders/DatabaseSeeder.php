@@ -522,8 +522,8 @@ class DatabaseSeeder extends Seeder
             // Google
             [
                 'provider_slug' => 'google-gemini',
-                'model_identifier' => 'gemini-2.0-flash',
-                'display_name' => 'Google Gemini 2.0 Flash',
+                'model_identifier' => 'gemini-2.0-flash-exp',
+                'display_name' => 'Google Gemini 2.0 Flash Experimental',
                 'cost_per_1k_input_tokens' => 0.00010,
                 'cost_per_1k_output_tokens' => 0.00040,
                 'context_window' => 1048576,
@@ -535,8 +535,8 @@ class DatabaseSeeder extends Seeder
             ],
             [
                 'provider_slug' => 'google-gemini',
-                'model_identifier' => 'gemini-1.5-pro',
-                'display_name' => 'Google Gemini 1.5 Pro',
+                'model_identifier' => 'gemini-1.5-pro-002',
+                'display_name' => 'Google Gemini 1.5 Pro 002',
                 'cost_per_1k_input_tokens' => 0.00125,
                 'cost_per_1k_output_tokens' => 0.00500,
                 'context_window' => 2097152,

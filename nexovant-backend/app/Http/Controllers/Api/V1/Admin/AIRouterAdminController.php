@@ -15,6 +15,7 @@ use App\Services\AI\DTO\AIRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class AIRouterAdminController
@@ -481,11 +482,12 @@ class AIRouterAdminController
     }
 
     /**
-     * Update model capabilities, context window, or pricing.
+     * Update model capabilities, context window, pricing, or model identifier.
      */
     public function updateModel(string $id, Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'model_identifier' => ['sometimes', 'string', 'max:150'],
             'display_name' => ['sometimes', 'string', 'max:255'],
             'cost_per_1k_input_tokens' => ['sometimes', 'numeric', 'min:0'],
             'cost_per_1k_output_tokens' => ['sometimes', 'numeric', 'min:0'],
@@ -505,6 +507,160 @@ class AIRouterAdminController
             'success' => true,
             'message' => "Model '{$model->display_name}' updated successfully.",
             'model' => $model->load('provider:id,name,slug'),
+        ]);
+    }
+
+    /**
+     * Fetch available models directly from a provider's live API.
+     * Requires at least one active credential for the provider.
+     */
+    public function fetchProviderModels(string $id): JsonResponse
+    {
+        $provider = AIProvider::with(['credentials' => function ($q) {
+            $q->where('status', 'active')->where('is_valid', true)->orderBy('priority');
+        }])->findOrFail($id);
+
+        $credential = $provider->credentials->first();
+
+        if (! $credential) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'NO_ACTIVE_CREDENTIAL',
+                    'message' => "No active credential found for provider '{$provider->name}'. Add an API key first.",
+                ],
+            ], 422);
+        }
+
+        try {
+            $apiKey = Crypt::decryptString($credential->encrypted_api_key);
+        } catch (\Throwable) {
+            $apiKey = $credential->encrypted_api_key; // legacy plaintext fallback
+        }
+
+        $httpOpts = ['verify' => false, 'timeout' => 15];
+        $slug = $provider->slug;
+        $models = [];
+
+        try {
+            if (str_contains($slug, 'gemini') || str_contains($slug, 'google')) {
+                // Google Gemini: GET /v1beta/models?key=API_KEY
+                $response = Http::withOptions($httpOpts)
+                    ->get("https://generativelanguage.googleapis.com/v1beta/models?key={$apiKey}");
+
+                if (! $response->successful()) {
+                    $body = $response->json() ?? [];
+                    $errMsg = $body['error']['message'] ?? $response->body();
+                    return response()->json([
+                        'success' => false,
+                        'error' => ['code' => 'PROVIDER_API_ERROR', 'message' => "Gemini API error: {$errMsg}"],
+                    ], 422);
+                }
+
+                foreach ($response->json('models', []) as $m) {
+                    // Strip "models/" prefix from name
+                    $identifier = ltrim($m['name'] ?? '', 'models/');
+                    if (str_starts_with($identifier, 'models/')) {
+                        $identifier = substr($identifier, 7);
+                    }
+                    // Only return generative and embedding models (skip tuned/base-only)
+                    $supportedMethods = $m['supportedGenerationMethods'] ?? [];
+                    if (empty($supportedMethods)) {
+                        continue;
+                    }
+                    $models[] = [
+                        'id' => $identifier,
+                        'display_name' => $m['displayName'] ?? $identifier,
+                        'description' => $m['description'] ?? null,
+                        'context_window' => $m['inputTokenLimit'] ?? null,
+                        'max_output_tokens' => $m['outputTokenLimit'] ?? null,
+                        'supports_embedding' => in_array('embedContent', $supportedMethods, true),
+                        'supports_generation' => in_array('generateContent', $supportedMethods, true),
+                        'version' => $m['version'] ?? null,
+                    ];
+                }
+            } elseif (str_contains($slug, 'openai') || str_contains($slug, 'gpt')) {
+                // OpenAI: GET /v1/models
+                $response = Http::withOptions($httpOpts)
+                    ->withHeaders(['Authorization' => "Bearer {$apiKey}"])
+                    ->get('https://api.openai.com/v1/models');
+
+                if (! $response->successful()) {
+                    $body = $response->json() ?? [];
+                    $errMsg = $body['error']['message'] ?? $response->body();
+                    return response()->json([
+                        'success' => false,
+                        'error' => ['code' => 'PROVIDER_API_ERROR', 'message' => "OpenAI API error: {$errMsg}"],
+                    ], 422);
+                }
+
+                $rawModels = collect($response->json('data', []))
+                    ->sortByDesc('created')
+                    ->values();
+
+                foreach ($rawModels as $m) {
+                    $models[] = [
+                        'id' => $m['id'],
+                        'display_name' => $m['id'],
+                        'description' => "OpenAI model owned by: " . ($m['owned_by'] ?? 'openai'),
+                        'context_window' => null,
+                        'max_output_tokens' => null,
+                        'supports_embedding' => str_contains($m['id'], 'embedding'),
+                        'supports_generation' => ! str_contains($m['id'], 'embedding'),
+                        'version' => null,
+                    ];
+                }
+            } elseif (str_contains($slug, 'anthropic') || str_contains($slug, 'claude')) {
+                // Anthropic: GET /v1/models
+                $response = Http::withOptions($httpOpts)
+                    ->withHeaders([
+                        'x-api-key' => $apiKey,
+                        'anthropic-version' => '2023-06-01',
+                    ])
+                    ->get('https://api.anthropic.com/v1/models');
+
+                if (! $response->successful()) {
+                    $body = $response->json() ?? [];
+                    $errMsg = $body['error']['message'] ?? $response->body();
+                    return response()->json([
+                        'success' => false,
+                        'error' => ['code' => 'PROVIDER_API_ERROR', 'message' => "Anthropic API error: {$errMsg}"],
+                    ], 422);
+                }
+
+                foreach ($response->json('data', []) as $m) {
+                    $models[] = [
+                        'id' => $m['id'],
+                        'display_name' => $m['display_name'] ?? $m['id'],
+                        'description' => null,
+                        'context_window' => null,
+                        'max_output_tokens' => null,
+                        'supports_embedding' => false,
+                        'supports_generation' => true,
+                        'version' => null,
+                    ];
+                }
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'UNSUPPORTED_PROVIDER',
+                        'message' => "Live model discovery is not yet supported for provider '{$provider->name}' (slug: {$slug}).",
+                    ],
+                ], 422);
+            }
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => 'FETCH_FAILED', 'message' => "Failed to reach provider API: " . $e->getMessage()],
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'provider' => ['id' => $provider->id, 'name' => $provider->name, 'slug' => $provider->slug],
+            'count' => count($models),
+            'models' => $models,
         ]);
     }
 

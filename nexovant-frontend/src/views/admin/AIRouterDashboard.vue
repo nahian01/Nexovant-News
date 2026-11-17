@@ -21,6 +21,7 @@ import {
   Pause,
   Plus,
   RefreshCw,
+  Download,
 } from 'lucide-vue-next'
 
 const activeTab = ref<'providers' | 'credentials' | 'models' | 'tasks' | 'usage'>('credentials')
@@ -45,6 +46,65 @@ const isTestConsoleModalOpen = ref(false)
 const testingCredentialId = ref<string | null>(null)
 const isTesting = ref(false)
 const testOutput = ref<any>(null)
+
+// Fetch Live Models Modal state
+const isFetchModelsModalOpen = ref(false)
+const fetchModelsProviderId = ref('')
+const fetchModelsProviderName = ref('')
+const isFetchingModels = ref(false)
+const fetchedModels = ref<any[]>([])
+const fetchModelsError = ref('')
+
+// Edit Model Identifier state
+const editModelId = ref('')
+const editModelIdentifier = ref('')
+const editModelDisplayName = ref('')
+const isSavingModel = ref(false)
+
+const openFetchModelsModal = (provider: any) => {
+  fetchModelsProviderId.value = provider.id
+  fetchModelsProviderName.value = provider.name
+  fetchedModels.value = []
+  fetchModelsError.value = ''
+  isFetchModelsModalOpen.value = true
+}
+
+const handleFetchProviderModels = async () => {
+  isFetchingModels.value = true
+  fetchModelsError.value = ''
+  fetchedModels.value = []
+  try {
+    const res = await adminService.fetchProviderModels(fetchModelsProviderId.value)
+    fetchedModels.value = res.models ?? []
+    if (fetchedModels.value.length === 0) {
+      fetchModelsError.value = 'No models returned from provider API.'
+    }
+  } catch (err: any) {
+    fetchModelsError.value = err.response?.data?.error?.message || err.response?.data?.message || 'Failed to fetch models from provider.'
+  } finally {
+    isFetchingModels.value = false
+  }
+}
+
+const handleUpdateModelIdentifier = async (localModel: any, newIdentifier: string, newDisplayName: string) => {
+  if (!newIdentifier.trim()) return
+  isSavingModel.value = true
+  statusMessage.value = ''
+  errorMessage.value = ''
+  try {
+    const res = await adminService.updateAIModel(localModel.id, {
+      model_identifier: newIdentifier.trim(),
+      display_name: newDisplayName.trim() || newIdentifier.trim(),
+    })
+    statusMessage.value = res.message || `Model updated to ${newIdentifier}`
+    await fetchAll()
+    editModelId.value = ''
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || 'Failed to update model identifier.'
+  } finally {
+    isSavingModel.value = false
+  }
+}
 
 const testForm = ref({
   prompt: 'Provide a concise 2-sentence intelligence briefing on latest developments in AI model routing.',
@@ -525,27 +585,79 @@ onMounted(() => {
       </div>
 
       <!-- TAB 3: MODEL REGISTRY -->
-      <div v-if="activeTab === 'models'">
-        <Table :headers="['Model ID & Name', 'Provider', 'Context Window', 'Pricing (Input/Output per 1k)', 'Status']" :is-empty="models.length === 0">
+      <div v-if="activeTab === 'models'" class="space-y-4">
+        <!-- Per-provider fetch live models -->
+        <div class="flex flex-wrap gap-2 items-center text-xs">
+          <span class="text-nexo-text-muted font-mono">Fetch live models from provider API:</span>
+          <button
+            v-for="prov in providers"
+            :key="prov.id"
+            @click="openFetchModelsModal(prov)"
+            class="px-2.5 py-1 rounded border border-nexo-accent-cyan text-nexo-accent-cyan font-mono text-[10px] font-bold hover:bg-nexo-accent-cyan/10 transition flex items-center gap-1"
+          >
+            <RefreshCw class="h-3 w-3" /> {{ prov.name }}
+          </button>
+        </div>
+        <Table :headers="['Model Identifier (API)', 'Display Name', 'Provider', 'Context Window', 'Pricing (In / Out per 1k)', 'Status', 'Actions']" :is-empty="models.length === 0">
           <tr v-for="m in models" :key="m.id" class="hover:bg-nexo-surface/40 transition">
             <td class="py-3 px-4">
-              <div class="font-bold text-nexo-text-primary">{{ m.display_name }}</div>
-              <div class="text-[10px] font-mono text-nexo-text-muted">{{ m.model_id }}</div>
+              <template v-if="editModelId === m.id">
+                <input
+                  v-model="editModelIdentifier"
+                  class="w-full p-1.5 border border-nexo-accent-gold rounded text-xs font-mono bg-white text-nexo-text-primary"
+                  placeholder="e.g. gemini-2.0-flash-exp"
+                />
+              </template>
+              <template v-else>
+                <div class="font-mono text-xs text-nexo-text-primary font-bold">{{ m.model_identifier }}</div>
+              </template>
+            </td>
+            <td class="py-3 px-4">
+              <template v-if="editModelId === m.id">
+                <input
+                  v-model="editModelDisplayName"
+                  class="w-full p-1.5 border border-nexo-border rounded text-xs bg-white text-nexo-text-primary"
+                  placeholder="Display name"
+                />
+              </template>
+              <template v-else>
+                <div class="text-sm text-nexo-text-primary">{{ m.display_name }}</div>
+              </template>
             </td>
             <td class="py-3 px-4 font-mono text-xs text-nexo-accent-cyan font-bold uppercase">
               {{ m.provider?.name || 'Provider' }}
             </td>
             <td class="py-3 px-4 font-mono text-xs">
-              {{ Number(m.context_window).toLocaleString() }} tokens
+              {{ Number(m.context_window || 0).toLocaleString() }} tokens
             </td>
             <td class="py-3 px-4 font-mono text-xs">
-              <span class="text-nexo-text-primary">${{ m.input_price_per_1k_tokens }} in</span> /
-              <span class="text-nexo-accent-gold font-bold">${{ m.output_price_per_1k_tokens }} out</span>
+              <span class="text-nexo-text-primary">${{ m.cost_per_1k_input_tokens }} in</span> /
+              <span class="text-nexo-accent-gold font-bold">${{ m.cost_per_1k_output_tokens }} out</span>
             </td>
             <td class="py-3 px-4 font-mono text-xs">
-              <span class="px-2 py-0.5 rounded text-[9px] uppercase font-bold bg-emerald-100 text-emerald-800">
-                Active
+              <span :class="['px-2 py-0.5 rounded text-[9px] uppercase font-bold', m.is_active !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600']">
+                {{ m.is_active !== false ? 'Active' : 'Inactive' }}
               </span>
+            </td>
+            <td class="py-3 px-4 font-mono text-xs">
+              <div class="flex items-center space-x-2">
+                <template v-if="editModelId === m.id">
+                  <Button variant="primary" size="sm" :disabled="isSavingModel" @click="handleUpdateModelIdentifier(m, editModelIdentifier, editModelDisplayName)" class="bg-nexo-accent-gold hover:bg-[#8e6e18] text-[10px]">
+                    <RefreshCw v-if="isSavingModel" class="h-3 w-3 animate-spin" />
+                    <span v-else>Save</span>
+                  </Button>
+                  <Button variant="ghost" size="sm" @click="editModelId = ''" class="text-[10px]">Cancel</Button>
+                </template>
+                <template v-else>
+                  <button
+                    @click="editModelId = m.id; editModelIdentifier = m.model_identifier; editModelDisplayName = m.display_name"
+                    class="px-2 py-1 rounded border border-nexo-border text-nexo-text-secondary hover:bg-nexo-surface text-[10px] font-mono"
+                    title="Edit model identifier"
+                  >
+                    Edit ID
+                  </button>
+                </template>
+              </div>
             </td>
           </tr>
         </Table>
@@ -617,6 +729,83 @@ onMounted(() => {
           </tr>
         </Table>
       </div>
+
+      <!-- Fetch Live Provider Models Modal -->
+      <Modal :is-open="isFetchModelsModalOpen" :title="`Live Models — ${fetchModelsProviderName}`" max-width="lg" @close="isFetchModelsModalOpen = false">
+        <div class="space-y-4 text-xs text-left">
+          <p class="text-nexo-text-secondary text-[11px]">
+            Fetches the available model list directly from {{ fetchModelsProviderName }}'s API using your registered active credential.
+            You can then update an existing model's identifier to use a newer model.
+          </p>
+
+          <div v-if="fetchModelsError" class="p-2.5 bg-red-50 border border-red-200 rounded text-red-700 text-[11px]">
+            {{ fetchModelsError }}
+          </div>
+
+          <div class="flex justify-between items-center">
+            <Button
+              variant="primary"
+              size="sm"
+              :disabled="isFetchingModels"
+              @click="handleFetchProviderModels"
+              class="bg-nexo-accent-cyan hover:bg-cyan-700"
+            >
+              <RefreshCw v-if="isFetchingModels" class="h-3.5 w-3.5 mr-1 animate-spin" />
+              <RefreshCw v-else class="h-3.5 w-3.5 mr-1" />
+              {{ isFetchingModels ? 'Fetching from API...' : 'Fetch Available Models' }}
+            </Button>
+            <span v-if="fetchedModels.length > 0" class="text-nexo-text-muted font-mono">
+              {{ fetchedModels.length }} models found
+            </span>
+          </div>
+
+          <div v-if="fetchedModels.length > 0" class="max-h-80 overflow-y-auto border border-nexo-border rounded">
+            <table class="w-full text-[11px]">
+              <thead class="bg-nexo-surface/80 sticky top-0">
+                <tr>
+                  <th class="text-left px-3 py-2 font-mono text-nexo-text-muted uppercase text-[9px]">Model ID</th>
+                  <th class="text-left px-3 py-2 font-mono text-nexo-text-muted uppercase text-[9px]">Display Name</th>
+                  <th class="text-left px-3 py-2 font-mono text-nexo-text-muted uppercase text-[9px]">Context</th>
+                  <th class="text-left px-3 py-2 font-mono text-nexo-text-muted uppercase text-[9px]">Type</th>
+                  <th class="text-left px-3 py-2 font-mono text-nexo-text-muted uppercase text-[9px]">Use</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="fm in fetchedModels" :key="fm.id" class="border-t border-nexo-border/40 hover:bg-nexo-surface/40">
+                  <td class="px-3 py-2 font-mono font-bold text-nexo-text-primary">{{ fm.id }}</td>
+                  <td class="px-3 py-2 text-nexo-text-secondary">{{ fm.display_name }}</td>
+                  <td class="px-3 py-2 font-mono text-nexo-text-muted">
+                    {{ fm.context_window ? Number(fm.context_window).toLocaleString() : '—' }}
+                  </td>
+                  <td class="px-3 py-2">
+                    <span v-if="fm.supports_embedding" class="px-1.5 py-0.5 rounded text-[9px] bg-purple-100 text-purple-800 font-bold uppercase">Embedding</span>
+                    <span v-else class="px-1.5 py-0.5 rounded text-[9px] bg-blue-100 text-blue-800 font-bold uppercase">Generative</span>
+                  </td>
+                  <td class="px-3 py-2">
+                    <select
+                      class="p-1 border border-nexo-border rounded text-[10px] bg-white text-nexo-text-primary font-mono"
+                      @change="(e) => { const target = (e.target as HTMLSelectElement); if (target.value) { editModelId = target.value; editModelIdentifier = fm.id; editModelDisplayName = fm.display_name || fm.id; isFetchModelsModalOpen = false; activeTab = 'models' } }"
+                    >
+                      <option value="">Apply to…</option>
+                      <option
+                        v-for="lm in models.filter(x => x.provider_id === fetchModelsProviderId)"
+                        :key="lm.id"
+                        :value="lm.id"
+                      >
+                        {{ lm.display_name }}
+                      </option>
+                    </select>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pt-2 flex justify-end">
+            <Button variant="ghost" size="sm" @click="isFetchModelsModalOpen = false">Close</Button>
+          </div>
+        </div>
+      </Modal>
 
       <!-- Add Credential Modal -->
       <Modal :is-open="isAddCredentialModalOpen" title="Register New AI API Credential (AES-256-GCM Encrypted)" max-width="md" @close="isAddCredentialModalOpen = false">

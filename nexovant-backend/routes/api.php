@@ -417,6 +417,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/ai-router/models', [AIRouterAdminController::class, 'models']);
         Route::post('/ai-router/models', [AIRouterAdminController::class, 'storeModel']);
         Route::put('/ai-router/models/{id}', [AIRouterAdminController::class, 'updateModel']);
+        Route::get('/ai-router/providers/{id}/fetch-models', [AIRouterAdminController::class, 'fetchProviderModels'])->name('api.admin.ai-router.fetch-provider-models');
 
         Route::get('/ai-tasks', [AIRouterAdminController::class, 'tasks'])->name('api.admin.ai-tasks.index');
         Route::put('/ai-tasks/{id}', [AIRouterAdminController::class, 'updateTask'])->name('api.admin.ai-tasks.update');

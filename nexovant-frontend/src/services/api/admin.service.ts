@@ -247,6 +247,15 @@ export const adminService = {
     return res.data
   },
 
+  /**
+   * Fetch available models directly from the provider's live API.
+   * Requires at least one active credential registered for the provider.
+   */
+  async fetchProviderModels(providerId: string) {
+    const res = await apiClient.get(`/admin/ai-router/providers/${providerId}/fetch-models`)
+    return res.data
+  },
+
   async getAITasks() {
     const res = await apiClient.get('/admin/ai-router/tasks')
     return res.data.data
