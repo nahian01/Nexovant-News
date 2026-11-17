@@ -55,6 +55,13 @@ use App\Http\Controllers\Api\V1\Automation\TrendForecastController;
 use App\Http\Controllers\Api\V1\Automation\AutomatedReportController;
 use App\Http\Controllers\Api\V1\Admin\AnalystReviewAdminController;
 use App\Http\Controllers\Api\V1\Admin\IntelligenceAutomationAdminController;
+use App\Http\Controllers\Api\V1\Executive\ExecutiveBriefingController;
+use App\Http\Controllers\Api\V1\Executive\StrategicImpactController;
+use App\Http\Controllers\Api\V1\Executive\OpportunityRiskController;
+use App\Http\Controllers\Api\V1\Executive\ScenarioAnalysisController;
+use App\Http\Controllers\Api\V1\Executive\DecisionSupportController;
+use App\Http\Controllers\Api\V1\Executive\ExecutiveAssistantController;
+use App\Http\Controllers\Api\V1\Executive\ExecutiveDashboardController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -328,6 +335,57 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Stage 13 Early Warning Status Updates
         Route::post('/early-warnings/{id}/status', [EarlyWarningController::class, 'updateStatus'])->name('api.workspace.early-warnings.status');
+    });
+
+    // =========================================================================
+    // Stage 15: Advanced Executive Intelligence & Decision Support Suite
+    // =========================================================================
+    Route::prefix('executive')->group(function () {
+        // Executive Cockpit Overview
+        Route::get('/cockpit', [ExecutiveDashboardController::class, 'cockpit'])->name('api.executive.cockpit');
+
+        // Executive Intelligence Briefings
+        Route::get('/briefings', [ExecutiveBriefingController::class, 'index'])->name('api.executive.briefings.index');
+        Route::post('/briefings', [ExecutiveBriefingController::class, 'store'])->name('api.executive.briefings.store');
+        Route::get('/briefings/{id}', [ExecutiveBriefingController::class, 'show'])->name('api.executive.briefings.show');
+        Route::put('/briefings/{id}', [ExecutiveBriefingController::class, 'update'])->name('api.executive.briefings.update');
+        Route::post('/briefings/{id}/review', [ExecutiveBriefingController::class, 'review'])->name('api.executive.briefings.review');
+        Route::get('/briefings/{id}/export', [ExecutiveBriefingController::class, 'export'])->name('api.executive.briefings.export');
+
+        // Strategic Impact Analysis
+        Route::get('/strategic-impacts', [StrategicImpactController::class, 'index'])->name('api.executive.strategic-impacts.index');
+        Route::post('/strategic-impacts', [StrategicImpactController::class, 'store'])->name('api.executive.strategic-impacts.store');
+        Route::get('/strategic-impacts/{id}', [StrategicImpactController::class, 'show'])->name('api.executive.strategic-impacts.show');
+
+        // Opportunity & Risk Intelligence
+        Route::get('/opportunities', [OpportunityRiskController::class, 'getOpportunities'])->name('api.executive.opportunities.index');
+        Route::post('/opportunities', [OpportunityRiskController::class, 'storeOpportunity'])->name('api.executive.opportunities.store');
+        Route::patch('/opportunities/{id}/status', [OpportunityRiskController::class, 'updateOpportunityStatus'])->name('api.executive.opportunities.status');
+        Route::get('/risks', [OpportunityRiskController::class, 'getRisks'])->name('api.executive.risks.index');
+        Route::post('/risks', [OpportunityRiskController::class, 'storeRisk'])->name('api.executive.risks.store');
+        Route::patch('/risks/{id}/status', [OpportunityRiskController::class, 'updateRiskStatus'])->name('api.executive.risks.status');
+
+        // Scenario Analysis Engine
+        Route::get('/scenarios', [ScenarioAnalysisController::class, 'index'])->name('api.executive.scenarios.index');
+        Route::post('/scenarios', [ScenarioAnalysisController::class, 'store'])->name('api.executive.scenarios.store');
+        Route::post('/scenarios/generate-suite', [ScenarioAnalysisController::class, 'generateSuite'])->name('api.executive.scenarios.generate-suite');
+        Route::post('/scenarios/compare', [ScenarioAnalysisController::class, 'compare'])->name('api.executive.scenarios.compare');
+        Route::post('/scenarios/{id}/duplicate', [ScenarioAnalysisController::class, 'duplicate'])->name('api.executive.scenarios.duplicate');
+        Route::put('/scenarios/{id}', [ScenarioAnalysisController::class, 'update'])->name('api.executive.scenarios.update');
+        Route::post('/scenarios/{id}/archive', [ScenarioAnalysisController::class, 'archive'])->name('api.executive.scenarios.archive');
+
+        // Structured Decision Support Engine
+        Route::get('/decisions', [DecisionSupportController::class, 'index'])->name('api.executive.decisions.index');
+        Route::post('/decisions', [DecisionSupportController::class, 'store'])->name('api.executive.decisions.store');
+        Route::get('/decisions/{id}', [DecisionSupportController::class, 'show'])->name('api.executive.decisions.show');
+        Route::post('/decisions/{id}/options', [DecisionSupportController::class, 'addOption'])->name('api.executive.decisions.options.store');
+        Route::post('/decisions/{id}/milestones', [DecisionSupportController::class, 'addMilestone'])->name('api.executive.decisions.milestones.store');
+        Route::patch('/decisions/{id}/milestones/{milestoneId}', [DecisionSupportController::class, 'updateMilestone'])->name('api.executive.decisions.milestones.update');
+        Route::post('/decisions/{id}/approve', [DecisionSupportController::class, 'approve'])->name('api.executive.decisions.approve');
+        Route::post('/decisions/{id}/post-review', [DecisionSupportController::class, 'postReview'])->name('api.executive.decisions.post-review');
+
+        // Executive Intelligence Assistant (Grounded Q&A)
+        Route::post('/assistant/ask', [ExecutiveAssistantController::class, 'ask'])->name('api.executive.assistant.ask');
     });
 
     // Administrative Console Endpoints (Guarded by admin middleware)

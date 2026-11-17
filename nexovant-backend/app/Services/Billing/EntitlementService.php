@@ -25,6 +25,17 @@ class EntitlementService
     public const FEATURE_HISTORICAL_TIMELINE_DAYS = 'historical_timeline_days';
     public const FEATURE_EXPORT_FORMATS = 'export_formats';
 
+    // Stage 15 Executive Decision Support Features
+    public const FEATURE_EXECUTIVE_BRIEFINGS = 'executive.briefings';
+    public const FEATURE_STRATEGIC_IMPACT = 'executive.strategic_impact';
+    public const FEATURE_OPPORTUNITY_RISK = 'executive.opportunity_risk';
+    public const FEATURE_SCENARIO_ANALYSIS = 'executive.scenario_analysis';
+    public const FEATURE_DECISION_SUPPORT = 'executive.decision_support';
+    public const FEATURE_EXECUTIVE_ASSISTANT = 'executive.assistant';
+    public const FEATURE_MAX_EXECUTIVE_BRIEFINGS = 'max_executive_briefings';
+    public const FEATURE_MAX_SCENARIOS = 'max_scenarios';
+    public const FEATURE_MAX_DECISIONS = 'max_decisions';
+
     /**
      * Check if a boolean feature is granted to the user.
      */

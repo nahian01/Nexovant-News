@@ -51,6 +51,15 @@ import IntelligenceControlCenter from '@/views/admin/IntelligenceControlCenter.v
 import ResearchControlCenter from '@/views/admin/ResearchControlCenter.vue'
 import AdminSubscriberIntelligenceView from '@/views/admin/AdminSubscriberIntelligenceView.vue'
 
+// Stage 15 Executive Intelligence Views
+import ExecutiveDashboardView from '@/views/executive/ExecutiveDashboardView.vue'
+import ExecutiveBriefingsView from '@/views/executive/ExecutiveBriefingsView.vue'
+import StrategicImpactView from '@/views/executive/StrategicImpactView.vue'
+import OpportunitiesRisksView from '@/views/executive/OpportunitiesRisksView.vue'
+import ScenarioAnalysisView from '@/views/executive/ScenarioAnalysisView.vue'
+import DecisionCenterView from '@/views/executive/DecisionCenterView.vue'
+import ExecutiveAssistantView from '@/views/executive/ExecutiveAssistantView.vue'
+
 const routes = [
   // 1. Public Intelligence Network
   {
@@ -222,6 +231,54 @@ const routes = [
     path: '/workspace/preferences',
     name: 'workspace-preferences',
     component: SubscriberPreferencesView,
+    meta: { requiresAuth: true },
+  },
+
+  // Stage 15 Executive Decision Support Routes
+  {
+    path: '/executive',
+    redirect: '/executive/dashboard',
+  },
+  {
+    path: '/executive/dashboard',
+    name: 'executive-dashboard',
+    component: ExecutiveDashboardView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/executive/briefings',
+    name: 'executive-briefings',
+    component: ExecutiveBriefingsView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/executive/strategic-impact',
+    name: 'executive-strategic-impact',
+    component: StrategicImpactView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/executive/opportunities-risks',
+    name: 'executive-opportunities-risks',
+    component: OpportunitiesRisksView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/executive/scenarios',
+    name: 'executive-scenarios',
+    component: ScenarioAnalysisView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/executive/decisions',
+    name: 'executive-decisions',
+    component: DecisionCenterView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/executive/assistant',
+    name: 'executive-assistant',
+    component: ExecutiveAssistantView,
     meta: { requiresAuth: true },
   },
 

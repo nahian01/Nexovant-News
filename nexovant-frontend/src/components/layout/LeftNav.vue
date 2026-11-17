@@ -44,6 +44,16 @@ const signedInLibraryItems = [
   { name: 'Notifications', path: '/notifications', badge: '3' },
 ]
 
+const signedInExecutiveItems = [
+  { name: 'Executive Cockpit', path: '/executive/dashboard' },
+  { name: 'Briefings', path: '/executive/briefings' },
+  { name: 'Strategic Impact', path: '/executive/strategic-impact' },
+  { name: 'Opportunities & Risks', path: '/executive/opportunities-risks' },
+  { name: 'Scenario Analysis', path: '/executive/scenarios' },
+  { name: 'Decision Center', path: '/executive/decisions' },
+  { name: 'Executive Assistant', path: '/executive/assistant' },
+]
+
 const isActive = (path: string) => {
   if (path === '/') return route.path === '/'
   if (path.includes('?')) {
@@ -185,6 +195,24 @@ const isActive = (path: string) => {
             <span v-if="item.badge" class="flex h-4 w-4 items-center justify-center rounded-full bg-nexo-breaking text-[10px] font-bold text-white">
               {{ item.badge }}
             </span>
+          </RouterLink>
+        </nav>
+
+        <!-- EXECUTIVE INTELLIGENCE -->
+        <nav class="space-y-1 border-t border-nexo-border pt-4">
+          <p class="section-label px-2 pb-2 text-nexo-cobalt">EXECUTIVE</p>
+          <RouterLink
+            v-for="item in signedInExecutiveItems"
+            :key="item.name"
+            :to="item.path"
+            :class="[
+              'flex items-center justify-between rounded-[4px] px-2.5 py-1.5 text-sm transition-colors',
+              isActive(item.path)
+                ? 'bg-nexo-paper-2 font-semibold text-nexo-ink'
+                : 'text-nexo-text-2 hover:bg-nexo-paper-2/60 hover:text-nexo-ink'
+            ]"
+          >
+            <span>{{ item.name }}</span>
           </RouterLink>
         </nav>
 
