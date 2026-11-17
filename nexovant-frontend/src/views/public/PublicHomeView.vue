@@ -105,7 +105,15 @@ onMounted(fetchStories)
     <div class="space-y-8 text-left pb-16">
 
       <!-- SECTION 1: BREAKING DEVELOPMENTS HERO (Design Mockup: 1 News-first homepage — desktop.png) -->
-      <section v-if="heroStory" class="space-y-3">
+      <section v-if="isLoading" class="space-y-3">
+        <div class="card-editorial p-6 sm:p-7 space-y-4 animate-pulse">
+          <div class="h-4 w-32 bg-nexo-border/40 rounded"></div>
+          <div class="h-8 w-3/4 bg-nexo-border/40 rounded"></div>
+          <div class="h-16 w-full bg-nexo-border/30 rounded"></div>
+        </div>
+      </section>
+
+      <section v-else-if="heroStory" class="space-y-3">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <span class="h-2 w-2 rounded-full bg-[#B3261E] animate-pulse"></span>
@@ -124,11 +132,11 @@ onMounted(fetchStories)
             <!-- Badges & Provenance Meta -->
             <div class="flex flex-wrap items-center gap-2.5 text-xs text-[#5F6875]">
               <span class="badge-breaking">BREAKING</span>
-              <span class="font-medium text-[#3F4A5A]">{{ heroStory.source?.name || 'Reuters, FT' }}</span>
+              <span class="font-medium text-[#3F4A5A]">{{ heroStory.source?.name || 'Verified Wire' }}</span>
               <span>·</span>
               <span>{{ formatTimeAgo(heroStory.published_at) }}</span>
-              <span>·</span>
-              <span class="text-[#274888] font-medium">{{ heroStory.sources_count || 18 }} reports consolidated</span>
+              <span v-if="heroStory.sources_count">·</span>
+              <span v-if="heroStory.sources_count" class="text-[#274888] font-medium">{{ heroStory.sources_count }} reports consolidated</span>
             </div>
 
             <!-- Headline -->
@@ -140,17 +148,17 @@ onMounted(fetchStories)
 
             <!-- Editorial Summary -->
             <p class="text-sm sm:text-[15px] text-[#3F4A5A] leading-relaxed max-w-3xl">
-              {{ heroStory.summary?.executive_summary || heroStory.content_normalized?.slice(0, 220) || 'Halvorsen Energy has finalized a major funding round aimed at scaling modular offshore grid infrastructure across Northern Europe. Capital expenditures will focus on standardized subsea interconnector nodes.' }}...
+              {{ heroStory.summary?.executive_summary || heroStory.content_normalized?.slice(0, 260) || heroStory.content_raw?.slice(0, 260) || 'Primary corporate and regulatory disclosure consolidated from verified cross-border intelligence feeds.' }}
             </p>
 
             <!-- Entity Tags -->
-            <div class="flex flex-wrap items-center gap-1.5 pt-1">
+            <div v-if="heroStory.tags?.length || heroStory.categories?.length" class="flex flex-wrap items-center gap-1.5 pt-1">
               <span
-                v-for="tag in heroStory.tags || ['Halvorsen Energy', 'Modular Grid Tech', 'Series C', 'Offshore Power']"
-                :key="tag"
+                v-for="tag in (heroStory.tags?.length ? heroStory.tags : heroStory.categories.map((c: any) => c.name))"
+                :key="typeof tag === 'string' ? tag : tag.name"
                 class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#F8FAF7] border border-[#D0D9CF] text-[#0E1A2B]"
               >
-                {{ tag }}
+                {{ typeof tag === 'string' ? tag : tag.name }}
               </span>
             </div>
 
@@ -163,17 +171,19 @@ onMounted(fetchStories)
                     <ArrowRight class="h-3.5 w-3.5" />
                   </button>
                 </RouterLink>
-                <button
-                  type="button"
-                  class="text-xs px-3.5 py-2 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] font-medium transition-colors"
-                >
-                  + Follow Topic
-                </button>
+                <RouterLink :to="`/news/${heroStory.slug}`">
+                  <button
+                    type="button"
+                    class="text-xs px-3.5 py-2 rounded-[4px] border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] text-[#0E1A2B] font-medium transition-colors"
+                  >
+                    View Dossier
+                  </button>
+                </RouterLink>
               </div>
 
               <div class="flex items-center gap-2 text-xs text-[#17794D] bg-[#E3F1EA] px-2.5 py-1 rounded-[2px] font-medium">
                 <ShieldCheck class="h-3.5 w-3.5" />
-                <span>Verified · 96% Provable facts</span>
+                <span>Verified · Provable facts</span>
               </div>
             </div>
           </div>
@@ -181,7 +191,17 @@ onMounted(fetchStories)
       </section>
 
       <!-- SECTION 2: IMPORTANT DEVELOPMENTS (3-card grid per Design Mockup) -->
-      <section v-if="importantDevelopments.length" class="space-y-3">
+      <section v-if="isLoading" class="space-y-3">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div v-for="i in 3" :key="i" class="card-editorial p-5 space-y-3 animate-pulse">
+            <div class="h-3 w-20 bg-nexo-border/40 rounded"></div>
+            <div class="h-5 w-4/5 bg-nexo-border/40 rounded"></div>
+            <div class="h-10 w-full bg-nexo-border/30 rounded"></div>
+          </div>
+        </div>
+      </section>
+
+      <section v-else-if="importantDevelopments.length" class="space-y-3">
         <div class="flex items-center justify-between">
           <h3 class="section-label">Important developments</h3>
           <RouterLink to="/feed" class="text-xs text-[#274888] hover:underline font-medium">
@@ -197,7 +217,7 @@ onMounted(fetchStories)
           >
             <div class="space-y-2">
               <div class="flex items-center justify-between text-[10px] uppercase font-mono tracking-wider">
-                <span class="font-bold text-[#8A5A08]">{{ item.category || (idx === 0 ? 'MARKETS' : idx === 1 ? 'HEALTHCARE' : 'TECHNOLOGY') }}</span>
+                <span class="font-bold text-[#8A5A08]">{{ item.category || item.categories?.[0]?.name || 'GLOBAL' }}</span>
                 <span class="text-[#5F6875]">{{ formatTimeAgo(item.published_at) }}</span>
               </div>
 
@@ -208,14 +228,14 @@ onMounted(fetchStories)
               </h4>
 
               <p class="text-xs text-[#5F6875] line-clamp-2 leading-relaxed">
-                {{ item.summary?.executive_summary || item.content_normalized || 'Consolidated intelligence from verified multi-publisher disclosures.' }}
+                {{ item.summary?.executive_summary || item.content_normalized || item.content_raw?.slice(0, 140) || 'Consolidated intelligence from verified multi-publisher disclosures.' }}
               </p>
             </div>
 
             <div class="pt-3 border-t border-[#D0D9CF]/60 flex items-center justify-between text-[11px] text-[#5F6875]">
               <span class="badge-verified" v-if="item.verification_status === 'confirmed'">VERIFIED</span>
               <span class="badge-developing" v-else>DEVELOPING</span>
-              <span>{{ item.sources_count || (idx + 3) }} sources</span>
+              <span v-if="item.sources_count">{{ item.sources_count }} sources</span>
             </div>
           </div>
         </div>

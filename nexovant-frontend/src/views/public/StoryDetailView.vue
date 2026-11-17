@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import {
   ArrowLeft,
@@ -62,42 +62,67 @@ const handleShare = () => {
   showToast('Article URL copied to clipboard.')
 }
 
-const supportingSources = [
-  {
-    publisher: 'SEC EDGAR Disclosures',
-    original_headline: 'Form 8-K Regulatory Filing for Capital Allocation',
-    published_at: '2h ago',
-    url: 'https://sec.gov',
-    coverage_type: 'Regulatory',
-    adds_new_info: true,
-    description: 'Primary authorized filing with audited balance sheet allocation and state aid disclosures.',
-  },
-  {
-    publisher: 'Reuters Technology Wire',
-    original_headline: 'Nvidia approves long-term silicon packaging plan across Germany and France',
-    published_at: '1h ago',
-    url: 'https://reuters.com',
-    coverage_type: 'Wire',
-    adds_new_info: false,
-    description: 'Independent cross-confirmation citing diplomatic and supply chain procurement sources.',
-  },
-  {
-    publisher: 'Financial Times',
-    original_headline: 'European fab incentives spark supply chain realignments',
-    published_at: '45m ago',
-    url: 'https://ft.com',
-    coverage_type: 'Analysis',
-    adds_new_info: true,
-    description: 'Detailed analysis of European Chips Act subsidies and supply chain impacts.',
-  },
-]
+const formatTimeAgo = (dateStr?: string) => {
+  if (!dateStr) return 'Recently'
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${Math.max(1, mins)}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
 
-const storyTimeline = [
-  { time: '07:30 UTC', event: 'Board Approval', desc: 'Board of Directors authorizes $15B multi-year capital commitment.', source: 'SEC Filing' },
-  { time: '08:12 UTC', event: 'Official SEC 8-K Lodged', desc: 'Normalized filing published to EDGAR corporate repository.', source: 'SEC EDGAR' },
-  { time: '08:45 UTC', event: 'Diplomatic Briefing', desc: 'European Commission DG Internal Market acknowledges compliance with Chips Act.', source: 'EU Briefing' },
-  { time: '10:00 UTC', event: 'Supply Chain Assessment', desc: 'ASML and TSMC project integration timeline online Q1 FY28.', source: 'Industry Intelligence' },
-]
+const supportingSources = computed(() => {
+  if (article.value?.cluster?.articles && article.value.cluster.articles.length > 0) {
+    return article.value.cluster.articles.map((item: any) => ({
+      publisher: item.source?.name || 'Corroborating Publisher',
+      original_headline: item.title,
+      published_at: formatTimeAgo(item.published_at),
+      url: item.canonical_url || '#',
+      coverage_type: item.source?.source_type || 'Wire',
+      adds_new_info: item.id !== article.value.id,
+      description: item.summary?.executive_summary || item.content_normalized?.slice(0, 140) || 'Corroborating reporting cross-referenced in this intelligence cluster.',
+    }))
+  }
+  if (article.value?.source) {
+    return [
+      {
+        publisher: article.value.source.name,
+        original_headline: article.value.title,
+        published_at: formatTimeAgo(article.value.published_at),
+        url: article.value.canonical_url || '#',
+        coverage_type: article.value.source.source_type || 'Primary Wire',
+        adds_new_info: false,
+        description: 'Primary authorized filing and reporting disclosure registered in the Nexovant platform.',
+      }
+    ]
+  }
+  return []
+})
+
+const storyTimeline = computed(() => {
+  if (article.value?.timeline && Array.isArray(article.value.timeline) && article.value.timeline.length > 0) {
+    return article.value.timeline
+  }
+  const events: any[] = []
+  if (article.value?.published_at) {
+    events.push({
+      time: new Date(article.value.published_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      event: 'Primary Disclosure Published',
+      desc: `Published via ${article.value.source?.name || 'verified wire source'}.`,
+      source: article.value.source?.name || 'Primary Wire',
+    })
+  }
+  if (article.value?.created_at) {
+    events.push({
+      time: new Date(article.value.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      event: 'Ingestion & Fact Verification',
+      desc: `Ingested into Nexovant Core. Status: ${article.value.verification_status || 'verified'}.`,
+      source: 'Nexovant Verification',
+    })
+  }
+  return events
+})
 
 onMounted(() => {
   fetchDetail()
@@ -310,7 +335,7 @@ onMounted(() => {
         </section>
 
         <!-- Story Chronological Timeline -->
-        <section class="space-y-4 pt-6 border-t border-[#D0D9CF]">
+        <section v-if="storyTimeline.length > 0" class="space-y-4 pt-6 border-t border-[#D0D9CF]">
           <div class="flex items-center justify-between">
             <h3 class="section-label">Event chronology</h3>
             <span class="text-xs font-mono text-[#5F6875]">Chronological Sequencing</span>

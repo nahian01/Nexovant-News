@@ -193,7 +193,7 @@ class GeminiProvider extends AbstractAIProvider
     public function testConnection(string $apiKey, ?string $modelIdentifier = null): ConnectionTestResult
     {
         $startTime = hrtime(true);
-        $model = $modelIdentifier ?? 'gemini-2.0-flash-exp';
+        $model = $modelIdentifier ?? 'gemini-3.8-flash';
         $url = "{$this->baseUrl}/models/{$model}?key={$apiKey}";
 
         try {

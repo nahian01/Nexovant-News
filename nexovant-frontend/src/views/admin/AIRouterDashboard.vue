@@ -106,9 +106,21 @@ const handleUpdateModelIdentifier = async (localModel: any, newIdentifier: strin
   }
 }
 
+const handleSetProviderDefaultModel = async (modelIdentifier: string) => {
+  try {
+    await adminService.updateAIProvider(fetchModelsProviderId.value, {
+      default_model: modelIdentifier,
+    })
+    statusMessage.value = `Default model for ${fetchModelsProviderName.value} updated to ${modelIdentifier}.`
+    await fetchAll()
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || 'Failed to update default model.'
+  }
+}
+
 const testForm = ref({
   prompt: 'Provide a concise 2-sentence intelligence briefing on latest developments in AI model routing.',
-  task_type: 'article_summarization',
+  task_type: 'rss_summarization',
   provider_id: '',
   routing_strategy: 'priority',
 })
@@ -781,7 +793,7 @@ onMounted(() => {
                     <span v-if="fm.supports_embedding" class="px-1.5 py-0.5 rounded text-[9px] bg-purple-100 text-purple-800 font-bold uppercase">Embedding</span>
                     <span v-else class="px-1.5 py-0.5 rounded text-[9px] bg-blue-100 text-blue-800 font-bold uppercase">Generative</span>
                   </td>
-                  <td class="px-3 py-2">
+                  <td class="px-3 py-2 flex items-center gap-1.5">
                     <select
                       class="p-1 border border-nexo-border rounded text-[10px] bg-white text-nexo-text-primary font-mono"
                       @change="(e) => { const target = (e.target as HTMLSelectElement); if (target.value) { editModelId = target.value; editModelIdentifier = fm.id; editModelDisplayName = fm.display_name || fm.id; isFetchModelsModalOpen = false; activeTab = 'models' } }"
@@ -792,9 +804,18 @@ onMounted(() => {
                         :key="lm.id"
                         :value="lm.id"
                       >
-                        {{ lm.display_name }}
+                        {{ lm.display_name }} ({{ lm.model_identifier }})
                       </option>
                     </select>
+
+                    <button
+                      type="button"
+                      @click="handleSetProviderDefaultModel(fm.id)"
+                      class="px-2 py-1 rounded border border-nexo-accent-gold text-nexo-accent-gold hover:bg-nexo-accent-gold/10 text-[9px] font-mono font-bold whitespace-nowrap"
+                      title="Set as provider default model"
+                    >
+                      Make Default
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -935,7 +956,7 @@ onMounted(() => {
             <div>
               <label class="font-mono text-[10px] uppercase text-nexo-text-muted block mb-1">Task Type</label>
               <select v-model="testForm.task_type" class="w-full p-2 border border-nexo-border rounded text-xs bg-white text-nexo-text-primary">
-                <option value="article_summarization">Article Summarization</option>
+                <option value="rss_summarization">RSS Article Summarization</option>
                 <option value="multi_source_synthesis">Multi-Source Synthesis</option>
                 <option value="headline_generation">Headline Generation</option>
                 <option value="fact_extraction">Fact Extraction</option>

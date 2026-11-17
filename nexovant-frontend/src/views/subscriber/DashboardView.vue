@@ -35,15 +35,19 @@ const followedUpdates = ref<any[]>([])
 const trendingSignals = ref<any[]>([])
 
 const metrics = ref({
-  followed_entities: 18,
-  active_watchlists: 4,
-  active_monitors: 5,
-  saved_intelligence: 24,
-  unread_notifications: 3,
-  recent_research: 8,
+  followed_entities: 0,
+  active_watchlists: 0,
+  active_monitors: 0,
+  saved_intelligence: 0,
+  unread_notifications: 0,
+  recent_research: 0,
 })
 
-const firstName = computed(() => authStore.user?.name?.split(' ')[0] || 'Alexander')
+const firstName = computed(() => {
+  if (authStore.user?.name) return authStore.user.name.split(' ')[0]
+  if (authStore.user?.email) return authStore.user.email.split('@')[0]
+  return 'Subscriber'
+})
 const greetingMessage = computed(() => {
   if (overviewData.value?.greeting) return overviewData.value.greeting
   const hour = new Date().getHours()
@@ -143,7 +147,8 @@ onMounted(() => {
             <span class="text-[11px] font-mono uppercase text-[#5F6875]">Monitored</span>
             <Users class="h-4 w-4 text-[#274888]" />
           </div>
-          <p class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.followed_entities }}</p>
+          <Skeleton v-if="isLoading" class="h-7 w-12 mt-2" />
+          <p v-else class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.followed_entities }}</p>
           <p class="text-[10px] text-[#5F6875]">Entities & topics</p>
         </RouterLink>
 
@@ -153,7 +158,8 @@ onMounted(() => {
             <span class="text-[11px] font-mono uppercase text-[#5F6875]">Watchlists</span>
             <Bookmark class="h-4 w-4 text-[#8A5A08]" />
           </div>
-          <p class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.active_watchlists }}</p>
+          <Skeleton v-if="isLoading" class="h-7 w-12 mt-2" />
+          <p v-else class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.active_watchlists }}</p>
           <p class="text-[10px] text-[#5F6875]">Custom portfolios</p>
         </RouterLink>
 
@@ -163,7 +169,8 @@ onMounted(() => {
             <span class="text-[11px] font-mono uppercase text-[#5F6875]">Monitors</span>
             <Radar class="h-4 w-4 text-[#17794D]" />
           </div>
-          <p class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.active_monitors }}</p>
+          <Skeleton v-if="isLoading" class="h-7 w-12 mt-2" />
+          <p v-else class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.active_monitors }}</p>
           <p class="text-[10px] text-[#5F6875]">Autonomous radars</p>
         </RouterLink>
 
@@ -173,7 +180,8 @@ onMounted(() => {
             <span class="text-[11px] font-mono uppercase text-[#5F6875]">Saved</span>
             <Library class="h-4 w-4 text-[#58488A]" />
           </div>
-          <p class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.saved_intelligence }}</p>
+          <Skeleton v-if="isLoading" class="h-7 w-12 mt-2" />
+          <p v-else class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.saved_intelligence }}</p>
           <p class="text-[10px] text-[#5F6875]">Dossiers & notes</p>
         </RouterLink>
 
@@ -183,8 +191,9 @@ onMounted(() => {
             <span class="text-[11px] font-mono uppercase text-[#5F6875]">Alerts</span>
             <Bell class="h-4 w-4 text-[#B3261E]" />
           </div>
-          <p class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.unread_notifications }}</p>
-          <p class="text-[10px] text-[#B3261E] font-medium">3 unread notifications</p>
+          <Skeleton v-if="isLoading" class="h-7 w-12 mt-2" />
+          <p v-else class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.unread_notifications }}</p>
+          <p class="text-[10px] text-[#5F6875] font-medium">{{ metrics.unread_notifications }} unread</p>
         </RouterLink>
 
         <!-- Metric 6: Recent Research -->
@@ -193,7 +202,8 @@ onMounted(() => {
             <span class="text-[11px] font-mono uppercase text-[#5F6875]">Briefs</span>
             <Compass class="h-4 w-4 text-[#274888]" />
           </div>
-          <p class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.recent_research }}</p>
+          <Skeleton v-if="isLoading" class="h-7 w-12 mt-2" />
+          <p v-else class="mt-2 font-serif text-2xl font-semibold text-[#0E1A2B]">{{ metrics.recent_research }}</p>
           <p class="text-[10px] text-[#5F6875]">Synthesized briefs</p>
         </RouterLink>
       </section>

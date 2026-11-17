@@ -18,14 +18,7 @@ const fetchCompanies = async () => {
     const res = await apiClient.get('/companies', { params })
     companies.value = res.data?.data || []
   } catch {
-    companies.value = [
-      { id: '1', name: 'ASML Holding NV', ticker: 'ASML', market_cap_tier: 'Mega', sector: 'Semiconductors', summary: 'World-leading photolithography equipment manufacturer essential to sub-3nm chip production.' },
-      { id: '2', name: 'Nvidia Corporation', ticker: 'NVDA', market_cap_tier: 'Mega', sector: 'Accelerated Computing', summary: 'Dominant designer of GPU architectures, CUDA software ecosystems, and high-bandwidth interconnects.' },
-      { id: '3', name: 'Halvorsen Energy', ticker: 'HALV', market_cap_tier: 'Large', sector: 'Renewable Power', summary: 'Nordic offshore grid infrastructure specialist deploying modular HVDC transmission nodes.' },
-      { id: '4', name: 'Taiwan Semiconductor Manufacturing Co.', ticker: 'TSM', market_cap_tier: 'Mega', sector: 'Foundry Services', summary: 'Primary global pure-play semiconductor foundry manufacturing advanced nodes across Asia and Europe.' },
-      { id: '5', name: 'Siemens Energy AG', ticker: 'ENR', market_cap_tier: 'Large', sector: 'Grid Equipment', summary: 'Global provider of high-voltage transformers, switchgear, and offshore substation technology.' },
-      { id: '6', name: 'Tennet TSO', ticker: 'PRIVATE', market_cap_tier: 'Strategic', sector: 'Transmission Operator', summary: 'Key European electricity transmission system operator managing cross-border grid integration.' },
-    ]
+    companies.value = []
   } finally {
     isLoading.value = false
   }

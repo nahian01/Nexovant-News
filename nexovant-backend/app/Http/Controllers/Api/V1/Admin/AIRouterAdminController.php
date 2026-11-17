@@ -363,7 +363,7 @@ class AIRouterAdminController
             'routing_strategy' => ['nullable', 'in:priority,round_robin,least_utilized,lowest_cost,health,capability'],
         ]);
 
-        $taskType = $validated['task_type'] ?? 'article_summarization';
+        $taskType = $validated['task_type'] ?? 'rss_summarization';
         $options = [];
         if (!empty($validated['provider_id'])) {
             $options['provider_id'] = $validated['provider_id'];

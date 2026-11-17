@@ -6,59 +6,36 @@ import {
   ChevronUp,
 } from 'lucide-vue-next'
 import { categoryService, type CategoryItem } from '@/services/api/categories.service'
+import { apiClient } from '@/services/api/client'
 
 const emit = defineEmits<{
   (e: 'selectCategory', slug: string): void
 }>()
 
 const categories = ref<CategoryItem[]>([])
-const expandedCategory = ref<string | null>('leadership')
-const followedEntities = ref<Record<string, boolean>>({
-  'halvorsen-energy': false,
-  'arden-logistics': false,
-  'orbis-health': false,
-  'pelham-motors': false,
-  'dana-whitcombe': false,
-  'mara-okonkwo': false,
-  'tomas-aldridge': false,
-})
+const expandedCategory = ref<string | null>('technology')
+const followedEntities = ref<Record<string, boolean>>({})
 
-const defaultCategories = [
-  { id: '1', name: 'Business', slug: 'business' },
-  { id: '2', name: 'Finance', slug: 'finance' },
-  { id: '3', name: 'Technology', slug: 'technology' },
-  {
-    id: '4',
-    name: 'Leadership',
-    slug: 'leadership',
-    subcategories: ['All leadership', 'CEO changes', 'Boards', 'Succession']
-  },
-  { id: '5', name: 'Workforce', slug: 'workforce' },
-  { id: '6', name: 'Healthcare', slug: 'healthcare' },
-  { id: '7', name: 'Energy', slug: 'energy' },
-  { id: '8', name: 'Markets', slug: 'markets' },
+const defaultCategories: CategoryItem[] = [
+  { id: '1', name: 'Technology', slug: 'technology', color: '#274888', article_count: 0, subcategories: [] },
+  { id: '2', name: 'Healthcare', slug: 'healthcare', color: '#17794D', article_count: 0, subcategories: [] },
+  { id: '3', name: 'Finance', slug: 'finance', color: '#8A5A08', article_count: 0, subcategories: [] },
+  { id: '4', name: 'Energy', slug: 'energy', color: '#B7791F', article_count: 0, subcategories: [] },
+  { id: '5', name: 'Leadership', slug: 'leadership', color: '#58488A', article_count: 0, subcategories: [] },
+  { id: '6', name: 'Markets', slug: 'markets', color: '#0E1A2B', article_count: 0, subcategories: [] },
 ]
 
-const risingTopics = [
-  { rank: 1, name: 'Succession planning', velocity: '+148%' },
-  { rank: 2, name: 'Grid storage', velocity: '+96%' },
-  { rank: 3, name: 'Board independence', velocity: '+71%' },
-  { rank: 4, name: 'Freight consolidation', velocity: '+58%' },
-  { rank: 5, name: 'Device guidance', velocity: '+44%' },
-]
+const risingTopics = ref([
+  { rank: 1, name: 'AI Silicon Packaging', velocity: '+148%' },
+  { rank: 2, name: 'Autonomous Radars', velocity: '+96%' },
+  { rank: 3, name: 'Cross-Border Foundries', velocity: '+71%' },
+  { rank: 4, name: 'European Chips Act', velocity: '+58%' },
+  { rank: 5, name: 'EDA Synthesis', velocity: '+44%' },
+])
 
-const popularCompanies = [
-  { id: 'he', monogram: 'HE', name: 'Halvorsen Energy', industry: 'Energy', slug: 'halvorsen-energy' },
-  { id: 'al', monogram: 'AL', name: 'Arden Logistics', industry: 'Transport and logistics', slug: 'arden-logistics' },
-  { id: 'oh', monogram: 'OH', name: 'Orbis Health', industry: 'Healthcare devices', slug: 'orbis-health' },
-  { id: 'pm', monogram: 'PM', name: 'Pelham Motors', industry: 'Automotive', slug: 'pelham-motors' },
-]
-
-const trendingExecutives = [
-  { id: 'dw', monogram: 'DW', name: 'Dana Whitcombe', role: 'CEO, Halvorsen Energy', slug: 'dana-whitcombe' },
-  { id: 'mo', monogram: 'MO', name: 'Mara Okonkwo', role: 'CEO, Arden Logistics', slug: 'mara-okonkwo' },
-  { id: 'ta', monogram: 'TA', name: 'Tomás Aldridge', role: 'Chair, Veldt Foods', slug: 'tomas-aldridge' },
-]
+const popularCompanies = ref<any[]>([])
+const trendingExecutives = ref<any[]>([])
+const isLoadingEntities = ref(true)
 
 const toggleExpand = (slug: string) => {
   if (expandedCategory.value === slug) {
@@ -73,16 +50,56 @@ const toggleFollow = (slug: string) => {
   followedEntities.value[slug] = !followedEntities.value[slug]
 }
 
+const getMonogram = (name: string) => {
+  return name.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
+}
+
 onMounted(async () => {
   try {
-    const res = await categoryService.getCategories()
-    if (res && res.length > 0) {
-      categories.value = res
+    const [catRes, compRes] = await Promise.allSettled([
+      categoryService.getCategories(),
+      apiClient.get('/companies'),
+    ])
+
+    if (catRes.status === 'fulfilled' && catRes.value?.length > 0) {
+      categories.value = catRes.value
     } else {
       categories.value = defaultCategories as any
     }
+
+    if (compRes.status === 'fulfilled' && compRes.value?.data?.data?.length > 0) {
+      const comps = compRes.value.data.data
+      popularCompanies.value = comps.map((c: any) => ({
+        id: c.id,
+        monogram: c.ticker || getMonogram(c.name),
+        name: c.name,
+        industry: c.industry || c.sector || 'Enterprise',
+        slug: c.slug,
+      }))
+
+      // Extract real executives from companies
+      const execs: any[] = []
+      for (const c of comps) {
+        if (c.executives && Array.isArray(c.executives)) {
+          for (const ex of c.executives) {
+            execs.push({
+              id: ex.id,
+              monogram: getMonogram(ex.full_name),
+              name: ex.full_name,
+              role: `${ex.current_title || 'Executive'}, ${c.name}`,
+              slug: ex.slug || c.slug,
+            })
+          }
+        }
+      }
+      if (execs.length > 0) {
+        trendingExecutives.value = execs
+      }
+    }
   } catch {
     categories.value = defaultCategories as any
+  } finally {
+    isLoadingEntities.value = false
   }
 })
 </script>
@@ -152,8 +169,22 @@ onMounted(async () => {
 
     <!-- 3. POPULAR COMPANIES -->
     <section class="space-y-3 border-t border-nexo-border pt-5">
-      <p class="section-label">POPULAR COMPANIES</p>
-      <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <p class="section-label">POPULAR ENTITIES</p>
+        <RouterLink to="/companies" class="text-[11px] text-[#274888] hover:underline font-medium">
+          All entities ↗
+        </RouterLink>
+      </div>
+
+      <div v-if="isLoadingEntities" class="space-y-2">
+        <div v-for="i in 3" :key="i" class="h-8 rounded bg-nexo-border/20 animate-pulse"></div>
+      </div>
+
+      <div v-else-if="popularCompanies.length === 0" class="text-[11px] text-nexo-muted py-2">
+        No monitored companies listed.
+      </div>
+
+      <div v-else class="space-y-3">
         <div
           v-for="co in popularCompanies"
           :key="co.id"
@@ -181,8 +212,22 @@ onMounted(async () => {
 
     <!-- 4. TRENDING EXECUTIVES -->
     <section class="space-y-3 border-t border-nexo-border pt-5">
-      <p class="section-label">TRENDING EXECUTIVES</p>
-      <div class="space-y-3">
+      <div class="flex items-center justify-between">
+        <p class="section-label">TRENDING EXECUTIVES</p>
+        <RouterLink to="/companies" class="text-[11px] text-[#274888] hover:underline font-medium">
+          All executives ↗
+        </RouterLink>
+      </div>
+
+      <div v-if="isLoadingEntities" class="space-y-2">
+        <div v-for="i in 2" :key="i" class="h-8 rounded bg-nexo-border/20 animate-pulse"></div>
+      </div>
+
+      <div v-else-if="trendingExecutives.length === 0" class="text-[11px] text-nexo-muted py-2">
+        Profiles updating across intelligence disclosures.
+      </div>
+
+      <div v-else class="space-y-3">
         <div
           v-for="exec in trendingExecutives"
           :key="exec.id"

@@ -466,7 +466,7 @@ class DatabaseSeeder extends Seeder
 
         // 8. Seed AI Providers, Models, Capabilities & Tasks
         $providers = [
-            ['name' => 'Google Gemini', 'slug' => 'google-gemini', 'priority' => 1, 'circuit_state' => 'closed', 'rpm' => 120, 'tpm' => 300000, 'default_model' => 'gemini-2.0-flash'],
+            ['name' => 'Google Gemini', 'slug' => 'google-gemini', 'priority' => 1, 'circuit_state' => 'closed', 'rpm' => 120, 'tpm' => 300000, 'default_model' => 'gemini-3.8-flash'],
             ['name' => 'Anthropic Claude', 'slug' => 'anthropic', 'priority' => 2, 'circuit_state' => 'closed', 'rpm' => 100, 'tpm' => 200000, 'default_model' => 'claude-3-5-sonnet-20241022'],
             ['name' => 'OpenAI GPT', 'slug' => 'openai', 'priority' => 3, 'circuit_state' => 'closed', 'rpm' => 100, 'tpm' => 250000, 'default_model' => 'gpt-4o-mini'],
         ];
@@ -522,8 +522,8 @@ class DatabaseSeeder extends Seeder
             // Google
             [
                 'provider_slug' => 'google-gemini',
-                'model_identifier' => 'gemini-2.0-flash-exp',
-                'display_name' => 'Google Gemini 2.0 Flash Experimental',
+                'model_identifier' => 'gemini-3.8-flash',
+                'display_name' => 'Google Gemini 3.8 Flash',
                 'cost_per_1k_input_tokens' => 0.00010,
                 'cost_per_1k_output_tokens' => 0.00040,
                 'context_window' => 1048576,
@@ -629,28 +629,28 @@ class DatabaseSeeder extends Seeder
 
         // 9. Seed Central AI Task Registry (Section 5)
         $tasksData = [
-            ['task_type' => 'rss_summarization', 'display_name' => 'RSS Article Summarization', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.2, 'max_tokens' => 800],
+            ['task_type' => 'rss_summarization', 'display_name' => 'RSS Article Summarization', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-3.8-flash', 'temperature' => 0.2, 'max_tokens' => 800],
             ['task_type' => 'multi_source_synthesis', 'display_name' => 'Multi-Source Story Synthesis', 'pref_prov' => 'anthropic', 'pref_model' => 'claude-3-5-sonnet-20241022', 'temperature' => 0.3, 'max_tokens' => 2000],
             ['task_type' => 'fact_extraction', 'display_name' => 'Fact & Verification Extraction', 'pref_prov' => 'openai', 'pref_model' => 'gpt-4o-mini', 'temperature' => 0.1, 'max_tokens' => 1000],
-            ['task_type' => 'story_classification', 'display_name' => 'Story Category & Importance Classification', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.1, 'max_tokens' => 500],
-            ['task_type' => 'topic_identification', 'display_name' => 'Taxonomy & Topic Identification', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.2, 'max_tokens' => 500],
+            ['task_type' => 'story_classification', 'display_name' => 'Story Category & Importance Classification', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-3.8-flash', 'temperature' => 0.1, 'max_tokens' => 500],
+            ['task_type' => 'topic_identification', 'display_name' => 'Taxonomy & Topic Identification', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-3.8-flash', 'temperature' => 0.2, 'max_tokens' => 500],
             ['task_type' => 'entity_extraction', 'display_name' => 'Company & Executive Entity Recognition', 'pref_prov' => 'openai', 'pref_model' => 'gpt-4o-mini', 'temperature' => 0.1, 'max_tokens' => 800],
-            ['task_type' => 'duplicate_detection', 'display_name' => 'Duplicate & Clustering Analysis', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.1, 'max_tokens' => 500],
+            ['task_type' => 'duplicate_detection', 'display_name' => 'Duplicate & Clustering Analysis', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-3.8-flash', 'temperature' => 0.1, 'max_tokens' => 500],
             ['task_type' => 'similarity_analysis', 'display_name' => 'Story Similarity & Conflict Scoring', 'pref_prov' => 'openai', 'pref_model' => 'gpt-4o-mini', 'temperature' => 0.1, 'max_tokens' => 500],
             ['task_type' => 'headline_generation', 'display_name' => 'Executive Headline Generation', 'pref_prov' => 'anthropic', 'pref_model' => 'claude-3-5-sonnet-20241022', 'temperature' => 0.4, 'max_tokens' => 250],
-            ['task_type' => 'seo_generation', 'display_name' => 'SEO Title & Meta Description Generation', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.3, 'max_tokens' => 400],
+            ['task_type' => 'seo_generation', 'display_name' => 'SEO Title & Meta Description Generation', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-3.8-flash', 'temperature' => 0.3, 'max_tokens' => 400],
             ['task_type' => 'editorial_quality', 'display_name' => 'Editorial Quality & Accuracy Assessment', 'pref_prov' => 'anthropic', 'pref_model' => 'claude-3-5-sonnet-20241022', 'temperature' => 0.2, 'max_tokens' => 1500],
-            ['task_type' => 'translation', 'display_name' => 'Multilingual Intelligence Translation', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.1, 'max_tokens' => 2000],
+            ['task_type' => 'translation', 'display_name' => 'Multilingual Intelligence Translation', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-3.8-flash', 'temperature' => 0.1, 'max_tokens' => 2000],
             ['task_type' => 'research_report', 'display_name' => 'Deep Research Report Synthesis', 'pref_prov' => 'anthropic', 'pref_model' => 'claude-3-5-sonnet-20241022', 'temperature' => 0.3, 'max_tokens' => 4000],
             ['task_type' => 'premium_intelligence', 'display_name' => '10-Dimension Executive Assessment', 'pref_prov' => 'anthropic', 'pref_model' => 'claude-3-5-sonnet-20241022', 'temperature' => 0.25, 'max_tokens' => 2500],
             ['task_type' => 'embedding_generation', 'display_name' => 'Knowledge Chunk Embedding', 'pref_prov' => 'openai', 'pref_model' => 'text-embedding-3-small', 'temperature' => 0.0, 'max_tokens' => 0],
-            ['task_type' => 'search_enhancement', 'display_name' => 'Search Query Semantic Enhancement', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.2, 'max_tokens' => 300],
+            ['task_type' => 'search_enhancement', 'display_name' => 'Search Query Semantic Enhancement', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-3.8-flash', 'temperature' => 0.2, 'max_tokens' => 300],
             ['task_type' => 'rag_query', 'display_name' => 'Grounded Knowledge Retrieval Question Answering', 'pref_prov' => 'anthropic', 'pref_model' => 'claude-3-5-sonnet-20241022', 'temperature' => 0.2, 'max_tokens' => 2000],
             ['task_type' => 'entity_resolution', 'display_name' => 'Intelligence Entity Resolution & Alias Matching', 'pref_prov' => 'openai', 'pref_model' => 'gpt-4o-mini', 'temperature' => 0.1, 'max_tokens' => 800],
-            ['task_type' => 'relationship_extraction', 'display_name' => 'Entity Relationship & Edge Extraction', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.1, 'max_tokens' => 1000],
+            ['task_type' => 'relationship_extraction', 'display_name' => 'Entity Relationship & Edge Extraction', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-3.8-flash', 'temperature' => 0.1, 'max_tokens' => 1000],
             ['task_type' => 'claim_verification', 'display_name' => '10-Dimension Claim Verification Assistance', 'pref_prov' => 'anthropic', 'pref_model' => 'claude-3-5-sonnet-20241022', 'temperature' => 0.15, 'max_tokens' => 1500],
-            ['task_type' => 'historical_event_matching', 'display_name' => 'Historical Event Matching & Sequencing', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.2, 'max_tokens' => 800],
-            ['task_type' => 'trend_detection', 'display_name' => 'Intelligence Trend & Signal Analysis', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-2.0-flash', 'temperature' => 0.2, 'max_tokens' => 1000],
+            ['task_type' => 'historical_event_matching', 'display_name' => 'Historical Event Matching & Sequencing', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-3.8-flash', 'temperature' => 0.2, 'max_tokens' => 800],
+            ['task_type' => 'trend_detection', 'display_name' => 'Intelligence Trend & Signal Analysis', 'pref_prov' => 'google-gemini', 'pref_model' => 'gemini-3.8-flash', 'temperature' => 0.2, 'max_tokens' => 1000],
             ['task_type' => 'deep_research_synthesis', 'display_name' => 'Deep Research Structured Report Synthesis', 'pref_prov' => 'anthropic', 'pref_model' => 'claude-3-5-sonnet-20241022', 'temperature' => 0.25, 'max_tokens' => 4000],
         ];
 
