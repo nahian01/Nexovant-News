@@ -17,12 +17,11 @@ const expandedCategory = ref<string | null>('technology')
 const followedEntities = ref<Record<string, boolean>>({})
 
 const defaultCategories: CategoryItem[] = [
-  { id: '1', name: 'Technology', slug: 'technology', color: '#274888', article_count: 0, subcategories: [] },
-  { id: '2', name: 'Healthcare', slug: 'healthcare', color: '#17794D', article_count: 0, subcategories: [] },
-  { id: '3', name: 'Finance', slug: 'finance', color: '#8A5A08', article_count: 0, subcategories: [] },
-  { id: '4', name: 'Energy', slug: 'energy', color: '#B7791F', article_count: 0, subcategories: [] },
-  { id: '5', name: 'Leadership', slug: 'leadership', color: '#58488A', article_count: 0, subcategories: [] },
-  { id: '6', name: 'Markets', slug: 'markets', color: '#0E1A2B', article_count: 0, subcategories: [] },
+  { id: '1', name: 'Strategic Technology', slug: 'strategic-technology', industry: 'Technology', color: '#274888', article_count: 0, subcategories: [] },
+  { id: '2', name: 'Leadership Transitions', slug: 'leadership-transitions', industry: 'Corporate & Governance', color: '#17794D', article_count: 0, subcategories: [] },
+  { id: '3', name: 'Financial Performance', slug: 'financial-performance', industry: 'Corporate & Governance', color: '#8A5A08', article_count: 0, subcategories: [] },
+  { id: '4', name: 'Regulatory & Legal', slug: 'regulatory-legal', industry: 'Corporate & Governance', color: '#B7791F', article_count: 0, subcategories: [] },
+  { id: '5', name: 'Emerging Risks', slug: 'emerging-risks', industry: 'Corporate & Governance', color: '#58488A', article_count: 0, subcategories: [] },
 ]
 
 const risingTopics = ref([
@@ -62,9 +61,10 @@ onMounted(async () => {
     ])
 
     if (catRes.status === 'fulfilled' && catRes.value?.length > 0) {
-      categories.value = catRes.value
+      const activeCats = catRes.value.filter((c: CategoryItem) => (c.article_count || 0) > 0)
+      categories.value = activeCats.length > 0 ? activeCats : defaultCategories
     } else {
-      categories.value = defaultCategories as any
+      categories.value = defaultCategories
     }
 
     if (compRes.status === 'fulfilled' && compRes.value?.data?.data?.length > 0) {
@@ -134,12 +134,12 @@ onMounted(async () => {
           >
             <button
               v-for="sub in cat.subcategories"
-              :key="sub"
+              :key="typeof sub === 'string' ? sub : (sub as any).slug || (sub as any).name"
               type="button"
-              @click="emit('selectCategory', cat.slug)"
+              @click="emit('selectCategory', typeof sub === 'string' ? cat.slug : ((sub as any).slug || cat.slug))"
               class="rounded-[2px] border border-nexo-border bg-white px-2 py-0.5 text-[11px] text-nexo-text-2 hover:bg-nexo-paper-2 hover:text-nexo-ink"
             >
-              {{ sub }}
+              {{ typeof sub === 'string' ? sub : (sub as any).name }}
             </button>
           </div>
         </div>

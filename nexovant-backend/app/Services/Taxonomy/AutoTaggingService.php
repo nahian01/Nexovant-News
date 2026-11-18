@@ -238,6 +238,90 @@ class AutoTaggingService
             ];
         }
 
+        // 9. Regulatory & Legal Filings
+        if (Str::contains($lower, ['8-k', '10-k', '10-q', 'sec filing', 'sec edgar', 'filer', 'form 8-k', 'regulatory filing', 'securities and exchange commission'])) {
+            return [
+                'industry' => 'Corporate & Governance',
+                'category_name' => 'Regulatory & Legal Filings',
+                'category_slug' => 'regulatory-legal',
+                'subcategory_name' => 'SEC Filings',
+                'subcategory_slug' => 'sec-filings',
+                'topics' => ['SEC Filings', 'Regulatory Disclosures', 'Corporate Governance', 'Compliance'],
+                'tags' => ['SEC', '8-K', 'Compliance', 'Governance'],
+                'confidence' => 0.95,
+            ];
+        }
+
+        // 10. Leadership Transitions
+        if (Str::contains($lower, ['ceo', 'board chair', 'board member', 'boardroom', 'ouster', 'ousting', 'steps down', 'stepping down', 'reappoint', 'reinstate', 'resigns', 'chief executive', 'jensen huang'])) {
+            return [
+                'industry' => 'Corporate & Governance',
+                'category_name' => 'Leadership Transitions',
+                'category_slug' => 'leadership-transitions',
+                'subcategory_name' => 'CEO Transitions',
+                'subcategory_slug' => 'ceo-transitions',
+                'topics' => ['Leadership', 'Executive Transitions', 'CEO Succession', 'Boardroom Moves'],
+                'tags' => ['CEO', 'Leadership', 'Board', 'Executive'],
+                'confidence' => 0.93,
+            ];
+        }
+
+        // 11. Financial Performance & Earnings
+        if (Str::contains($lower, ['revenue', 'earnings', 'quarterly profit', 'losses', 'valuation', 'market cap', 'guidance', 'fiscal', 'soaring revenue', 'ballooned to'])) {
+            return [
+                'industry' => 'Corporate & Governance',
+                'category_name' => 'Financial Performance & Earnings',
+                'category_slug' => 'financial-performance',
+                'subcategory_name' => 'Earnings Disclosures',
+                'subcategory_slug' => 'earnings-disclosures',
+                'topics' => ['Earnings', 'Revenue Growth', 'Financial Performance', 'Valuation'],
+                'tags' => ['Earnings', 'Revenue', 'Finance', 'Markets'],
+                'confidence' => 0.92,
+            ];
+        }
+
+        // 12. Acquisitions & Mergers
+        if (Str::contains($lower, ['acquisition', 'merger', 'acquire', 'buyout', 'takeover', 'ipo', 'stake in', 'stakes ballooned', 'antitrust review'])) {
+            return [
+                'industry' => 'Corporate & Governance',
+                'category_name' => 'Acquisitions & Mergers',
+                'category_slug' => 'acquisitions-mergers',
+                'subcategory_name' => 'Strategic Buyouts',
+                'subcategory_slug' => 'strategic-buyouts',
+                'topics' => ['M&A', 'Acquisitions', 'Buyouts', 'IPO & Public Markets'],
+                'tags' => ['M&A', 'Buyout', 'IPO', 'Deals'],
+                'confidence' => 0.91,
+            ];
+        }
+
+        // 13. Emerging Business Risks
+        if (Str::contains($lower, ['hacked', 'malicious code', 'deepfakes', 'cyberattack', 'rogue agents', 'sanctions', 'abandoning china', 'export ban', 'predators'])) {
+            return [
+                'industry' => 'Corporate & Governance',
+                'category_name' => 'Emerging Business Risks',
+                'category_slug' => 'emerging-risks',
+                'subcategory_name' => 'Sanctions & Geopolitics',
+                'subcategory_slug' => 'sanctions-geopolitics',
+                'topics' => ['Geopolitical Risks', 'Cyber Threats', 'Sanctions', 'Business Continuity'],
+                'tags' => ['Risk', 'Security', 'Sanctions', 'Geopolitics'],
+                'confidence' => 0.90,
+            ];
+        }
+
+        // 14. Capital Expansion & Capex
+        if (Str::contains($lower, ['capex', 'capital expansion', 'foundry expansion', 'fab buildout', 'data center expansion', 'custom silicon foundry'])) {
+            return [
+                'industry' => 'Corporate & Governance',
+                'category_name' => 'Capital Expansion & Capex',
+                'category_slug' => 'expansion-capex',
+                'subcategory_name' => 'Foundry & Fabs',
+                'subcategory_slug' => 'foundry-fabs',
+                'topics' => ['Capital Expenditure', 'Foundry Buildout', 'Infrastructure Capex', 'Capacity Expansion'],
+                'tags' => ['Capex', 'Foundry', 'Infrastructure', 'Expansion'],
+                'confidence' => 0.92,
+            ];
+        }
+
         // Default General Technology
         return [
             'industry' => 'Technology',
@@ -249,5 +333,107 @@ class AutoTaggingService
             'tags' => ['Tech', 'Enterprise', 'Innovation'],
             'confidence' => 0.85,
         ];
+    }
+
+    /**
+     * Detect strategic corporate event categories and subcategories for multi-tagging.
+     *
+     * @return array<int, array{
+     *     category_name: string,
+     *     category_slug: string,
+     *     subcategory_name: string,
+     *     subcategory_slug: string,
+     *     industry: string
+     * }>
+     */
+    public function detectCorporateEventCategories(string $text): array
+    {
+        $lower = strtolower($text);
+        $matches = [];
+
+        // 1. Regulatory & Legal Filings
+        if (Str::contains($lower, ['8-k', '10-k', '10-q', 'sec filing', 'sec edgar', 'filer', 'form 8-k', 'form 10-k', 'securities and exchange commission', 'doj ', 'ftc ', 'antitrust probe', 'subpoena', 'senate hearing'])) {
+            $sub = Str::contains($lower, ['8-k', '10-k', '10-q', 'sec filing', 'sec edgar', 'filer']) ? 'SEC Filings' : 'Regulatory Scrutiny';
+            $matches[] = [
+                'category_name' => 'Regulatory & Legal Filings',
+                'category_slug' => 'regulatory-legal',
+                'subcategory_name' => $sub,
+                'subcategory_slug' => Str::slug($sub),
+                'industry' => 'Corporate & Governance',
+            ];
+        }
+
+        // 2. Leadership Transitions
+        if (Str::contains($lower, ['ceo', 'board chair', 'board member', 'boardroom', 'ouster', 'ousting', 'steps down', 'stepping down', 'reappoint', 'reinstate', 'resigns', 'resignation', 'appoints', 'appointment', 'chief executive', 'jensen huang', 'sam altman', 'bezos', 'satya nadella', 'leadership change', 'interim ceo'])) {
+            $sub = Str::contains($lower, ['board chair', 'board member', 'boardroom', 'board of directors']) ? 'Boardroom Moves' : 'CEO Transitions';
+            $matches[] = [
+                'category_name' => 'Leadership Transitions',
+                'category_slug' => 'leadership-transitions',
+                'subcategory_name' => $sub,
+                'subcategory_slug' => Str::slug($sub),
+                'industry' => 'Corporate & Governance',
+            ];
+        }
+
+        // 3. Financial Performance & Earnings
+        if (Str::contains($lower, ['revenue', 'earnings', 'quarterly', 'profit', 'losses', 'valuation', 'market cap', 'guidance', 'fiscal', 'ebitda', 'revenue will keep soaring', 'financial performance'])) {
+            $sub = Str::contains($lower, ['guidance', 'forecast', 'outlook']) ? 'Guidance Revisions' : 'Earnings Disclosures';
+            $matches[] = [
+                'category_name' => 'Financial Performance & Earnings',
+                'category_slug' => 'financial-performance',
+                'subcategory_name' => $sub,
+                'subcategory_slug' => Str::slug($sub),
+                'industry' => 'Corporate & Governance',
+            ];
+        }
+
+        // 4. Acquisitions & Mergers
+        if (Str::contains($lower, ['acquisition', 'merger', 'acquire', 'buyout', 'takeover', 'ipo', 'stake in', 'stakes ballooned', 'antitrust review', 'divestiture', 'own nearly', 'deals in doubt'])) {
+            $sub = Str::contains($lower, ['antitrust', 'ftc', 'regulatory review']) ? 'Antitrust Review' : 'Strategic Buyouts';
+            $matches[] = [
+                'category_name' => 'Acquisitions & Mergers',
+                'category_slug' => 'acquisitions-mergers',
+                'subcategory_name' => $sub,
+                'subcategory_slug' => Str::slug($sub),
+                'industry' => 'Corporate & Governance',
+            ];
+        }
+
+        // 5. Emerging Business Risks
+        if (Str::contains($lower, ['hacked', 'malicious code', 'optimizely', 'deepfakes', 'predators', 'slams roblox', 'cyberattack', 'rogue agents', 'vulnerability', 'sanctions', 'abandoning china', 'export ban', 'blacklist', 'security breach'])) {
+            $sub = Str::contains($lower, ['sanctions', 'china', 'export ban', 'geopolitics']) ? 'Sanctions & Geopolitics' : 'Regulatory Scrutiny';
+            $matches[] = [
+                'category_name' => 'Emerging Business Risks',
+                'category_slug' => 'emerging-risks',
+                'subcategory_name' => $sub,
+                'subcategory_slug' => Str::slug($sub),
+                'industry' => 'Corporate & Governance',
+            ];
+        }
+
+        // 6. Capital Expansion & Capex
+        if (Str::contains($lower, ['capex', 'capital expansion', 'foundry expansion', 'fab buildout', 'data center expansion', 'custom silicon foundry', 'gigawatt', 'billion expansion'])) {
+            $sub = Str::contains($lower, ['data center']) ? 'Data Centers' : 'Foundry & Fabs';
+            $matches[] = [
+                'category_name' => 'Capital Expansion & Capex',
+                'category_slug' => 'expansion-capex',
+                'subcategory_name' => $sub,
+                'subcategory_slug' => Str::slug($sub),
+                'industry' => 'Corporate & Governance',
+            ];
+        }
+
+        // 7. Restructuring & Workforce
+        if (Str::contains($lower, ['layoffs', 'workforce', 'job cuts', 'plant closures', 'downsizing', 'hiring freeze', 'reorganization'])) {
+            $matches[] = [
+                'category_name' => 'Restructuring & Workforce',
+                'category_slug' => 'restructuring-workforce',
+                'subcategory_name' => 'Workforce Realignment',
+                'subcategory_slug' => 'workforce-realignment',
+                'industry' => 'Corporate & Governance',
+            ];
+        }
+
+        return $matches;
     }
 }

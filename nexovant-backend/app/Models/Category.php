@@ -16,12 +16,32 @@ class Category extends Model
 
     protected $fillable = [
         'name',
+        'industry',
         'slug',
         'description',
         'color',
         'sort_order',
         'is_active',
     ];
+
+    public function getIndustryAttribute(?string $value): string
+    {
+        if (!empty($value)) {
+            return $value;
+        }
+
+        return match ($this->slug) {
+            'semiconductors', 'strategic-technology', 'artificial-intelligence', 'cybersecurity' => 'Technology',
+            'automotive-mobility' => 'Automotive & Mobility',
+            'biotechnology-healthcare' => 'Healthcare & Life Sciences',
+            'financial-services-fintech' => 'Financial Services',
+            'aerospace-defense' => 'Aerospace & Defense',
+            'energy-sustainability' => 'Energy & CleanTech',
+            'expansion-capex', 'leadership-transitions', 'financial-performance', 'acquisitions-mergers',
+            'restructuring-workforce', 'emerging-risks', 'regulatory-legal' => 'Corporate & Governance',
+            default => 'Technology',
+        };
+    }
 
     protected function casts(): array
     {

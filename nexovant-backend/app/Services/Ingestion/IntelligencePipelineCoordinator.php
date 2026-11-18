@@ -328,14 +328,44 @@ class IntelligencePipelineCoordinator
                         $subName = $classification['subcategory_name'] ?? ucwords(str_replace('-', ' ', $classification['subcategory_slug'] ?? 'General'));
                         $subSlug = Str::slug($classification['subcategory_slug'] ?? $subName);
                         $sub = Subcategory::firstOrCreate(
-                            ['category_id' => $cat->id, 'slug' => $subSlug],
+                            ['slug' => $subSlug],
                             [
+                                'category_id' => $cat->id,
                                 'name' => $subName,
                                 'description' => "Subcategory for {$subName} under {$categoryName}",
                                 'is_active' => true,
                             ]
                         );
                         $existingArticle->subcategories()->syncWithoutDetaching([$sub->id]);
+                    }
+
+                    // Attach detected corporate event categories
+                    $eventDims = $this->autoTaggingService->detectCorporateEventCategories($existingArticle->title . ' ' . $existingArticle->content_normalized);
+                    foreach ($eventDims as $dim) {
+                        $evtCat = Category::firstOrCreate(
+                            ['slug' => $dim['category_slug']],
+                            [
+                                'name' => $dim['category_name'],
+                                'industry' => $dim['industry'] ?? 'Corporate & Governance',
+                                'description' => "Strategic developments in {$dim['category_name']}",
+                                'color' => '#274888',
+                                'is_active' => true,
+                            ]
+                        );
+                        $existingArticle->categories()->syncWithoutDetaching([$evtCat->id]);
+
+                        if (!empty($dim['subcategory_slug'])) {
+                            $evtSub = Subcategory::firstOrCreate(
+                                ['slug' => $dim['subcategory_slug']],
+                                [
+                                    'category_id' => $evtCat->id,
+                                    'name' => $dim['subcategory_name'],
+                                    'description' => "Subcategory for {$dim['subcategory_name']}",
+                                    'is_active' => true,
+                                ]
+                            );
+                            $existingArticle->subcategories()->syncWithoutDetaching([$evtSub->id]);
+                        }
                     }
                 }
 
@@ -459,8 +489,9 @@ class IntelligencePipelineCoordinator
                 $subName = $classification['subcategory_name'] ?? ucwords(str_replace('-', ' ', $classification['subcategory_slug'] ?? 'General'));
                 $subSlug = Str::slug($classification['subcategory_slug'] ?? $subName);
                 $subcategory = Subcategory::firstOrCreate(
-                    ['category_id' => $category->id, 'slug' => $subSlug],
+                    ['slug' => $subSlug],
                     [
+                        'category_id' => $category->id,
                         'name' => $subName,
                         'description' => "Subcategory for {$subName} under {$categoryName}",
                         'is_active' => true,
@@ -486,6 +517,35 @@ class IntelligencePipelineCoordinator
                         ['name' => $tagName]
                     );
                     $article->tags()->syncWithoutDetaching([$tag->id]);
+                }
+            }
+
+            // Also detect and attach any matching strategic corporate event categories & subcategories
+            $eventDims = $this->autoTaggingService->detectCorporateEventCategories($article->title . ' ' . $article->content_normalized);
+            foreach ($eventDims as $dim) {
+                $evtCat = Category::firstOrCreate(
+                    ['slug' => $dim['category_slug']],
+                    [
+                        'name' => $dim['category_name'],
+                        'industry' => $dim['industry'] ?? 'Corporate & Governance',
+                        'description' => "Strategic developments in {$dim['category_name']}",
+                        'color' => '#274888',
+                        'is_active' => true,
+                    ]
+                );
+                $article->categories()->syncWithoutDetaching([$evtCat->id]);
+
+                if (!empty($dim['subcategory_slug'])) {
+                    $evtSub = Subcategory::firstOrCreate(
+                        ['slug' => $dim['subcategory_slug']],
+                        [
+                            'category_id' => $evtCat->id,
+                            'name' => $dim['subcategory_name'],
+                            'description' => "Subcategory for {$dim['subcategory_name']}",
+                            'is_active' => true,
+                        ]
+                    );
+                    $article->subcategories()->syncWithoutDetaching([$evtSub->id]);
                 }
             }
 

@@ -399,4 +399,109 @@ class PersonalizedFeedAndNavigationTest extends TestCase
         $res7d->assertStatus(200)
             ->assertJson(['success' => true]);
     }
+
+    public function test_categories_endpoint_hides_empty_categories_and_returns_industries_with_non_zero_counts(): void
+    {
+        $activeCat = Category::create([
+            'name' => 'Active Tech Sector',
+            'slug' => 'active-tech-sector',
+            'industry' => 'Technology',
+            'color' => '#147A67',
+            'is_active' => true,
+        ]);
+
+        $emptyCat = Category::create([
+            'name' => 'Empty Empty Sector',
+            'slug' => 'empty-empty-sector',
+            'industry' => 'Aerospace & Defense',
+            'color' => '#8A5A08',
+            'is_active' => true,
+        ]);
+
+        $article = Article::create([
+            'title' => 'Quantum Chip Breakthrough Published',
+            'slug' => 'quantum-chip-breakthrough-published',
+            'canonical_url' => 'https://reuters.com/tech/quantum-chip',
+            'content_raw' => 'Engineers successfully initialized qubits at room temperature...',
+            'content_normalized' => 'Engineers successfully initialized qubits at room temperature...',
+            'source_id' => $this->source->id,
+            'verification_status' => 'confirmed',
+            'importance_score' => 9.0,
+            'status' => 'PUBLISHED',
+            'published_at' => now(),
+        ]);
+        $article->categories()->attach($activeCat->id);
+
+        $response = $this->getJson('/api/v1/categories');
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $slugs = collect($response->json('data'))->pluck('slug')->all();
+        $this->assertContains('active-tech-sector', $slugs);
+        $this->assertNotContains('empty-empty-sector', $slugs);
+
+        $industries = collect($response->json('meta.industries'))->pluck('name')->all();
+        $this->assertContains('Technology', $industries);
+        $this->assertNotContains('Aerospace & Defense', $industries);
+    }
+
+    public function test_articles_endpoint_filters_by_industry_and_returns_available_statuses_with_non_zero_counts(): void
+    {
+        $techCat = Category::create([
+            'name' => 'Enterprise Software',
+            'slug' => 'enterprise-software',
+            'industry' => 'Technology',
+            'color' => '#147A67',
+            'is_active' => true,
+        ]);
+
+        $autoCat = Category::create([
+            'name' => 'EV Batteries',
+            'slug' => 'ev-batteries',
+            'industry' => 'Automotive & Mobility',
+            'color' => '#274888',
+            'is_active' => true,
+        ]);
+
+        $techArticle = Article::create([
+            'title' => 'Next Gen Compiler Ships',
+            'slug' => 'next-gen-compiler-ships',
+            'canonical_url' => 'https://reuters.com/tech/compiler',
+            'content_raw' => 'New compiler optimizes enterprise binary distributions...',
+            'content_normalized' => 'New compiler optimizes enterprise binary distributions...',
+            'source_id' => $this->source->id,
+            'verification_status' => 'confirmed',
+            'importance_score' => 8.5,
+            'status' => 'PUBLISHED',
+            'published_at' => now(),
+        ]);
+        $techArticle->categories()->attach($techCat->id);
+
+        $autoArticle = Article::create([
+            'title' => 'Solid State Battery Factory Breaks Ground',
+            'slug' => 'solid-state-battery-factory-breaks-ground',
+            'canonical_url' => 'https://reuters.com/auto/battery-factory',
+            'content_raw' => 'New solid state battery pilot facility begins construction...',
+            'content_normalized' => 'New solid state battery pilot facility begins construction...',
+            'source_id' => $this->source->id,
+            'verification_status' => 'reported_reliable',
+            'importance_score' => 8.0,
+            'status' => 'PUBLISHED',
+            'published_at' => now(),
+        ]);
+        $autoArticle->categories()->attach($autoCat->id);
+
+        // Filter by Automotive & Mobility
+        $res = $this->getJson('/api/v1/articles?industry=Automotive%20%26%20Mobility');
+        $res->assertStatus(200);
+
+        $data = $res->json('data');
+        $this->assertCount(1, $data);
+        $this->assertEquals('solid-state-battery-factory-breaks-ground', $data[0]['slug']);
+
+        $statuses = $res->json('meta.available_statuses');
+        $this->assertArrayHasKey('reported_reliable', $statuses);
+        $this->assertArrayNotHasKey('confirmed', $statuses);
+    }
 }

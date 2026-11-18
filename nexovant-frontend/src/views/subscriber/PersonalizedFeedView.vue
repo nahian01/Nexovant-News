@@ -56,7 +56,8 @@ const sortOptions = [
 
 const fetchCategories = async () => {
   try {
-    categories.value = await categoryService.getCategories()
+    const cats = await categoryService.getCategories({ has_articles: true })
+    categories.value = (cats || []).filter((c) => (c.article_count || 0) > 0)
   } catch {
     categories.value = []
   }
@@ -282,15 +283,23 @@ onMounted(async () => {
             v-for="cat in categories"
             :key="cat.id"
             type="button"
-            @click="selectedCategory = cat.slug"
+            @click="selectedCategory = selectedCategory === cat.slug ? '' : cat.slug"
             :class="[
-              'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors',
+              'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors cursor-pointer',
               selectedCategory === cat.slug
                 ? 'bg-[#0E1A2B] text-white shadow-xs'
                 : 'border border-[#D0D9CF] bg-white text-[#3F4A5A] hover:bg-[#EEEBE4] hover:text-[#0E1A2B]'
             ]"
           >
             <span>{{ cat.name }}</span>
+            <span
+              :class="[
+                'px-1.5 py-0.2 rounded-full text-[10px] font-mono',
+                selectedCategory === cat.slug ? 'bg-white/20 text-white' : 'bg-[#F0EFEA] text-[#5F6875]'
+              ]"
+            >
+              {{ cat.article_count }}
+            </span>
           </button>
         </div>
       </header>

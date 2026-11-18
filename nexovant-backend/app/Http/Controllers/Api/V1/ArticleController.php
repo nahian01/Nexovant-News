@@ -7,24 +7,47 @@ namespace App\Http\Controllers\Api\V1;
 use App\Models\Article;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ArticleController
 {
     /**
-     * List verified and developing intelligence articles.
+     * List verified and developing intelligence articles with multi-dimensional filtering.
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Article::with(['source:id,name,credibility_score', 'categories:id,name,slug,color', 'companies:id,name,ticker'])
-            ->latest('published_at');
+        $query = Article::with([
+            'source:id,name,credibility_score',
+            'categories:id,name,slug,color,industry',
+            'subcategories:id,name,slug',
+            'companies:id,name,ticker'
+        ])
+        ->where('status', 'PUBLISHED')
+        ->latest('published_at');
 
-        if ($request->has('category')) {
-            $query->whereHas('categories', function ($q) use ($request) {
-                $q->where('slug', $request->query('category'));
+        if ($request->filled('category') && $request->query('category') !== 'all') {
+            $catSlug = $request->query('category');
+            $query->where(function ($q) use ($catSlug) {
+                $q->whereHas('categories', function ($cq) use ($catSlug) {
+                    $cq->where('slug', $catSlug)
+                      ->orWhere('name', 'like', "%{$catSlug}%");
+                })->orWhereHas('subcategories', function ($sq) use ($catSlug) {
+                    $sq->where('slug', $catSlug)
+                      ->orWhere('name', 'like', "%{$catSlug}%");
+                });
             });
         }
 
-        if ($request->has('verification_status')) {
+        if ($request->filled('industry') && $request->query('industry') !== 'all') {
+            $industry = $request->query('industry');
+            $query->whereHas('categories', function ($cq) use ($industry) {
+                $cq->where('industry', $industry)
+                   ->orWhere('name', 'like', "%{$industry}%")
+                   ->orWhere('slug', 'like', "%" . Str::slug($industry) . "%");
+            });
+        }
+
+        if ($request->filled('verification_status') && $request->query('verification_status') !== 'all') {
             $query->where('verification_status', $request->query('verification_status'));
         }
 
@@ -45,7 +68,46 @@ class ArticleController
             });
         }
 
-        $articles = $query->paginate((int) $request->query('per_page', 15));
+        $perPage = min(50, max(5, (int) $request->query('per_page', 15)));
+        $articles = $query->paginate($perPage);
+
+        // Dynamically compute available verification statuses with non-zero counts for the current scope
+        $statusQuery = Article::query()->where('status', 'PUBLISHED');
+
+        if ($request->filled('category') && $request->query('category') !== 'all') {
+            $catSlug = $request->query('category');
+            $statusQuery->where(function ($q) use ($catSlug) {
+                $q->whereHas('categories', function ($cq) use ($catSlug) {
+                    $cq->where('slug', $catSlug)
+                      ->orWhere('name', 'like', "%{$catSlug}%");
+                })->orWhereHas('subcategories', function ($sq) use ($catSlug) {
+                    $sq->where('slug', $catSlug)
+                      ->orWhere('name', 'like', "%{$catSlug}%");
+                });
+            });
+        }
+
+        if ($request->filled('industry') && $request->query('industry') !== 'all') {
+            $industry = $request->query('industry');
+            $statusQuery->whereHas('categories', function ($cq) use ($industry) {
+                $cq->where('industry', $industry)
+                   ->orWhere('name', 'like', "%{$industry}%")
+                   ->orWhere('slug', 'like', "%" . Str::slug($industry) . "%");
+            });
+        }
+
+        if ($search = $request->query('q')) {
+            $statusQuery->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('content_normalized', 'like', "%{$search}%");
+            });
+        }
+
+        $statusCounts = $statusQuery
+            ->selectRaw('verification_status, count(*) as count')
+            ->groupBy('verification_status')
+            ->pluck('count', 'verification_status')
+            ->toArray();
 
         return response()->json([
             'success' => true,
@@ -54,6 +116,7 @@ class ArticleController
                 'current_page' => $articles->currentPage(),
                 'last_page' => $articles->lastPage(),
                 'total' => $articles->total(),
+                'available_statuses' => $statusCounts,
             ]
         ]);
     }
