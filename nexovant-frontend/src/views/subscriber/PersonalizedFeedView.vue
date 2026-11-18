@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   Clock,
+  Compass,
   ExternalLink,
   Filter,
   Layers,
@@ -362,6 +363,17 @@ onMounted(async () => {
                 <Sparkles class="h-2.5 w-2.5" />
                 <span>{{ item.relevance_score || 90 }}% Relevance</span>
               </span>
+
+              <!-- 80/20 Adaptive Ratio Badge -->
+              <span
+                v-if="item.personalization_factor || item.is_serendipity"
+                class="inline-flex items-center gap-1 rounded-[2px] px-2 py-0.5 font-mono text-[10px] font-semibold"
+                :class="item.is_serendipity ? 'bg-[#FFF3D6] text-[#8C5D00] border border-[#E0BE73]/50' : 'bg-[#E3F1EA] text-[#17794D] border border-[#17794D]/30'"
+              >
+                <Compass v-if="item.is_serendipity" class="h-2.5 w-2.5" />
+                <Sparkles v-else class="h-2.5 w-2.5" />
+                <span>{{ item.personalization_factor || (item.is_serendipity ? '20% Diverse Discovery' : '80% User Interests') }}</span>
+              </span>
             </div>
 
             <!-- Reading Time & Timestamp -->
@@ -376,13 +388,28 @@ onMounted(async () => {
           </div>
 
           <!-- Card Body: Headline & Summary -->
-          <div class="space-y-1.5">
+          <div class="space-y-2">
             <RouterLink
               :to="`/news/${item.slug || item.id}`"
               class="editorial-headline block text-xl sm:text-[22px] font-medium leading-snug tracking-tight text-[#0E1A2B] transition-colors group-hover:text-[#274888]"
             >
               {{ item.headline || item.title }}
             </RouterLink>
+
+            <!-- Remote Article Thumbnail & Credit (Zero local storage) -->
+            <div v-if="item.primary_image || item.featured_image" class="relative overflow-hidden rounded-[3px] border border-[#D0D9CF] max-h-48 bg-[#0E1A2B]/5">
+              <img
+                :src="item.primary_image || item.featured_image"
+                :alt="item.headline || item.title"
+                class="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-[1.01]"
+                loading="lazy"
+                @error="(e: any) => e.target.parentElement.style.display = 'none'"
+              />
+              <div class="absolute bottom-2 left-2 bg-black/75 backdrop-blur-xs text-white text-[10px] font-mono px-2 py-0.5 rounded-[2px]">
+                {{ item.source_attribution || (item.source?.name ? `Source: ${item.source.name}` : 'Source: Wire Service') }}
+              </div>
+            </div>
+
             <p class="text-xs sm:text-[13px] leading-relaxed text-[#3F4A5A]">
               {{ item.summary }}
             </p>

@@ -291,8 +291,23 @@ class IntelligencePipelineCoordinator
                     }
                 }
 
-                if (!$existingArticle->lock_image && !empty($leadStory->featured_image)) {
-                    $updateData['featured_image'] = $leadStory->featured_image;
+                $resolvedImage = $leadStory->featured_image;
+                $resolvedCaption = $leadStory->source?->name ? "Source: {$leadStory->source->name}" : null;
+                if (empty($resolvedImage)) {
+                    foreach ($clusterStories as $cs) {
+                        if (!empty($cs->featured_image)) {
+                            $resolvedImage = $cs->featured_image;
+                            $resolvedCaption = $cs->source?->name ? "Source: {$cs->source->name}" : null;
+                            break;
+                        }
+                    }
+                }
+
+                if (!$existingArticle->lock_image && !empty($resolvedImage)) {
+                    $updateData['featured_image'] = $resolvedImage;
+                    if ($resolvedCaption) {
+                        $updateData['featured_image_caption'] = $resolvedCaption;
+                    }
                 }
 
                 if (!$existingArticle->lock_category && !empty($classification['category_slug'])) {
@@ -369,6 +384,18 @@ class IntelligencePipelineCoordinator
             // Create new Article
             $slug = Str::slug(substr($synthesis['title'], 0, 80)) . '-' . Str::random(5);
 
+            $resolvedImage = $leadStory->featured_image;
+            $attributionSource = $leadStory->source?->name ?? 'Wire';
+            if (empty($resolvedImage)) {
+                foreach ($clusterStories as $cs) {
+                    if (!empty($cs->featured_image)) {
+                        $resolvedImage = $cs->featured_image;
+                        $attributionSource = $cs->source?->name ?? $attributionSource;
+                        break;
+                    }
+                }
+            }
+
             $article = Article::create([
                 'source_id' => $leadStory->source_id ?? NewsSource::first()?->id,
                 'title' => $synthesis['title'],
@@ -382,8 +409,8 @@ class IntelligencePipelineCoordinator
                 'is_editorial_approved' => ($targetStatus === 'PUBLISHED'),
                 'verification_status' => 'reported_reliable',
                 'importance_score' => 7.50,
-                'featured_image' => $leadStory->featured_image,
-                'featured_image_caption' => "Source attribution: {$leadStory->source?->name}",
+                'featured_image' => $resolvedImage,
+                'featured_image_caption' => "Source: {$attributionSource}",
                 'meta_title' => $seo['meta_title'] ?? $synthesis['title'],
                 'meta_description' => $seo['meta_description'] ?? substr($synthesis['summary'] ?? '', 0, 155),
                 'meta_keywords' => !empty($seo['keywords']) ? implode(',', $seo['keywords']) : 'tech,ai',

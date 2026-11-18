@@ -242,6 +242,11 @@ class FeedCollectorService
                     }
                 }
 
+                // Fallback: extract first remote image URL from HTML content or description (Zero local storage)
+                if (empty($featuredImage) && preg_match('/<img[^>]+src=["\'](https?:\/\/[^"\'>]+)["\']/i', $contentRaw ?: $description, $imgMatch)) {
+                    $featuredImage = $imgMatch[1];
+                }
+
                 $publishedAt = null;
                 if (isset($item->pubDate)) {
                     try {
@@ -312,6 +317,35 @@ class FeedCollectorService
                     }
                 }
 
+                // Extract remote image enclosure or media content for Atom (Zero local storage)
+                $featuredImage = null;
+                $entryNamespaces = $entry->getNamespaces(true);
+                $atomMediaNs = $entryNamespaces['media'] ?? null;
+
+                if (isset($entry->link)) {
+                    foreach ($entry->link as $linkTag) {
+                        $rel = (string) ($linkTag['rel'] ?? '');
+                        $type = (string) ($linkTag['type'] ?? '');
+                        if (($rel === 'enclosure' || str_starts_with($type, 'image/')) && isset($linkTag['href'])) {
+                            $featuredImage = (string) $linkTag['href'];
+                            break;
+                        }
+                    }
+                }
+
+                if (!$featuredImage && $atomMediaNs) {
+                    $media = $entry->children($atomMediaNs);
+                    if (isset($media->content) && isset($media->content['url'])) {
+                        $featuredImage = (string) $media->content['url'];
+                    } elseif (isset($media->thumbnail) && isset($media->thumbnail['url'])) {
+                        $featuredImage = (string) $media->thumbnail['url'];
+                    }
+                }
+
+                if (!$featuredImage && preg_match('/<img[^>]+src=["\'](https?:\/\/[^"\'>]+)["\']/i', $contentRaw ?: $summary, $imgMatch)) {
+                    $featuredImage = $imgMatch[1];
+                }
+
                 if (!empty($title) && !empty($link)) {
                     $items[] = new FeedItemDTO(
                         title: html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
@@ -320,7 +354,7 @@ class FeedCollectorService
                         contentRaw: $contentRaw,
                         author: $author,
                         publishedAt: $publishedAt ?? new DateTimeImmutable(),
-                        featuredImage: null,
+                        featuredImage: $featuredImage,
                         language: $source?->language ?? 'en',
                         guid: (string) ($entry->id ?? $link),
                         metadata: [

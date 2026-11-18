@@ -565,7 +565,7 @@ class DatabaseSeeder extends Seeder
 
         // 8. Seed AI Providers, Models, Capabilities & Tasks
         $providers = [
-            ['name' => 'Google Gemini', 'slug' => 'google-gemini', 'priority' => 1, 'circuit_state' => 'closed', 'rpm' => 120, 'tpm' => 300000, 'default_model' => 'gemini-3.8-flash'],
+            ['name' => 'Google Gemini', 'slug' => 'google-gemini', 'priority' => 1, 'circuit_state' => 'closed', 'rpm' => 15, 'tpm' => 1000000, 'daily_request_limit' => 1500, 'default_model' => 'gemini-3.8-flash'],
             ['name' => 'Anthropic Claude', 'slug' => 'anthropic', 'priority' => 2, 'circuit_state' => 'closed', 'rpm' => 100, 'tpm' => 200000, 'default_model' => 'claude-3-5-sonnet-20241022'],
             ['name' => 'OpenAI GPT', 'slug' => 'openai', 'priority' => 3, 'circuit_state' => 'closed', 'rpm' => 100, 'tpm' => 250000, 'default_model' => 'gpt-4o-mini'],
         ];
@@ -576,14 +576,15 @@ class DatabaseSeeder extends Seeder
         foreach ($providers as $provData) {
             $rpm = $provData['rpm'];
             $tpm = $provData['tpm'];
-            unset($provData['rpm'], $provData['tpm']);
+            $dailyLimit = $provData['daily_request_limit'] ?? null;
+            unset($provData['rpm'], $provData['tpm'], $provData['daily_request_limit']);
 
             $prov = AIProvider::updateOrCreate(['slug' => $provData['slug']], $provData);
             $seededProviders[$prov->slug] = $prov;
 
             AIProviderQuota::updateOrCreate(
                 ['provider_id' => $prov->id],
-                ['rpm_limit' => $rpm, 'tpm_limit' => $tpm]
+                ['rpm_limit' => $rpm, 'tpm_limit' => $tpm, 'daily_request_limit' => $dailyLimit]
             );
 
             // Register default initial encrypted credential
@@ -618,13 +619,13 @@ class DatabaseSeeder extends Seeder
 
         // Models configuration
         $modelsData = [
-            // Google
+            // Google (Calibrated for AI Studio Free Tier: $0.00 Cost, 15 RPM, 1500 RPD)
             [
                 'provider_slug' => 'google-gemini',
                 'model_identifier' => 'gemini-3.8-flash',
                 'display_name' => 'Google Gemini 3.8 Flash',
-                'cost_per_1k_input_tokens' => 0.00010,
-                'cost_per_1k_output_tokens' => 0.00040,
+                'cost_per_1k_input_tokens' => 0.00000,
+                'cost_per_1k_output_tokens' => 0.00000,
                 'context_window' => 1048576,
                 'max_output_tokens' => 8192,
                 'supports_structured_output' => true,
@@ -636,8 +637,8 @@ class DatabaseSeeder extends Seeder
                 'provider_slug' => 'google-gemini',
                 'model_identifier' => 'gemini-1.5-pro-002',
                 'display_name' => 'Google Gemini 1.5 Pro 002',
-                'cost_per_1k_input_tokens' => 0.00125,
-                'cost_per_1k_output_tokens' => 0.00500,
+                'cost_per_1k_input_tokens' => 0.00000,
+                'cost_per_1k_output_tokens' => 0.00000,
                 'context_window' => 2097152,
                 'max_output_tokens' => 8192,
                 'supports_structured_output' => true,

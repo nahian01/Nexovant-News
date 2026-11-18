@@ -38,17 +38,19 @@ class GeminiProvider extends AbstractAIProvider
 
     protected function executeGenerate(AIRequest $request, string $apiKey, string $modelIdentifier, ?array $jsonSchema): AIResponse
     {
+        $this->throttleForFreeTier();
         $startTime = hrtime(true);
         $url = "{$this->baseUrl}/models/{$modelIdentifier}:generateContent?key={$apiKey}";
 
-        // Map messages to Gemini contents format
+        // Map messages to Gemini contents format with lean context truncation
         $contents = [];
         foreach ($request->messages as $msg) {
             $role = ($msg['role'] === 'assistant' || $msg['role'] === 'model') ? 'model' : 'user';
+            $text = substr((string) ($msg['content'] ?? ''), 0, 4000);
             $contents[] = [
                 'role' => $role,
                 'parts' => [
-                    ['text' => $msg['content']],
+                    ['text' => $text],
                 ],
             ];
         }
@@ -238,5 +240,26 @@ class GeminiProvider extends AbstractAIProvider
     protected function extractErrorMessage(array $body, string $rawBody, int $status): string
     {
         return $body['error']['message'] ?? ($body['message'] ?? "HTTP {$status}: " . substr($rawBody, 0, 200));
+    }
+
+    /**
+     * Enforce 15 RPM throttling for Google Gemini Free Tier.
+     */
+    protected function throttleForFreeTier(): void
+    {
+        $lockKey = 'gemini_free_tier_last_request_time';
+        $lastTime = (float) (\Illuminate\Support\Facades\Cache::get($lockKey, 0.0));
+        $now = microtime(true);
+        $diff = $now - $lastTime;
+
+        // 15 RPM = 1 request every 4.0 seconds minimum
+        if ($diff < 4.0 && $lastTime > 0.0) {
+            $sleepMicroseconds = (int) round((4.0 - $diff) * 1_000_000);
+            if ($sleepMicroseconds > 0 && $sleepMicroseconds <= 4_000_000) {
+                usleep($sleepMicroseconds);
+            }
+        }
+
+        \Illuminate\Support\Facades\Cache::put($lockKey, microtime(true), 60);
     }
 }

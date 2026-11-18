@@ -159,6 +159,20 @@ onMounted(() => {
             </h3>
           </RouterLink>
 
+          <!-- Remote Thumbnail & Credit (Zero local storage) -->
+          <div v-if="art.featured_image || art.primary_image" class="relative overflow-hidden rounded-[3px] border border-[#D0D9CF] max-h-48 bg-[#0E1A2B]/5">
+            <img
+              :src="art.featured_image || art.primary_image"
+              :alt="art.title"
+              class="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-[1.01]"
+              loading="lazy"
+              @error="(e: any) => e.target.parentElement.style.display = 'none'"
+            />
+            <div class="absolute bottom-2 left-2 bg-black/75 backdrop-blur-xs text-white text-[10px] font-mono px-2 py-0.5 rounded-[2px]">
+              {{ art.featured_image_caption || (art.source?.name ? `Source: ${art.source.name}` : 'Source: Wire Service') }}
+            </div>
+          </div>
+
           <p v-if="art.summary" class="text-xs sm:text-[13px] text-[#3F4A5A] leading-relaxed">
             {{ typeof art.summary === 'object' ? art.summary.executive_summary : art.summary }}
           </p>

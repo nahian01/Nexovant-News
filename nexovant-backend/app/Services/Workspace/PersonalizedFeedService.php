@@ -26,18 +26,183 @@ use Illuminate\Support\Str;
 class PersonalizedFeedService
 {
     /**
+     * Generate an intelligent executive baseline profile for a new user with zero prior activity (Cold Start).
+     */
+    public function generateBaselineColdStartProfile(User $user): UserPreference
+    {
+        return UserPreference::updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'preferred_industries' => ['Artificial Intelligence', 'Semiconductors', 'Cloud Infrastructure', 'Cybersecurity'],
+                'preferred_topics' => ['Generative AI', 'Chip Manufacturing', 'Autonomous Agents', 'Enterprise Cloud', 'Cyber Defense'],
+                'preferred_companies' => ['Nvidia', 'OpenAI', 'Microsoft', 'Google', 'TSMC'],
+                'personalization_enabled' => true,
+                'receive_breaking_alerts' => true,
+                'receive_pdf_briefings' => true,
+                'digest_frequency' => 'daily',
+                'email_frequency' => 'daily',
+            ]
+        );
+    }
+
+    /**
+     * Build dynamic RAG subscriber profile context with interaction-weighted affinities.
+     * Weights: share = 4.0, save = 3.0, search = 2.0, view = 1.0.
+     *
+     * @return array{
+     *   is_cold_start: bool,
+     *   interaction_count: int,
+     *   top_topics: array<string>,
+     *   top_categories: array<string>,
+     *   top_companies: array<string>,
+     *   search_keywords: array<string>,
+     *   topic_weights: array<string, float>,
+     *   category_weights: array<string, float>,
+     *   company_weights: array<string, float>
+     * }
+     */
+    public function buildRAGSubscriberProfileContext(User $user): array
+    {
+        $preferences = $user->preferences;
+        if (!$preferences || empty($preferences->preferred_topics) || empty($preferences->preferred_industries)) {
+            $preferences = $this->generateBaselineColdStartProfile($user);
+        }
+
+        $interactions = $user->interactions()
+            ->latest('created_at')
+            ->limit(100)
+            ->get();
+
+        $isColdStart = $interactions->isEmpty();
+
+        $weights = [
+            'share' => 4.0,
+            'save' => 3.0,
+            'search' => 2.0,
+            'view' => 1.0,
+        ];
+
+        $topicWeights = [];
+        $categoryWeights = [];
+        $companyWeights = [];
+        $searchKeywords = [];
+
+        // Baseline seed weights from user preferences
+        foreach ((array) ($preferences->preferred_topics ?? []) as $t) {
+            $tKey = strtolower(trim((string) $t));
+            if ($tKey !== '') {
+                $topicWeights[$tKey] = ($topicWeights[$tKey] ?? 0.0) + 2.0;
+            }
+        }
+        foreach ((array) ($preferences->preferred_industries ?? []) as $ind) {
+            $indKey = strtolower(trim((string) $ind));
+            if ($indKey !== '') {
+                $categoryWeights[$indKey] = ($categoryWeights[$indKey] ?? 0.0) + 2.0;
+            }
+        }
+        foreach ((array) ($preferences->preferred_companies ?? []) as $cmp) {
+            $cmpKey = strtolower(trim((string) $cmp));
+            if ($cmpKey !== '') {
+                $companyWeights[$cmpKey] = ($companyWeights[$cmpKey] ?? 0.0) + 2.0;
+            }
+        }
+
+        // Fold in followed portfolio
+        foreach ($this->collectFollowedEntityNames($user) as $fn) {
+            $fnKey = strtolower(trim((string) $fn));
+            if ($fnKey !== '') {
+                $companyWeights[$fnKey] = ($companyWeights[$fnKey] ?? 0.0) + 3.0;
+            }
+        }
+
+        // Process subscriber interaction signals using RAG methodology
+        $articleIds = $interactions->where('target_type', 'article')
+            ->pluck('target_id')
+            ->filter()
+            ->unique()
+            ->toArray();
+
+        $articlesMap = !empty($articleIds)
+            ? Article::whereIn('id', $articleIds)
+                ->with(['categories:id,name,slug', 'topics:id,name', 'companies:id,name'])
+                ->get()
+                ->keyBy('id')
+            : collect();
+
+        foreach ($interactions as $interaction) {
+            $w = $weights[$interaction->interaction_type] ?? 1.0;
+
+            if ($interaction->interaction_type === 'search') {
+                $queryStr = trim((string) ($interaction->metadata['query'] ?? $interaction->target_id ?? ''));
+                if (!empty($queryStr)) {
+                    $terms = array_filter(explode(' ', strtolower($queryStr)), fn($t) => strlen($t) > 2);
+                    foreach ($terms as $term) {
+                        $searchKeywords[$term] = ($searchKeywords[$term] ?? 0.0) + $w;
+                    }
+                }
+            } elseif ($interaction->target_type === 'article' && isset($articlesMap[$interaction->target_id])) {
+                $art = $articlesMap[$interaction->target_id];
+
+                foreach ($art->categories as $c) {
+                    $name = strtolower(trim($c->name));
+                    if ($name !== '') {
+                        $categoryWeights[$name] = ($categoryWeights[$name] ?? 0.0) + $w;
+                    }
+                }
+
+                foreach ($art->topics as $t) {
+                    $tName = strtolower(trim($t->name));
+                    if ($tName !== '') {
+                        $topicWeights[$tName] = ($topicWeights[$tName] ?? 0.0) + $w;
+                    }
+                }
+
+                foreach ($art->companies as $cmp) {
+                    $cmpName = strtolower(trim($cmp->name));
+                    if ($cmpName !== '') {
+                        $companyWeights[$cmpName] = ($companyWeights[$cmpName] ?? 0.0) + $w;
+                    }
+                }
+            }
+        }
+
+        arsort($topicWeights);
+        arsort($categoryWeights);
+        arsort($companyWeights);
+        arsort($searchKeywords);
+
+        return [
+            'is_cold_start' => $isColdStart,
+            'interaction_count' => $interactions->count(),
+            'top_topics' => array_slice(array_keys($topicWeights), 0, 10),
+            'top_categories' => array_slice(array_keys($categoryWeights), 0, 10),
+            'top_companies' => array_slice(array_keys($companyWeights), 0, 10),
+            'search_keywords' => array_slice(array_keys($searchKeywords), 0, 10),
+            'topic_weights' => $topicWeights,
+            'category_weights' => $categoryWeights,
+            'company_weights' => $companyWeights,
+        ];
+    }
+
+    /**
      * Build personalized feed grouped into structured intelligence sections.
      */
     public function getPersonalizedFeed(User $user, ?string $section = null): array
     {
+        $ragProfile = $this->buildRAGSubscriberProfileContext($user);
         $preferences = $user->preferences;
         $watchlists = $user->watchlists()->with('items')->get();
 
         // Collect followed entity names and topics
         $followedEntityNames = $this->collectFollowedEntityNames($user);
 
-        $preferredTopics = (array) ($preferences?->preferred_topics ?? ['Artificial Intelligence', 'Semiconductors', 'Cloud Infrastructure']);
-        $preferredIndustries = (array) ($preferences?->preferred_industries ?? ['Technology', 'Semiconductors']);
+        $preferredTopics = !empty($ragProfile['top_topics'])
+            ? array_map('ucwords', $ragProfile['top_topics'])
+            : (array) ($preferences?->preferred_topics ?? ['Artificial Intelligence', 'Semiconductors', 'Cloud Infrastructure']);
+
+        $preferredIndustries = !empty($ragProfile['top_categories'])
+            ? array_map('ucwords', $ragProfile['top_categories'])
+            : (array) ($preferences?->preferred_industries ?? ['Technology', 'Semiconductors']);
 
         // Check if personalization is active
         $personalizationActive = $preferences ? $preferences->personalization_enabled : true;
@@ -51,7 +216,7 @@ class PersonalizedFeedService
 
         // Build Sections
         $feed = [
-            'for_you' => $this->buildForYouSection($user, $followedEntityNames, $preferredTopics, $hiddenIds, $personalizationActive),
+            'for_you' => $this->buildForYouSection($user, $followedEntityNames, $preferredTopics, $hiddenIds, $personalizationActive, $ragProfile),
             'following' => $this->buildFollowingSection($user, $followedEntityNames, $hiddenIds),
             'breaking' => $this->buildBreakingSection($hiddenIds),
             'trending' => $this->buildTrendingSection($preferredTopics),
@@ -73,7 +238,7 @@ class PersonalizedFeedService
      * Section 1: For You (Strict user-profile grounded algorithmic intelligence)
      * Fully personalized against subscriber's followed portfolio, preferred topics, and reading history.
      */
-    protected function buildForYouSection(User $user, array $entityNames, array $topics, array $hiddenIds, bool $active): array
+    protected function buildForYouSection(User $user, array $entityNames, array $topics, array $hiddenIds, bool $active, ?array $ragProfile = null): array
     {
         $preferences = $user->preferences;
         $preferredIndustries = (array) ($preferences?->preferred_industries ?? []);
@@ -194,11 +359,29 @@ class PersonalizedFeedService
                 }
             }
 
+            // Evaluate RAG interaction weights if present
+            if ($ragProfile) {
+                if (!empty($ragProfile['topic_weights']) && $article->relationLoaded('topics')) {
+                    foreach ($article->topics as $t) {
+                        $tLow = strtolower($t->name);
+                        if (isset($ragProfile['topic_weights'][$tLow])) {
+                            $score += (int) min(20, round($ragProfile['topic_weights'][$tLow] * 2.5));
+                            $explanation = "RAG Profile Match: High affinity with your interests in {$t->name}";
+                            $matchedReason = 'rag_topic';
+                            break;
+                        }
+                    }
+                }
+            }
+
             // Boost for importance score
             $score += (int) (($article->importance_score ?? 5.0) * 2);
 
             $rawText = strip_tags($article->content_normalized ?? $article->content_raw ?? '');
             $category = $article->categories->first();
+            $remoteImage = $article->featured_image ?? $article->hero_image ?? null;
+            $sourceName = $article->source?->name ?? 'Wire Service';
+            $attribution = $article->featured_image_caption ?: ($article->source ? "Source: {$sourceName}" : 'Source: Wire Service');
 
             $items[] = [
                 'id' => $article->id,
@@ -207,8 +390,12 @@ class PersonalizedFeedService
                 'headline' => $article->title,
                 'slug' => $article->slug,
                 'summary' => substr($rawText, 0, 220) . (strlen($rawText) > 220 ? '...' : ''),
+                'primary_image' => $remoteImage,
+                'featured_image' => $remoteImage,
+                'featured_image_caption' => $attribution,
+                'source_attribution' => $attribution,
                 'source' => [
-                    'name' => $article->source?->name ?? 'Wire Service',
+                    'name' => $sourceName,
                     'credibility_score' => $article->source?->credibility_score ?? 9.2,
                 ],
                 'category' => $category ? [
@@ -665,35 +852,27 @@ class PersonalizedFeedService
 
         $isOverviewFeed = (empty($category) || $category === 'all' || $category === 'All Intelligence') && empty($search) && (empty($sort) || $sort === 'relevance');
 
-        // When viewing the main Overview Feed, apply 80% user interest / 20% diverse discovery ratio
+        // When viewing the main Overview Feed, apply 80% user interest / 20% diverse discovery ratio with RAG methodology
         if ($isOverviewFeed) {
+            $ragProfile = $this->buildRAGSubscriberProfileContext($user);
             $preferences = $user->preferences;
-            $preferredTopics = (array) ($preferences?->preferred_topics ?? ['Artificial Intelligence', 'Semiconductors', 'Cloud Infrastructure']);
-            $preferredIndustries = (array) ($preferences?->preferred_industries ?? ['Technology', 'Semiconductors']);
-
-            $interactedArticleIds = $user->interactions()
-                ->whereIn('interaction_type', ['view', 'save', 'share'])
-                ->pluck('target_id')
-                ->filter()
-                ->toArray();
-
-            $interactedCategoryIds = !empty($interactedArticleIds)
-                ? \Illuminate\Support\Facades\DB::table('article_categories')
-                    ->whereIn('article_id', $interactedArticleIds)
-                    ->pluck('category_id')
-                    ->unique()
-                    ->toArray()
-                : [];
+            $preferredTopics = !empty($ragProfile['top_topics'])
+                ? $ragProfile['top_topics']
+                : (array) ($preferences?->preferred_topics ?? ['artificial intelligence', 'semiconductors', 'cloud infrastructure']);
+            $preferredIndustries = !empty($ragProfile['top_categories'])
+                ? $ragProfile['top_categories']
+                : (array) ($preferences?->preferred_industries ?? ['technology', 'semiconductors']);
+            $searchKeywords = $ragProfile['search_keywords'] ?? [];
 
             $targetInterestCount = (int) max(1, (int) round($perPage * 0.8));
             $targetDiverseCount = (int) max(1, $perPage - $targetInterestCount);
 
-            // 1. User Interest Query (80%)
+            // 1. User Interest Query (80% - Profile Grounded & RAG Retrieved)
             $interestQuery = Article::whereNotIn('id', $hiddenIds)
                 ->whereIn('verification_status', ['verified', 'confirmed', 'reported_reliable', 'developing'])
-                ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'subcategories:id,name,slug', 'companies:id,name,slug,ticker']);
+                ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'subcategories:id,name,slug', 'companies:id,name,slug,ticker', 'topics:id,name']);
 
-            $interestQuery->where(function ($q) use ($followedNames, $preferredTopics, $preferredIndustries, $interactedCategoryIds) {
+            $interestQuery->where(function ($q) use ($followedNames, $preferredTopics, $preferredIndustries, $searchKeywords) {
                 if (!empty($followedNames)) {
                     foreach ($followedNames as $name) {
                         $q->orWhere('title', 'like', "%{$name}%")
@@ -714,38 +893,97 @@ class PersonalizedFeedService
                 }
                 if (!empty($preferredIndustries)) {
                     $q->orWhereHas('categories', function ($catQ) use ($preferredIndustries) {
-                        $catQ->whereIn('name', $preferredIndustries);
+                        $catQ->whereIn('name', $preferredIndustries)
+                             ->orWhereIn('slug', array_map('Illuminate\Support\Str::slug', $preferredIndustries));
                     });
                 }
-                if (!empty($interactedCategoryIds)) {
-                    $q->orWhereHas('categories', function ($catQ) use ($interactedCategoryIds) {
-                        $catQ->whereIn('id', $interactedCategoryIds);
-                    });
+                if (!empty($searchKeywords)) {
+                    foreach ($searchKeywords as $kw) {
+                        $q->orWhere('title', 'like', "%{$kw}%");
+                    }
                 }
             });
 
             $totalInterest = (clone $interestQuery)->count();
-            $interestArticles = $interestQuery->orderByDesc('importance_score')
+            $candidateInterestArticles = $interestQuery->orderByDesc('importance_score')
                 ->latest('published_at')
-                ->forPage($page, $targetInterestCount)
+                ->limit(60)
                 ->get();
+
+            // RAG Dynamic Affinity Re-ranking based on interaction weights
+            $scoredInterestArticles = $candidateInterestArticles->map(function ($article) use ($ragProfile) {
+                $score = 50.0;
+                $explanation = 'Grounded in your institutional intelligence profile';
+
+                // Topic affinity (RAG weighted)
+                if ($article->relationLoaded('topics') && $article->topics) {
+                    foreach ($article->topics as $t) {
+                        $tLow = strtolower($t->name);
+                        if (isset($ragProfile['topic_weights'][$tLow])) {
+                            $score += min(25.0, $ragProfile['topic_weights'][$tLow] * 3.0);
+                            $explanation = "RAG Profile Match: Grounded in your focus on {$t->name}";
+                        }
+                    }
+                }
+
+                // Category affinity
+                if ($article->relationLoaded('categories') && $article->categories) {
+                    foreach ($article->categories as $c) {
+                        $cLow = strtolower($c->name);
+                        if (isset($ragProfile['category_weights'][$cLow])) {
+                            $score += min(20.0, $ragProfile['category_weights'][$cLow] * 2.5);
+                        }
+                    }
+                }
+
+                // Followed or monitored company affinity
+                if ($article->relationLoaded('companies') && $article->companies) {
+                    foreach ($article->companies as $cmp) {
+                        $cmpLow = strtolower($cmp->name);
+                        if (isset($ragProfile['company_weights'][$cmpLow])) {
+                            $score += min(25.0, $ragProfile['company_weights'][$cmpLow] * 3.5);
+                            $explanation = "Because you follow {$cmp->name}";
+                        }
+                    }
+                }
+
+                // Importance score contribution
+                $score += ($article->importance_score ?? 5.0) * 1.5;
+
+                $article->rag_affinity_score = min(99, (int) round($score));
+                $article->rag_explanation = $explanation;
+                return $article;
+            })->sortByDesc('rag_affinity_score')->values();
+
+            // Slice current page of interest items
+            $interestArticles = $scoredInterestArticles->slice(($page - 1) * $targetInterestCount, $targetInterestCount)->values();
+
+            // If user is brand new or candidate matches are sparse, backfill from verified reports
+            if ($interestArticles->count() < $targetInterestCount) {
+                $needed = $targetInterestCount - $interestArticles->count();
+                $existingIds = array_merge($hiddenIds, $interestArticles->pluck('id')->toArray());
+                $backfill = Article::whereNotIn('id', $existingIds)
+                    ->whereIn('verification_status', ['verified', 'confirmed', 'reported_reliable'])
+                    ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'subcategories:id,name,slug', 'companies:id,name,slug,ticker', 'topics:id,name'])
+                    ->orderByDesc('importance_score')
+                    ->latest('published_at')
+                    ->limit($needed)
+                    ->get();
+                $interestArticles = $interestArticles->concat($backfill);
+            }
 
             $usedIds = array_merge($hiddenIds, $interestArticles->pluck('id')->toArray());
 
             // 2. Diverse Discovery Query (20% - outside primary user interests to prevent filter bubble)
             $diverseQuery = Article::whereNotIn('id', $usedIds)
                 ->whereIn('verification_status', ['verified', 'confirmed', 'reported_reliable', 'developing'])
-                ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'subcategories:id,name,slug', 'companies:id,name,slug,ticker']);
+                ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'subcategories:id,name,slug', 'companies:id,name,slug,ticker', 'topics:id,name']);
 
             // Exclude user's top categories if possible to ensure real diversity
-            if (!empty($preferredIndustries) || !empty($interactedCategoryIds)) {
-                $diverseQuery->whereDoesntHave('categories', function ($cq) use ($preferredIndustries, $interactedCategoryIds) {
-                    if (!empty($preferredIndustries)) {
-                        $cq->whereIn('name', $preferredIndustries);
-                    }
-                    if (!empty($interactedCategoryIds)) {
-                        $cq->orWhereIn('id', $interactedCategoryIds);
-                    }
+            if (!empty($preferredIndustries)) {
+                $diverseQuery->whereDoesntHave('categories', function ($cq) use ($preferredIndustries) {
+                    $cq->whereIn('name', $preferredIndustries)
+                       ->orWhereIn('slug', array_map('Illuminate\Support\Str::slug', $preferredIndustries));
                 });
             }
 
@@ -755,25 +993,29 @@ class PersonalizedFeedService
                 ->forPage($page, $targetDiverseCount)
                 ->get();
 
-            // Fallback backfill if diverse or interest pools had fewer items
+            // Fallback backfill if diverse pool had fewer items
             if ($diverseArticles->count() < $targetDiverseCount) {
-                $needed = $targetDiverseCount - $diverseArticles->count();
-                $backfill = Article::whereNotIn('id', array_merge($usedIds, $diverseArticles->pluck('id')->toArray()))
-                    ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'subcategories:id,name,slug', 'companies:id,name,slug,ticker'])
+                $neededDiverse = $targetDiverseCount - $diverseArticles->count();
+                $existingDiverseIds = array_merge($usedIds, $diverseArticles->pluck('id')->toArray());
+                $diverseBackfill = Article::whereNotIn('id', $existingDiverseIds)
+                    ->with(['source:id,name,credibility_score,url', 'categories:id,name,slug,color', 'subcategories:id,name,slug', 'companies:id,name,slug,ticker', 'topics:id,name'])
                     ->latest('published_at')
-                    ->limit($needed)
+                    ->limit($neededDiverse)
                     ->get();
-                $diverseArticles = $diverseArticles->concat($backfill);
+                $diverseArticles = $diverseArticles->concat($diverseBackfill);
             }
 
             // Format items with explicit 80/20 attribution
             $formattedInterest = [];
             foreach ($interestArticles as $art) {
-                $item = $this->formatFeedItem($art, $user, null, $followedNames, $savedArticleIds);
+                $item = $this->formatFeedItem($art, $user, $art->rag_explanation ?? null, $followedNames, $savedArticleIds);
                 $item['match_type'] = 'interest';
                 $item['is_interest_match'] = true;
                 $item['is_serendipity'] = false;
-                $item['personalization_factor'] = '80% User Interests';
+                $item['personalization_factor'] = '80% User Interests (RAG Adaptive)';
+                if (isset($art->rag_affinity_score)) {
+                    $item['relevance_score'] = $art->rag_affinity_score;
+                }
                 $formattedInterest[] = $item;
             }
 
@@ -819,6 +1061,8 @@ class PersonalizedFeedService
                     'last_page' => $lastPage,
                     'per_page' => $perPage,
                     'total' => $totalApprox,
+                    'is_cold_start' => $ragProfile['is_cold_start'],
+                    'interaction_count' => $ragProfile['interaction_count'],
                     'personalization_distribution' => [
                         'interest_percentage' => 80,
                         'diversity_percentage' => 20,
@@ -955,6 +1199,9 @@ class PersonalizedFeedService
         $readingTime = max(1, (int) ceil($wordCount / 200));
 
         $category = $article->categories->first();
+        $remoteImage = $article->featured_image ?? $article->hero_image ?? null;
+        $sourceName = $article->source?->name ?? 'Wire Service';
+        $attribution = $article->featured_image_caption ?: ($article->source ? "Source: {$sourceName}" : 'Source: Wire Service');
 
         return [
             'id' => $article->id,
@@ -963,7 +1210,10 @@ class PersonalizedFeedService
             'title' => $article->title,
             'slug' => $article->slug,
             'summary' => substr($rawText, 0, 240) . (strlen($rawText) > 240 ? '...' : ''),
-            'primary_image' => $article->primary_image_url ?? null,
+            'primary_image' => $remoteImage,
+            'featured_image' => $remoteImage,
+            'featured_image_caption' => $attribution,
+            'source_attribution' => $attribution,
             'category' => $category ? [
                 'id' => $category->id,
                 'name' => $category->name,
@@ -988,12 +1238,12 @@ class PersonalizedFeedService
                 : [],
             'published_at' => $article->published_at?->toIso8601String(),
             'source' => [
-                'name' => $article->source?->name ?? 'Wire Service',
+                'name' => $sourceName,
                 'credibility_score' => $article->source?->credibility_score ?? 9.2,
                 'url' => $article->source?->url ?? null,
             ],
-            'source_count' => max(1, $article->companies->count() + 1),
-            'entities' => $article->companies->pluck('name')->toArray(),
+            'source_count' => max(1, ($article->relationLoaded('companies') && $article->companies ? $article->companies->count() : 0) + 1),
+            'entities' => ($article->relationLoaded('companies') && $article->companies) ? $article->companies->pluck('name')->toArray() : [],
             'verification_status' => $article->verification_status ?? 'confirmed',
             'is_breaking' => (bool) $article->is_breaking,
             'is_trending' => (bool) ($article->is_breaking || ($article->importance_score ?? 0) >= 8.5),

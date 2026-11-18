@@ -66,6 +66,21 @@ onMounted(() => {
             </div>
           </div>
 
+          <!-- Remote Featured Image & Source Attribution (Zero local storage) -->
+          <div v-if="article.featured_image || article.primary_image || article.hero_image" class="overflow-hidden rounded-[4px] border border-nexo-border/60 bg-nexo-surface">
+            <img
+              :src="article.featured_image || article.primary_image || article.hero_image"
+              :alt="article.title"
+              class="w-full max-h-[460px] object-cover bg-black/20"
+              loading="lazy"
+              @error="(e: any) => e.target.parentElement.style.display = 'none'"
+            />
+            <div class="px-3.5 py-2 bg-nexo-surface/90 border-t border-nexo-border/40 text-[11px] font-mono text-nexo-text-muted flex justify-between items-center">
+              <span>{{ article.featured_image_caption || (article.source?.name ? `Source: ${article.source.name}` : 'Source: Wire Service') }}</span>
+              <span class="text-[10px] text-nexo-accent-cyan/80">Remote Attribution</span>
+            </div>
+          </div>
+
           <!-- Executive Summary Callout -->
           <Card padding="md" class="border-nexo-accent-cyan/40 bg-nexo-surface/60">
             <h4 class="font-mono text-xs text-nexo-accent-cyan uppercase font-semibold mb-2">

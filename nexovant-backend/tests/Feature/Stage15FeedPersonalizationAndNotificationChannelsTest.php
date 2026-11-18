@@ -297,4 +297,161 @@ class Stage15FeedPersonalizationAndNotificationChannelsTest extends TestCase
         $this->assertNull($pref->whatsapp_phone);
         $this->assertFalse($pref->channels['whatsapp']);
     }
+
+    /**
+     * Test 6: Cold start baseline profile auto-generation for users with zero interactions.
+     */
+    public function test_cold_start_baseline_profile_generation(): void
+    {
+        $user = User::factory()->create();
+        $this->assertNull($user->preferences);
+
+        /** @var PersonalizedFeedService $feedService */
+        $feedService = app(PersonalizedFeedService::class);
+        $profile = $feedService->buildRAGSubscriberProfileContext($user);
+
+        $this->assertTrue($profile['is_cold_start']);
+        $this->assertEquals(0, $profile['interaction_count']);
+        $this->assertNotEmpty($profile['top_topics']);
+        $this->assertNotEmpty($profile['top_categories']);
+
+        // Assert database preferences record was seeded
+        $user->refresh();
+        $this->assertNotNull($user->preferences);
+        $this->assertContains('Artificial Intelligence', $user->preferences->preferred_industries);
+        $this->assertContains('Generative AI', $user->preferences->preferred_topics);
+    }
+
+    /**
+     * Test 7: Usage-driven RAG personalization with interaction weights (view:1, search:2, save:3, share:4).
+     */
+    public function test_rag_usage_driven_personalization_with_interaction_weights(): void
+    {
+        $user = User::factory()->create();
+        /** @var PersonalizedFeedService $feedService */
+        $feedService = app(PersonalizedFeedService::class);
+
+        // Create categories and topics
+        $cyberCategory = Category::create(['id' => (string) Str::uuid(), 'name' => 'Cybersecurity', 'slug' => 'cybersecurity', 'is_active' => true]);
+        $cyberTopic = Topic::create(['id' => (string) Str::uuid(), 'name' => 'Zero Trust Architecture', 'slug' => 'zero-trust-architecture', 'is_active' => true]);
+
+        $cyberArticle = $this->createArticle([
+            'title' => 'Critical Zero Trust Architecture Implementation in Federal Cloud',
+            'content_normalized' => 'In-depth assessment of enterprise cybersecurity defenses and zero trust protocols.',
+        ]);
+        $cyberArticle->categories()->attach($cyberCategory->id);
+        $cyberArticle->topics()->attach($cyberTopic->id);
+
+        // Record a high-weight 'share' interaction (weight: 4.0)
+        $feedService->recordInteraction($user, 'share', 'article', $cyberArticle->id);
+
+        $ragContext = $feedService->buildRAGSubscriberProfileContext($user);
+
+        $this->assertFalse($ragContext['is_cold_start']);
+        $this->assertEquals(1, $ragContext['interaction_count']);
+        $this->assertArrayHasKey('cybersecurity', $ragContext['category_weights']);
+        $this->assertGreaterThanOrEqual(4.0, $ragContext['category_weights']['cybersecurity']);
+
+        // Feed stream ranking should reflect this affinity
+        $stream = $feedService->getFeedStream($user, ['per_page' => 10]);
+        $found = collect($stream['items'])->firstWhere('id', $cyberArticle->id);
+        $this->assertNotNull($found);
+        $this->assertGreaterThanOrEqual(70, $found['relevance_score']);
+    }
+
+    /**
+     * Test 8: Remote image hotlinking with zero local storage and visible attribution credit.
+     */
+    public function test_remote_image_handling_zero_local_storage_and_attribution(): void
+    {
+        $source = $this->createNewsSource('Bloomberg Technology');
+        $remoteImageUrl = 'https://images.example.com/photos/semiconductor-cleanroom-2026.jpg';
+
+        $article = $this->createArticle([
+            'source_id' => $source->id,
+            'title' => 'Advanced Nanometer Photolithography Factory Launch',
+            'featured_image' => $remoteImageUrl,
+            'featured_image_caption' => "Source: {$source->name}",
+        ]);
+
+        $user = User::factory()->create();
+        /** @var PersonalizedFeedService $feedService */
+        $feedService = app(PersonalizedFeedService::class);
+        $formatted = $feedService->formatFeedItem($article, $user);
+
+        // Remote image URL preserved without local download
+        $this->assertEquals($remoteImageUrl, $formatted['primary_image']);
+        $this->assertEquals($remoteImageUrl, $formatted['featured_image']);
+        $this->assertEquals("Source: {$source->name}", $formatted['source_attribution']);
+        $this->assertEquals("Source: {$source->name}", $formatted['featured_image_caption']);
+    }
+
+    /**
+     * Test 9: Auto ingest scheduler hourly quota tracking (minimum 20 articles/hour target).
+     */
+    public function test_auto_ingest_scheduler_hourly_quota_enforcement(): void
+    {
+        /** @var \App\Services\Ingestion\AutoIngestSchedulerService $scheduler */
+        $scheduler = app(\App\Services\Ingestion\AutoIngestSchedulerService::class);
+        $stats = $scheduler->runDueIngestionCycles(force: false);
+
+        $this->assertArrayHasKey('hourly_target', $stats);
+        $this->assertEquals(20, $stats['hourly_target']);
+        $this->assertArrayHasKey('articles_last_hour', $stats);
+        $this->assertIsInt($stats['articles_last_hour']);
+    }
+
+    /**
+     * Test 10: Trending signals calculate social sharing and subscriber discourse velocity.
+     */
+    public function test_trending_signals_with_social_sharing_velocity(): void
+    {
+        $source = $this->createNewsSource('MIT Tech Review');
+        $cluster = StoryCluster::create([
+            'id' => (string) Str::uuid(),
+            'title' => 'Breakthrough Quantum Error Mitigation Algorithms',
+            'summary' => 'Quantum computing cluster with surging coverage.',
+            'status' => 'synthesized',
+        ]);
+
+        $discovered = DiscoveredStory::create([
+            'id' => (string) Str::uuid(),
+            'source_id' => $source->id,
+            'cluster_id' => $cluster->id,
+            'title' => 'Breakthrough Quantum Error Mitigation Algorithms',
+            'canonical_url' => 'https://mit.example.com/quantum-' . Str::random(4),
+            'summary' => 'Quantum computing breakthrough story.',
+            'content_raw' => 'Quantum computing breakthrough story.',
+            'content_normalized' => 'Quantum computing breakthrough story.',
+            'status' => 'clustered',
+            'published_at' => now(),
+        ]);
+
+        $article = $this->createArticle([
+            'title' => 'Breakthrough Quantum Error Mitigation Algorithms',
+            'source_id' => $source->id,
+        ]);
+        $cluster->update(['article_id' => $article->id]);
+
+        $user = User::factory()->create();
+        /** @var PersonalizedFeedService $feedService */
+        $feedService = app(PersonalizedFeedService::class);
+
+        // Register 4 shares on this article to simulate social virality
+        for ($i = 0; $i < 4; $i++) {
+            $feedService->recordInteraction($user, 'share', 'article', $article->id);
+        }
+
+        /** @var \App\Services\Research\TrendIntelligenceService $trendService */
+        $trendService = app(\App\Services\Research\TrendIntelligenceService::class);
+        $trends = $trendService->detectEmergingTrends(lookbackDays: 7);
+
+        $this->assertNotEmpty($trends);
+        $matchedTrend = $trends->firstWhere('slug', 'trend-breakthrough-quantum-error');
+        if ($matchedTrend) {
+            $this->assertArrayHasKey('social_metrics', $matchedTrend->metadata);
+            $this->assertGreaterThanOrEqual(4, $matchedTrend->metadata['social_metrics']['shares']);
+            $this->assertEquals('High Sharing Velocity', $matchedTrend->metadata['social_metrics']['buzz_label']);
+        }
+    }
 }

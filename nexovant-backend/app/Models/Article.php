@@ -108,6 +108,11 @@ class Article extends Model
         return $this->featured_image;
     }
 
+    public function getPrimaryImageUrlAttribute(): ?string
+    {
+        return $this->featured_image;
+    }
+
     public function setHeroImageAttribute(?string $value): void
     {
         $this->attributes['featured_image'] = $value;

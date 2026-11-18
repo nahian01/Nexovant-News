@@ -82,15 +82,48 @@ class TrendIntelligenceService
             // 5. Entity Relevance Score (0 - 100)
             $entityRelevance = min(100.0, count($bucket['clusters']) * 35.0);
 
-            // Composite Trend Score Formula
+            // 6. Social Sharing & Subscriber Discourse Velocity (0 - 100)
+            // Measures active shares, bookmarks/saves, and discussions across users
+            $clusterArticleIds = array_filter(array_map(fn($c) => $c->article_id, $bucket['clusters']));
+            $shareCount = 0;
+            $saveCount = 0;
+            $viewCount = 0;
+
+            if (!empty($clusterArticleIds)) {
+                $interactionCounts = DB::table('subscriber_interactions')
+                    ->whereIn('target_id', $clusterArticleIds)
+                    ->select('interaction_type', DB::raw('count(*) as count'))
+                    ->groupBy('interaction_type')
+                    ->pluck('count', 'interaction_type')
+                    ->toArray();
+
+                $shareCount = (int) ($interactionCounts['share'] ?? 0);
+                $saveCount = (int) ($interactionCounts['save'] ?? 0);
+                $viewCount = (int) ($interactionCounts['view'] ?? 0);
+            }
+
+            // High weights on shares (virality) and bookmarks (high-value saving)
+            $socialViralityScore = min(100.0, ($shareCount * 25.0) + ($saveCount * 15.0) + ($viewCount * 2.0));
+
+            // Composite Trend Score Formula with Social Sharing Signals
             $compositeScore = round(
-                ($volumeScore * 0.25) +
-                ($growthVelocity * 0.30) +
+                ($growthVelocity * 0.25) +
                 ($sourceDiversity * 0.20) +
-                ($avgCredibility * 0.15) +
+                ($socialViralityScore * 0.20) +
+                ($volumeScore * 0.15) +
+                ($avgCredibility * 0.10) +
                 ($entityRelevance * 0.10),
                 2
             );
+
+            // Determine social buzz indicator label
+            $socialBuzzLabel = match (true) {
+                $shareCount >= 3 => 'High Sharing Velocity',
+                $saveCount >= 3 => 'Executive Bookmark Trend',
+                $sourceCount >= 3 => 'Multi-Source Consensus',
+                $growthVelocity >= 70.0 => 'Surging Velocity',
+                default => 'Emerging Discourse',
+            };
 
             // Status based on velocity and volume
             $status = match (true) {
@@ -117,11 +150,18 @@ class TrendIntelligenceService
                     'last_observed_at' => now(),
                     'metadata' => [
                         'formula_weights' => [
-                            'volume' => 0.25,
-                            'growth_rate' => 0.30,
+                            'growth_rate' => 0.25,
                             'source_diversity' => 0.20,
-                            'source_credibility' => 0.15,
+                            'social_sharing' => 0.20,
+                            'volume' => 0.15,
+                            'source_credibility' => 0.10,
                             'entity_relevance' => 0.10,
+                        ],
+                        'social_metrics' => [
+                            'shares' => $shareCount,
+                            'saves' => $saveCount,
+                            'views' => $viewCount,
+                            'buzz_label' => $socialBuzzLabel,
                         ],
                         'lookback_days' => $lookbackDays,
                     ],
