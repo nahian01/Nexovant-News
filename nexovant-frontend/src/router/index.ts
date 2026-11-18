@@ -118,6 +118,18 @@ const routes = [
     component: CompaniesView,
   },
   {
+    path: '/categories',
+    redirect: '/companies',
+  },
+  {
+    path: '/industries',
+    redirect: '/companies',
+  },
+  {
+    path: '/executives',
+    redirect: '/companies',
+  },
+  {
     path: '/login',
     name: 'login',
     component: LoginView,

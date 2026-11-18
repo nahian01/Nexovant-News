@@ -187,6 +187,13 @@ const isActive = (path?: string) => {
                 <ChartNoAxesCombined class="h-4 w-4" /> Trending Intelligence
               </RouterLink>
               <RouterLink
+                to="/companies"
+                @click="isMobileDrawerOpen = false"
+                :class="['flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium', isActive('/companies') ? 'bg-[#e9f3ed] text-nexo-accent-cyan font-semibold' : 'text-nexo-text-secondary']"
+              >
+                <Building2 class="h-4 w-4" /> Global Companies
+              </RouterLink>
+              <RouterLink
                 to="/workspace/watchlists"
                 @click="isMobileDrawerOpen = false"
                 :class="['flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium', isActive('/workspace/watchlists') ? 'bg-[#e9f3ed] text-nexo-accent-cyan font-semibold' : 'text-nexo-text-secondary']"

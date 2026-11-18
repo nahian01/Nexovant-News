@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRoute, RouterLink } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import {
   ArrowLeft,
   Bookmark,
@@ -19,13 +19,24 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import NewsletterSubscribe from '@/components/common/NewsletterSubscribe.vue'
 import MoreCoverageModal from '@/components/common/MoreCoverageModal.vue'
 import { feedService } from '@/services/api/feed.service'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
 const article = ref<any>(null)
 const isLoading = ref(true)
 const isCoverageOpen = ref(false)
 const isSaved = ref(false)
 const toastMessage = ref('')
+
+const handleBack = () => {
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push(authStore.isAuthenticated ? '/feed' : '/')
+  }
+}
 
 const fetchDetail = async () => {
   isLoading.value = true
@@ -164,10 +175,10 @@ onMounted(() => {
 
       <!-- Navigation & Action Bar -->
       <div class="flex items-center justify-between pb-3 border-b border-[#D0D9CF] text-xs">
-        <RouterLink to="/" class="inline-flex items-center gap-1.5 font-medium text-[#274888] hover:underline">
+        <button type="button" @click="handleBack" class="inline-flex items-center gap-1.5 font-medium text-[#274888] hover:underline cursor-pointer">
           <ArrowLeft class="h-4 w-4" />
           <span>Back to intelligence feed</span>
-        </RouterLink>
+        </button>
 
         <div class="flex items-center gap-2">
           <button

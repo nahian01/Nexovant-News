@@ -29,6 +29,7 @@ const workspaceItems = [
   { name: 'For You', path: '/feed', icon: Sparkles },
   { name: 'Following', path: '/following', icon: Users },
   { name: 'Trending Intelligence', path: '/trends', icon: ChartNoAxesCombined },
+  { name: 'Global Companies', path: '/companies', icon: Building2 },
   { name: 'Watchlists', path: '/workspace/watchlists', icon: Bookmark },
   { name: 'Custom Monitors', path: '/workspace/monitors', icon: Radar },
   { name: 'Saved Searches', path: '/workspace/saved-searches', icon: Bookmark },

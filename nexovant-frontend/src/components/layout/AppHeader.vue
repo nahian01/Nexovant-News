@@ -32,8 +32,13 @@ const isSearchOpen = ref(false)
 const isProfileDropdownOpen = ref(false)
 const isNotificationDrawerOpen = ref(false)
 const unreadNotificationCount = ref(0)
+let notificationInterval: any = null
 
 const fetchUnreadCount = async () => {
+  if (!authStore.isAuthenticated) {
+    unreadNotificationCount.value = 0
+    return
+  }
   try {
     const res = await workspaceService.getNotifications({ per_page: 1 })
     if (res?.unread_count !== undefined) {
@@ -46,6 +51,7 @@ const fetchUnreadCount = async () => {
 
 const handleLogout = async () => {
   isProfileDropdownOpen.value = false
+  if (notificationInterval) clearInterval(notificationInterval)
   await authStore.logout()
   router.push('/login')
 }
@@ -66,10 +72,13 @@ const planTierLabel = computed(() => {
 })
 
 onMounted(async () => {
-  await fetchUnreadCount()
-  // 15-second polling interval for real-time unread updates
-  const interval = setInterval(fetchUnreadCount, 15000)
-  window.addEventListener('beforeunload', () => clearInterval(interval))
+  if (authStore.isAuthenticated) {
+    await fetchUnreadCount()
+    notificationInterval = setInterval(fetchUnreadCount, 15000)
+    window.addEventListener('beforeunload', () => {
+      if (notificationInterval) clearInterval(notificationInterval)
+    })
+  }
 })
 </script>
 

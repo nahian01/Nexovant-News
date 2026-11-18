@@ -15,9 +15,11 @@ import {
 } from 'lucide-vue-next'
 import { workspaceService } from '@/services/api/workspace.service'
 import { apiClient } from '@/services/api/client'
+import { useAuthStore } from '@/stores/auth'
 import Badge from '@/components/ui/Badge.vue'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const researchPrompt = ref('')
 const isSubmittingFollow = ref<Record<string, boolean>>({})
 
@@ -52,41 +54,44 @@ const loadPanelData = async () => {
     isLoadingTrends.value = false
   }
 
-  // 2. Fetch following list to mark followed items
-  try {
-    const followingRes = await workspaceService.getFollowing()
-    if (followingRes?.data) {
-      for (const item of followingRes.data) {
-        followedEntities.value[`${item.type}:${item.id}`] = true
-        followedEntities.value[`${item.type}:${item.name}`] = true
+  // 2. Fetch following list and suggestions only if authenticated
+  if (authStore.isAuthenticated) {
+    try {
+      const followingRes = await workspaceService.getFollowing()
+      if (followingRes?.data) {
+        for (const item of followingRes.data) {
+          followedEntities.value[`${item.type}:${item.id}`] = true
+          followedEntities.value[`${item.type}:${item.name}`] = true
+        }
       }
+    } catch {
+      //
     }
-  } catch {
-    //
-  }
 
-  // 3. Fetch following suggestions if available
-  try {
-    const suggestionsRes = await workspaceService.getFollowingSuggestions()
-    if (suggestionsRes?.data) {
-      if (suggestionsRes.data.companies?.length) {
-        suggestedCompanies.value = suggestionsRes.data.companies.slice(0, 4)
+    try {
+      const suggestionsRes = await workspaceService.getFollowingSuggestions()
+      if (suggestionsRes?.data) {
+        if (suggestionsRes.data.companies?.length) {
+          suggestedCompanies.value = suggestionsRes.data.companies.slice(0, 4)
+        }
+        if (suggestionsRes.data.technologies?.length) {
+          emergingTechnologies.value = suggestionsRes.data.technologies.slice(0, 4)
+        }
+        if (suggestionsRes.data.topics?.length) {
+          suggestedTopics.value = suggestionsRes.data.topics.slice(0, 3).map((t: any) => ({
+            slug: t.slug || t.id,
+            tag: `#${(t.name || '').replace(/\s+/g, '')}`,
+            name: t.name,
+            count: 'Trending'
+          }))
+        }
       }
-      if (suggestionsRes.data.technologies?.length) {
-        emergingTechnologies.value = suggestionsRes.data.technologies.slice(0, 4)
-      }
-      if (suggestionsRes.data.topics?.length) {
-        suggestedTopics.value = suggestionsRes.data.topics.slice(0, 3).map((t: any) => ({
-          slug: t.slug || t.id,
-          tag: `#${(t.name || '').replace(/\s+/g, '')}`,
-          name: t.name,
-          count: 'Trending'
-        }))
-      }
+    } catch {
+      //
+    } finally {
+      isLoadingSuggestions.value = false
     }
-  } catch {
-    //
-  } finally {
+  } else {
     isLoadingSuggestions.value = false
   }
 }

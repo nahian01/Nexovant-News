@@ -199,7 +199,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <AuthenticatedLayout :show-right-panel="true">
+  <AuthenticatedLayout :show-right-panel="false">
     <div class="space-y-7 text-left pb-16">
       <!-- 1. Header & Controls (per Mockup P04 Trending.png) -->
       <header class="border-b border-[#D0D9CF] pb-5">

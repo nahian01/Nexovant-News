@@ -19,23 +19,23 @@ const publicExploreItems = [
 ]
 
 const publicBrowseItems = [
-  { name: 'Companies', path: '/companies' },
-  { name: 'Executives', path: '/blog' },
-  { name: 'Industries', path: '/categories' },
-  { name: 'Categories', path: '/categories' },
+  { name: 'Companies & Markets', path: '/companies' },
+  { name: 'Trending Intelligence', path: '/trends' },
+  { name: 'Research Engine', path: '/search' },
+  { name: 'Executive Briefings', path: '/blog' },
 ]
 
 const signedInFeedItems = [
   { name: 'For You', path: '/feed' },
-  { name: 'Latest', path: '/feed?filter=latest' },
-  { name: 'Trending', path: '/trends' },
+  { name: 'Latest Stream', path: '/feed?filter=latest' },
+  { name: 'Trending Intelligence', path: '/trends' },
   { name: 'Following', path: '/following' },
 ]
 
 const signedInBrowseItems = [
-  { name: 'Companies', path: '/companies' },
-  { name: 'Executives', path: '/blog' },
-  { name: 'Industries', path: '/categories' },
+  { name: 'Global Companies', path: '/companies' },
+  { name: 'Deep Research', path: '/workspace/research' },
+  { name: 'Custom Monitors', path: '/workspace/monitors' },
 ]
 
 const signedInLibraryItems = [

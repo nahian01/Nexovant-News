@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import {
   Building2,
   Globe2,
@@ -292,6 +292,12 @@ const closeCompanyDetail = () => {
   selectedCompany.value = null
 }
 
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && isDetailDrawerOpen.value) {
+    closeCompanyDetail()
+  }
+}
+
 const getMonogram = (name: string) => {
   return name
     .split(' ')
@@ -329,23 +335,28 @@ watch(selectedCountry, () => {
 })
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleKeydown)
   await fetchTaxonomy()
   await fetchCompanies()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
 <template>
-  <AuthenticatedLayout :show-right-panel="true">
-    <div class="space-y-6 text-left pb-20">
+  <AuthenticatedLayout :show-right-panel="false">
+    <div class="space-y-6 text-left pb-24 max-w-[1600px] mx-auto w-full">
       <!-- Top Intelligence Header -->
-      <div class="border-b border-[#D0D9CF] pb-6 space-y-4">
+      <div class="border-b border-[#D0D9CF] pb-5 space-y-4">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div class="space-y-1.5">
+          <div class="space-y-1.5 min-w-0">
             <div class="flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-[#274888]">
-              <Building2 class="h-4 w-4" />
-              <span>GLOBAL CORPORATE DIRECTORY & GEO-TAXONOMY RADAR</span>
+              <Building2 class="h-4 w-4 shrink-0" />
+              <span class="truncate">GLOBAL CORPORATE DIRECTORY & GEO-TAXONOMY RADAR</span>
             </div>
-            <h1 class="editorial-headline text-3xl sm:text-4xl font-medium text-[#0E1A2B]">
+            <h1 class="editorial-headline text-2xl sm:text-3xl lg:text-4xl font-medium text-[#0E1A2B]">
               Enterprise Intelligence Directory
             </h1>
             <p class="text-xs sm:text-sm text-[#5F6875] max-w-3xl leading-relaxed">
@@ -365,21 +376,21 @@ onMounted(async () => {
             <button
               v-if="searchQuery"
               @click="searchQuery = ''; fetchCompanies()"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-[#5F6875] hover:text-[#0E1A2B]"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-[#5F6875] hover:text-[#0E1A2B] cursor-pointer"
             >
               <X class="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        <!-- Mode & Tab Navigation -->
-        <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
-          <div class="flex flex-wrap items-center gap-1.5 border border-[#D0D9CF] bg-[#F8FAF7] p-1 rounded-[6px]">
+        <!-- Mode & Tab Navigation: Scrollable strip on mobile, wraps cleanly on desktop -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar border border-[#D0D9CF] bg-[#F8FAF7] p-1 rounded-[6px] max-w-full">
             <button
               type="button"
               @click="setTab('for_you')"
               :class="[
-                'px-3.5 py-1.5 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer',
+                'px-3 sm:px-3.5 py-1.5 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer',
                 activeTab === 'for_you'
                   ? 'bg-[#0E1A2B] text-white shadow-xs'
                   : 'text-[#3F4A5A] hover:text-[#0E1A2B] hover:bg-white'
@@ -393,7 +404,7 @@ onMounted(async () => {
               type="button"
               @click="setTab('all')"
               :class="[
-                'px-3.5 py-1.5 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer',
+                'px-3 sm:px-3.5 py-1.5 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer',
                 activeTab === 'all'
                   ? 'bg-[#0E1A2B] text-white shadow-xs'
                   : 'text-[#3F4A5A] hover:text-[#0E1A2B] hover:bg-white'
@@ -407,7 +418,7 @@ onMounted(async () => {
               type="button"
               @click="setTab('global_giants')"
               :class="[
-                'px-3.5 py-1.5 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer',
+                'px-3 sm:px-3.5 py-1.5 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer',
                 activeTab === 'global_giants'
                   ? 'bg-[#0E1A2B] text-white shadow-xs'
                   : 'text-[#3F4A5A] hover:text-[#0E1A2B] hover:bg-white'
@@ -421,7 +432,7 @@ onMounted(async () => {
               type="button"
               @click="setTab('national_champions')"
               :class="[
-                'px-3.5 py-1.5 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer',
+                'px-3 sm:px-3.5 py-1.5 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer',
                 activeTab === 'national_champions'
                   ? 'bg-[#0E1A2B] text-white shadow-xs'
                   : 'text-[#3F4A5A] hover:text-[#0E1A2B] hover:bg-white'
@@ -435,7 +446,7 @@ onMounted(async () => {
               type="button"
               @click="setTab('watchlist')"
               :class="[
-                'px-3.5 py-1.5 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer',
+                'px-3 sm:px-3.5 py-1.5 rounded-[4px] text-xs font-medium transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer',
                 activeTab === 'watchlist'
                   ? 'bg-[#0E1A2B] text-white shadow-xs'
                   : 'text-[#3F4A5A] hover:text-[#0E1A2B] hover:bg-white'
@@ -446,24 +457,24 @@ onMounted(async () => {
             </button>
           </div>
 
-          <!-- Total Count & Active Filter Indicator -->
-          <div class="flex items-center gap-2 text-xs font-mono text-[#5F6875]">
+          <!-- Total Count Indicator -->
+          <div class="flex items-center gap-2 text-xs font-mono text-[#5F6875] shrink-0">
             <span class="font-bold text-[#0E1A2B]">{{ totalCompanies }}</span>
             <span>entities indexed</span>
             <span v-if="activeFiltersCount > 0" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[11px]">
-              {{ activeFiltersCount }} filters active
+              {{ activeFiltersCount }} active
             </span>
           </div>
         </div>
 
-        <!-- Quick Focus Industry Personalization Bar (For You Tab) -->
-        <div v-if="activeTab === 'for_you'" class="bg-gradient-to-r from-[#F0F4F8] to-[#F8FAF7] border border-[#D0D9CF] p-3 rounded-[6px] space-y-2">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-mono uppercase tracking-wider text-[#274888] flex items-center gap-1.5">
-              <Sparkles class="w-3 h-3 text-amber-500" />
-              <span>YOUR FOCUS SPECIALTIES & PERSONALIZATION TAGS (DEVELOPER / EXECUTIVE RADAR):</span>
+        <!-- Quick Focus Specialties Personalization Bar (For You Tab) -->
+        <div v-if="activeTab === 'for_you'" class="bg-gradient-to-r from-[#F0F4F8] to-[#F8FAF7] border border-[#D0D9CF] p-3 sm:p-4 rounded-[6px] space-y-2.5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <span class="text-[11px] font-mono uppercase tracking-wider text-[#274888] flex items-center gap-1.5 font-bold">
+              <Sparkles class="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>YOUR FOCUS SPECIALTIES & PERSONALIZATION TAGS:</span>
             </span>
-            <span class="text-[10px] text-[#5F6875] font-mono">Click tags to toggle focus</span>
+            <span class="text-[10px] text-[#5F6875] font-mono">Click tags to tailor your focus</span>
           </div>
           <div class="flex flex-wrap gap-1.5">
             <button
@@ -479,18 +490,18 @@ onMounted(async () => {
               ]"
             >
               <span>{{ tag }}</span>
-              <Check v-if="activePersonalizationTags.includes(tag)" class="w-3 h-3" />
+              <Check v-if="activePersonalizationTags.includes(tag)" class="w-3 h-3 shrink-0" />
             </button>
           </div>
         </div>
       </div>
 
       <!-- Multi-Level Geographic & Industry Cascading Filter Bar -->
-      <div class="bg-white border border-[#D0D9CF] p-4 rounded-[6px] shadow-xs space-y-3">
+      <div class="bg-white border border-[#D0D9CF] p-4 sm:p-5 rounded-[6px] shadow-xs space-y-3">
         <div class="flex items-center justify-between pb-2 border-b border-[#D0D9CF]/60 text-xs">
           <div class="flex items-center gap-1.5 font-mono text-[#0E1A2B] uppercase tracking-wider text-[11px] font-bold">
             <SlidersHorizontal class="w-3.5 h-3.5 text-[#274888]" />
-            <span>Multi-Level Geographic & Industry Filters</span>
+            <span>Multi-Level Geographic & Industry Taxonomy Filters</span>
           </div>
           <button
             v-if="activeFiltersCount > 0"
@@ -503,13 +514,16 @@ onMounted(async () => {
           </button>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+        <!-- 6 Dropdowns: 1 col on mobile, 2 on tablet, 3 on laptop, 6 on wide desktop -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 text-xs">
           <!-- 1. Continent Filter -->
-          <div>
-            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1">Continent</label>
+          <div class="min-w-0">
+            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1 font-semibold truncate">
+              Continent
+            </label>
             <select
               v-model="selectedContinent"
-              class="w-full px-2.5 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] focus:outline-none focus:border-[#274888]"
+              class="w-full truncate px-2.5 py-2 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] text-xs focus:outline-none focus:border-[#274888] shadow-2xs"
             >
               <option value="">All Continents (6)</option>
               <option v-for="c in taxonomyData.continents" :key="c" :value="c">
@@ -519,11 +533,13 @@ onMounted(async () => {
           </div>
 
           <!-- 2. Country Filter (Cascading) -->
-          <div>
-            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1">Country</label>
+          <div class="min-w-0">
+            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1 font-semibold truncate">
+              Country
+            </label>
             <select
               v-model="selectedCountry"
-              class="w-full px-2.5 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] focus:outline-none focus:border-[#274888]"
+              class="w-full truncate px-2.5 py-2 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] text-xs focus:outline-none focus:border-[#274888] shadow-2xs"
             >
               <option value="">All Countries</option>
               <option v-for="country in availableCountries" :key="country.country" :value="country.country">
@@ -533,12 +549,14 @@ onMounted(async () => {
           </div>
 
           <!-- 3. Division / State / Province (Cascading) -->
-          <div>
-            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1">State / Division</label>
+          <div class="min-w-0">
+            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1 font-semibold truncate">
+              State / Division
+            </label>
             <select
               v-model="selectedDivision"
               @change="currentPage = 1; fetchCompanies()"
-              class="w-full px-2.5 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] focus:outline-none focus:border-[#274888]"
+              class="w-full truncate px-2.5 py-2 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] text-xs focus:outline-none focus:border-[#274888] shadow-2xs"
             >
               <option value="">All Divisions/States</option>
               <option v-for="div in availableDivisions" :key="div.name" :value="div.name">
@@ -548,12 +566,14 @@ onMounted(async () => {
           </div>
 
           <!-- 4. District / County (Cascading) -->
-          <div>
-            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1">District / County</label>
+          <div class="min-w-0">
+            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1 font-semibold truncate">
+              District / County
+            </label>
             <select
               v-model="selectedDistrict"
               @change="currentPage = 1; fetchCompanies()"
-              class="w-full px-2.5 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] focus:outline-none focus:border-[#274888]"
+              class="w-full truncate px-2.5 py-2 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] text-xs focus:outline-none focus:border-[#274888] shadow-2xs"
             >
               <option value="">All Districts/Counties</option>
               <option v-for="dist in availableDistricts" :key="dist.name" :value="dist.name">
@@ -563,12 +583,14 @@ onMounted(async () => {
           </div>
 
           <!-- 5. Industry / Specialty -->
-          <div>
-            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1">Industry Sector</label>
+          <div class="min-w-0">
+            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1 font-semibold truncate">
+              Industry Sector
+            </label>
             <select
               v-model="selectedIndustry"
               @change="currentPage = 1; fetchCompanies()"
-              class="w-full px-2.5 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] focus:outline-none focus:border-[#274888]"
+              class="w-full truncate px-2.5 py-2 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] text-xs focus:outline-none focus:border-[#274888] shadow-2xs"
             >
               <option value="">All Industries</option>
               <option v-for="ind in taxonomyData.industries" :key="ind.name" :value="ind.name">
@@ -578,12 +600,14 @@ onMounted(async () => {
           </div>
 
           <!-- 6. Market Cap Tier -->
-          <div>
-            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1">Market Cap Tier</label>
+          <div class="min-w-0">
+            <label class="block text-[10px] font-mono uppercase text-[#5F6875] mb-1 font-semibold truncate">
+              Market Cap Tier
+            </label>
             <select
               v-model="selectedMarketCapTier"
               @change="currentPage = 1; fetchCompanies()"
-              class="w-full px-2.5 py-1.5 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] focus:outline-none focus:border-[#274888]"
+              class="w-full truncate px-2.5 py-2 rounded-[4px] border border-[#D0D9CF] bg-white text-[#0E1A2B] text-xs focus:outline-none focus:border-[#274888] shadow-2xs"
             >
               <option value="">All Tiers</option>
               <option value="mega">Mega Cap ($200B+)</option>
@@ -592,11 +616,55 @@ onMounted(async () => {
             </select>
           </div>
         </div>
+
+        <!-- Active Filter Badges Bar -->
+        <div v-if="activeFiltersCount > 0" class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#D0D9CF]/40 text-xs">
+          <span class="text-[11px] font-mono text-[#5F6875] font-semibold">Active:</span>
+
+          <span v-if="selectedContinent" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-900 text-[11px] border border-blue-200">
+            Continent: {{ selectedContinent }}
+            <button @click="selectedContinent = ''; fetchCompanies()" class="hover:text-black cursor-pointer"><X class="w-3 h-3" /></button>
+          </span>
+
+          <span v-if="selectedCountry" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-900 text-[11px] border border-blue-200">
+            Country: {{ selectedCountry }}
+            <button @click="selectedCountry = ''; fetchCompanies()" class="hover:text-black cursor-pointer"><X class="w-3 h-3" /></button>
+          </span>
+
+          <span v-if="selectedDivision" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-900 text-[11px] border border-blue-200">
+            State/Division: {{ selectedDivision }}
+            <button @click="selectedDivision = ''; fetchCompanies()" class="hover:text-black cursor-pointer"><X class="w-3 h-3" /></button>
+          </span>
+
+          <span v-if="selectedDistrict" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-900 text-[11px] border border-blue-200">
+            District: {{ selectedDistrict }}
+            <button @click="selectedDistrict = ''; fetchCompanies()" class="hover:text-black cursor-pointer"><X class="w-3 h-3" /></button>
+          </span>
+
+          <span v-if="selectedIndustry" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-900 text-[11px] border border-emerald-200">
+            Industry: {{ selectedIndustry }}
+            <button @click="selectedIndustry = ''; fetchCompanies()" class="hover:text-black cursor-pointer"><X class="w-3 h-3" /></button>
+          </span>
+
+          <span v-if="selectedMarketCapTier" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-900 text-[11px] border border-amber-200">
+            Tier: {{ selectedMarketCapTier }}
+            <button @click="selectedMarketCapTier = ''; fetchCompanies()" class="hover:text-black cursor-pointer"><X class="w-3 h-3" /></button>
+          </span>
+
+          <span v-if="searchQuery" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-800 text-[11px] border border-gray-300">
+            "{{ searchQuery }}"
+            <button @click="searchQuery = ''; fetchCompanies()" class="hover:text-black cursor-pointer"><X class="w-3 h-3" /></button>
+          </span>
+
+          <button @click="resetFilters" class="text-[11px] text-[#274888] hover:underline font-medium ml-1 cursor-pointer">
+            Clear all
+          </button>
+        </div>
       </div>
 
       <!-- Loading State -->
-      <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <div v-for="i in 6" :key="i" class="card-editorial p-5 space-y-4">
+      <div v-if="isLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+        <div v-for="i in 8" :key="i" class="card-editorial p-5 space-y-4 rounded-[6px] border border-[#D0D9CF] bg-white">
           <Skeleton class="h-6 w-1/3" />
           <Skeleton class="h-6 w-3/4" />
           <Skeleton class="h-14 w-full" />
@@ -608,10 +676,10 @@ onMounted(async () => {
       </div>
 
       <!-- Empty State -->
-      <div v-else-if="companies.length === 0" class="card-editorial p-12 text-center text-[#5F6875] space-y-3">
-        <Building2 class="w-8 h-8 mx-auto text-[#5F6875]/40" />
+      <div v-else-if="companies.length === 0" class="card-editorial p-12 text-center text-[#5F6875] space-y-3 rounded-[6px] border border-[#D0D9CF] bg-white">
+        <Building2 class="w-10 h-10 mx-auto text-[#5F6875]/40" />
         <h3 class="text-base font-semibold text-[#0E1A2B]">No companies matching your criteria</h3>
-        <p class="text-xs max-w-md mx-auto">
+        <p class="text-xs max-w-md mx-auto leading-relaxed">
           No corporate entities were found with the current combination of location, industry, or search parameters. Try clearing some filters.
         </p>
         <button
@@ -624,32 +692,32 @@ onMounted(async () => {
         </button>
       </div>
 
-      <!-- Companies Grid -->
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <!-- Companies Responsive Grid: 1 col on mobile, 2 on tablet, 3 on laptop, 4 on wide desktop -->
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-5">
         <div
           v-for="co in companies"
           :key="co.id"
-          class="card-editorial p-5 flex flex-col justify-between space-y-4 hover:border-[#274888]/60 transition-all hover:shadow-md group bg-white"
+          class="card-editorial p-4 sm:p-5 flex flex-col justify-between space-y-3.5 hover:border-[#274888]/60 transition-all hover:shadow-md group bg-white rounded-[6px] border border-[#D0D9CF] min-w-0"
         >
-          <div class="space-y-3.5">
+          <div class="space-y-3 min-w-0">
             <!-- Header Row: Monogram, Ticker, Industry, Market Cap -->
-            <div class="flex items-start justify-between gap-2">
-              <div class="flex items-center gap-3">
+            <div class="flex items-start justify-between gap-2.5">
+              <div class="flex items-center gap-2.5 min-w-0 flex-1">
                 <span class="w-10 h-10 rounded-[3px] bg-[#EEEBE4] border border-[#D0D9CF] text-[#0E1A2B] font-serif font-bold text-sm flex items-center justify-center shrink-0 group-hover:border-[#274888] group-hover:bg-[#EBF5EE] transition-colors">
                   {{ getMonogram(co.name) }}
                 </span>
-                <div>
-                  <div class="flex items-center gap-1.5">
-                    <span v-if="co.ticker" class="font-mono text-xs font-bold text-[#274888] bg-[#F0F4F8] px-1.5 py-0.5 rounded-[2px] border border-[#D0D9CF]/60">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span v-if="co.ticker" class="font-mono text-xs font-bold text-[#274888] bg-[#F0F4F8] px-1.5 py-0.5 rounded-[2px] border border-[#D0D9CF]/60 shrink-0">
                       {{ co.ticker }}
                     </span>
-                    <span class="text-[10px] font-mono uppercase font-semibold text-[#147A67] bg-[#EBF5EE] px-1.5 py-0.5 rounded-[2px] truncate max-w-[170px]" :title="co.industry">
+                    <span class="text-[10px] font-mono uppercase font-semibold text-[#147A67] bg-[#EBF5EE] px-1.5 py-0.5 rounded-[2px] truncate max-w-[140px] sm:max-w-[170px]" :title="co.industry">
                       {{ co.industry || co.sector || 'Enterprise' }}
                     </span>
                   </div>
-                  <div class="text-[11px] text-[#5F6875] flex items-center gap-1 mt-1 font-medium">
+                  <div class="text-[11px] text-[#5F6875] flex items-center gap-1 mt-1 font-medium truncate">
                     <Globe2 class="w-3 h-3 text-[#5F6875] shrink-0" />
-                    <span>{{ co.country || co.headquarters_country }} ({{ co.continent }})</span>
+                    <span class="truncate">{{ co.country || co.headquarters_country }} ({{ co.continent }})</span>
                   </div>
                 </div>
               </div>
@@ -657,7 +725,7 @@ onMounted(async () => {
               <!-- Market Cap Tier Badge -->
               <span
                 :class="[
-                  'px-2 py-0.5 rounded-[2px] text-[10px] font-mono uppercase font-bold shrink-0 border',
+                  'px-2 py-0.5 rounded-[2px] text-[10px] font-mono uppercase font-bold shrink-0 border whitespace-nowrap',
                   co.market_cap_tier === 'mega'
                     ? 'bg-amber-50 text-amber-900 border-amber-200'
                     : co.market_cap_tier === 'large'
@@ -672,7 +740,7 @@ onMounted(async () => {
             <!-- Company Name -->
             <h3
               @click="openCompanyDetail(co)"
-              class="editorial-headline text-lg font-medium text-[#0E1A2B] leading-snug cursor-pointer group-hover:text-[#274888] transition-colors line-clamp-1"
+              class="editorial-headline text-base sm:text-lg font-medium text-[#0E1A2B] leading-snug cursor-pointer group-hover:text-[#274888] transition-colors line-clamp-1 break-words"
               :title="co.name"
             >
               {{ co.name }}
@@ -680,40 +748,39 @@ onMounted(async () => {
 
             <!-- Geo Administrative Jurisdiction Hierarchy Breadcrumbs -->
             <div class="flex flex-wrap items-center gap-1 text-[10px] font-mono">
-              <span v-if="co.admin_level_1 || co.division || co.state" class="px-1.5 py-0.5 bg-[#F8FAF7] border border-[#D0D9CF] rounded-[2px] text-[#274888]">
-                <strong>{{ co.admin_labels?.level_1 || 'Division/State' }}:</strong> {{ co.admin_level_1 || co.division || co.state }}
+              <span v-if="co.admin_level_1 || co.division || co.state" class="px-1.5 py-0.5 bg-[#F8FAF7] border border-[#D0D9CF] rounded-[2px] text-[#274888] max-w-full truncate" :title="`${co.admin_labels?.level_1 || 'L1'}: ${co.admin_level_1 || co.division || co.state}`">
+                <strong class="font-semibold">{{ co.admin_labels?.level_1 || 'State' }}:</strong> {{ co.admin_level_1 || co.division || co.state }}
               </span>
-              <span v-if="co.admin_level_2 || co.district || co.county" class="px-1.5 py-0.5 bg-[#F8FAF7] border border-[#D0D9CF] rounded-[2px] text-[#147A67]">
-                <strong>{{ co.admin_labels?.level_2 || 'District/County' }}:</strong> {{ co.admin_level_2 || co.district || co.county }}
+              <span v-if="co.admin_level_2 || co.district || co.county" class="px-1.5 py-0.5 bg-[#F8FAF7] border border-[#D0D9CF] rounded-[2px] text-[#147A67] max-w-full truncate" :title="`${co.admin_labels?.level_2 || 'L2'}: ${co.admin_level_2 || co.district || co.county}`">
+                <strong class="font-semibold">{{ co.admin_labels?.level_2 || 'District' }}:</strong> {{ co.admin_level_2 || co.district || co.county }}
               </span>
-              <span v-if="co.admin_level_3 || co.upazila || co.city" class="px-1.5 py-0.5 bg-[#F8FAF7] border border-[#D0D9CF] rounded-[2px] text-[#8A5A08]">
-                <strong>{{ co.admin_labels?.level_3 || 'City/Upazila' }}:</strong> {{ co.admin_level_3 || co.upazila || co.city }}
+              <span v-if="co.admin_level_3 || co.upazila || co.city" class="px-1.5 py-0.5 bg-[#F8FAF7] border border-[#D0D9CF] rounded-[2px] text-[#8A5A08] max-w-full truncate" :title="`${co.admin_labels?.level_3 || 'L3'}: ${co.admin_level_3 || co.upazila || co.city}`">
+                <strong class="font-semibold">{{ co.admin_labels?.level_3 || 'City' }}:</strong> {{ co.admin_level_3 || co.upazila || co.city }}
               </span>
             </div>
 
             <!-- Summary -->
-            <p class="text-xs text-[#5F6875] line-clamp-2 leading-relaxed">
+            <p class="text-xs text-[#5F6875] line-clamp-2 leading-relaxed min-h-[34px]">
               {{ co.summary || 'Strategic corporate entity tracked by Nexovant multi-continental intelligence scanners.' }}
             </p>
           </div>
 
           <!-- Footer: Metrics & Follow Action -->
-          <div class="pt-3 border-t border-[#D0D9CF]/60 flex items-center justify-between text-xs">
-            <div class="flex items-center gap-2 text-[11px] font-mono text-[#5F6875]">
-              <span class="flex items-center gap-1">
-                <Users class="w-3 h-3 text-[#5F6875]" />
-                {{ co.employee_count ? `${co.employee_count.toLocaleString()}` : 'Enterprise' }}
+          <div class="pt-3 border-t border-[#D0D9CF]/60 flex items-center justify-between text-xs gap-2">
+            <div class="flex items-center gap-1.5 text-[11px] font-mono text-[#5F6875] truncate">
+              <span class="flex items-center gap-1 truncate">
+                <Users class="w-3 h-3 text-[#5F6875] shrink-0" />
+                <span class="truncate">{{ co.employee_count ? co.employee_count.toLocaleString() : 'Corporate' }}</span>
               </span>
               <span>•</span>
-              <span v-if="co.founded_year">Est. {{ co.founded_year }}</span>
-              <span v-else>Indexed</span>
+              <span class="shrink-0">{{ co.founded_year ? `Est. ${co.founded_year}` : 'Indexed' }}</span>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
                 @click="openCompanyDetail(co)"
-                class="px-2.5 py-1 text-xs text-[#274888] hover:underline font-medium cursor-pointer"
+                class="px-2 py-1 text-xs text-[#274888] hover:underline font-medium cursor-pointer"
               >
                 Profile →
               </button>
@@ -721,14 +788,14 @@ onMounted(async () => {
               <button
                 type="button"
                 :class="[
-                  'px-3 py-1.5 rounded-[4px] text-xs font-medium transition-all border cursor-pointer flex items-center gap-1',
+                  'px-2.5 py-1.5 rounded-[4px] text-xs font-medium transition-all border cursor-pointer flex items-center gap-1',
                   co.is_followed
                     ? 'border-[#17794D]/40 bg-[#E3F1EA] text-[#17794D] font-semibold'
                     : 'border-[#D0D9CF] bg-white text-[#0E1A2B] hover:bg-[#EEEBE4]'
                 ]"
                 @click="toggleFollow(co)"
               >
-                <component :is="co.is_followed ? Check : Plus" class="h-3 w-3" />
+                <component :is="co.is_followed ? Check : Plus" class="h-3 w-3 shrink-0" />
                 <span>{{ co.is_followed ? 'Monitored' : '+ Watch' }}</span>
               </button>
             </div>
@@ -737,7 +804,7 @@ onMounted(async () => {
       </div>
 
       <!-- Pagination Footer -->
-      <div v-if="lastPage > 1" class="flex items-center justify-between border-t border-[#D0D9CF] pt-5 text-xs">
+      <div v-if="lastPage > 1" class="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#D0D9CF] pt-5 text-xs">
         <span class="text-[#5F6875] font-mono">
           Page {{ currentPage }} of {{ lastPage }} ({{ totalCompanies }} companies)
         </span>
@@ -747,7 +814,7 @@ onMounted(async () => {
             :disabled="currentPage <= 1"
             @click="currentPage--; fetchCompanies()"
             :class="[
-              'px-3 py-1.5 rounded-[4px] border text-xs font-medium',
+              'px-3.5 py-1.5 rounded-[4px] border text-xs font-medium transition-colors',
               currentPage <= 1
                 ? 'border-[#D0D9CF] text-[#5F6875]/50 cursor-not-allowed bg-[#F8FAF7]'
                 : 'border-[#D0D9CF] bg-white text-[#0E1A2B] hover:bg-[#EEEBE4] cursor-pointer'
@@ -760,7 +827,7 @@ onMounted(async () => {
             :disabled="currentPage >= lastPage"
             @click="currentPage++; fetchCompanies()"
             :class="[
-              'px-3 py-1.5 rounded-[4px] border text-xs font-medium',
+              'px-3.5 py-1.5 rounded-[4px] border text-xs font-medium transition-colors',
               currentPage >= lastPage
                 ? 'border-[#D0D9CF] text-[#5F6875]/50 cursor-not-allowed bg-[#F8FAF7]'
                 : 'border-[#D0D9CF] bg-white text-[#0E1A2B] hover:bg-[#EEEBE4] cursor-pointer'
@@ -775,41 +842,42 @@ onMounted(async () => {
     <!-- Company Detail Slide-Over Modal / Drawer -->
     <div
       v-if="isDetailDrawerOpen && selectedCompany"
-      class="fixed inset-0 z-50 overflow-hidden bg-black/40 flex justify-end animate-in fade-in duration-200"
+      class="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
       @click.self="closeCompanyDetail"
     >
-      <div class="w-full max-w-xl bg-white h-full shadow-2xl flex flex-col justify-between text-left border-l border-[#D0D9CF] overflow-y-auto">
+      <div class="w-full sm:max-w-xl bg-white h-full shadow-2xl flex flex-col justify-between text-left border-l border-[#D0D9CF] overflow-y-auto">
         <!-- Header -->
-        <div class="p-6 border-b border-[#D0D9CF] bg-[#F8FAF7] flex items-start justify-between">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2 font-mono text-xs text-[#274888]">
-              <span v-if="selectedCompany.ticker" class="font-bold bg-[#EBF5EE] text-[#147A67] px-2 py-0.5 rounded">
+        <div class="p-5 sm:p-6 border-b border-[#D0D9CF] bg-[#F8FAF7] flex items-start justify-between gap-3">
+          <div class="space-y-1 min-w-0">
+            <div class="flex items-center gap-2 font-mono text-xs text-[#274888] flex-wrap">
+              <span v-if="selectedCompany.ticker" class="font-bold bg-[#EBF5EE] text-[#147A67] px-2 py-0.5 rounded shrink-0">
                 {{ selectedCompany.ticker }}
               </span>
-              <span>{{ selectedCompany.sector || 'Technology' }}</span>
+              <span class="truncate">{{ selectedCompany.sector || 'Technology' }}</span>
               <span>•</span>
-              <span class="capitalize">{{ selectedCompany.market_cap_tier }} Cap</span>
+              <span class="capitalize shrink-0">{{ selectedCompany.market_cap_tier }} Cap</span>
             </div>
-            <h2 class="editorial-headline text-2xl font-bold text-[#0E1A2B]">
+            <h2 class="editorial-headline text-xl sm:text-2xl font-bold text-[#0E1A2B] break-words">
               {{ selectedCompany.name }}
             </h2>
-            <div class="text-xs text-[#5F6875] flex items-center gap-1 font-medium">
-              <Globe2 class="w-3.5 h-3.5 text-[#5F6875]" />
-              <span>{{ selectedCompany.country }} • {{ selectedCompany.continent }}</span>
+            <div class="text-xs text-[#5F6875] flex items-center gap-1 font-medium truncate">
+              <Globe2 class="w-3.5 h-3.5 text-[#5F6875] shrink-0" />
+              <span class="truncate">{{ selectedCompany.country }} • {{ selectedCompany.continent }}</span>
             </div>
           </div>
 
           <button
             type="button"
             @click="closeCompanyDetail"
-            class="text-[#5F6875] hover:text-[#0E1A2B] p-1.5 rounded-full hover:bg-white border border-transparent hover:border-[#D0D9CF] cursor-pointer"
+            class="text-[#5F6875] hover:text-[#0E1A2B] p-1.5 rounded-full hover:bg-white border border-transparent hover:border-[#D0D9CF] cursor-pointer shrink-0"
+            aria-label="Close dialog"
           >
             <X class="w-5 h-5" />
           </button>
         </div>
 
         <!-- Body Details -->
-        <div class="p-6 space-y-6 flex-1 text-xs">
+        <div class="p-5 sm:p-6 space-y-6 flex-1 text-xs overflow-y-auto">
           <!-- Overview -->
           <div class="space-y-2">
             <h4 class="font-mono uppercase text-[11px] font-bold text-[#0E1A2B]">Corporate Intelligence Brief</h4>
@@ -821,10 +889,10 @@ onMounted(async () => {
           <!-- Multi-Level Geographic Administrative Jurisdiction Breakdown -->
           <div class="space-y-2.5 bg-[#F8FAF7] border border-[#D0D9CF] p-4 rounded-[6px]">
             <h4 class="font-mono uppercase text-[11px] font-bold text-[#274888] flex items-center gap-1.5">
-              <MapPin class="w-3.5 h-3.5 text-[#274888]" />
+              <MapPin class="w-3.5 h-3.5 text-[#274888] shrink-0" />
               <span>Geographic Administrative Jurisdiction:</span>
             </h4>
-            <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
                 <span class="text-[#5F6875] block text-[10px] font-mono uppercase">Continent:</span>
                 <span class="font-medium text-[#0E1A2B]">{{ selectedCompany.continent }}</span>
@@ -835,15 +903,15 @@ onMounted(async () => {
               </div>
               <div>
                 <span class="text-[#5F6875] block text-[10px] font-mono uppercase">{{ selectedCompany.admin_labels?.level_1 || 'State / Division' }}:</span>
-                <span class="font-medium text-[#0E1A2B]">{{ selectedCompany.admin_level_1 || selectedCompany.division || selectedCompany.state }}</span>
+                <span class="font-medium text-[#0E1A2B]">{{ selectedCompany.admin_level_1 || selectedCompany.division || selectedCompany.state || 'N/A' }}</span>
               </div>
               <div>
                 <span class="text-[#5F6875] block text-[10px] font-mono uppercase">{{ selectedCompany.admin_labels?.level_2 || 'District / County' }}:</span>
-                <span class="font-medium text-[#0E1A2B]">{{ selectedCompany.admin_level_2 || selectedCompany.district || selectedCompany.county }}</span>
+                <span class="font-medium text-[#0E1A2B]">{{ selectedCompany.admin_level_2 || selectedCompany.district || selectedCompany.county || 'N/A' }}</span>
               </div>
               <div>
                 <span class="text-[#5F6875] block text-[10px] font-mono uppercase">{{ selectedCompany.admin_labels?.level_3 || 'City / Upazila' }}:</span>
-                <span class="font-medium text-[#0E1A2B]">{{ selectedCompany.admin_level_3 || selectedCompany.upazila || selectedCompany.city }}</span>
+                <span class="font-medium text-[#0E1A2B]">{{ selectedCompany.admin_level_3 || selectedCompany.upazila || selectedCompany.city || 'N/A' }}</span>
               </div>
               <div>
                 <span class="text-[#5F6875] block text-[10px] font-mono uppercase">Industry:</span>
@@ -881,16 +949,16 @@ onMounted(async () => {
               :href="selectedCompany.website_url"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-xs text-[#274888] hover:underline flex items-center gap-1 font-mono"
+              class="text-xs text-[#274888] hover:underline flex items-center gap-1 font-mono break-all"
             >
               <span>{{ selectedCompany.website_url }}</span>
-              <ExternalLink class="w-3 h-3" />
+              <ExternalLink class="w-3 h-3 shrink-0" />
             </a>
           </div>
         </div>
 
         <!-- Footer Actions -->
-        <div class="p-6 border-t border-[#D0D9CF] bg-[#F8FAF7] flex items-center justify-between">
+        <div class="p-5 sm:p-6 border-t border-[#D0D9CF] bg-[#F8FAF7] flex items-center justify-between gap-3">
           <button
             type="button"
             @click="toggleFollow(selectedCompany)"
@@ -901,7 +969,7 @@ onMounted(async () => {
                 : 'border-[#274888] bg-[#274888] text-white hover:bg-[#1C3668]'
             ]"
           >
-            <component :is="selectedCompany.is_followed ? Check : Plus" class="w-4 h-4" />
+            <component :is="selectedCompany.is_followed ? Check : Plus" class="w-4 h-4 shrink-0" />
             <span>{{ selectedCompany.is_followed ? 'Monitored on Watchlist' : '+ Add to Monitored Watchlist' }}</span>
           </button>
 
