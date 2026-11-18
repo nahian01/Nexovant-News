@@ -50,6 +50,7 @@ const adminNavGroups = [
     title: 'Editorial & Taxonomy',
     items: [
       { name: 'Articles & Override Locks', path: '/admin/articles', icon: Newspaper },
+      { name: 'Companies & Geo-Directory', path: '/admin/companies', icon: Building2 },
       { name: 'Taxonomy & Knowledge DAG', path: '/admin/taxonomy', icon: FolderTree },
       { name: 'Story Clusters (Merge/Split)', path: '/admin/clusters', icon: Layers3 },
       { name: 'News Sources & RSS Feeds', path: '/admin/sources', icon: Radio },

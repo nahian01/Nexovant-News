@@ -12,15 +12,65 @@ use Illuminate\Http\Request;
 class CompanyController
 {
     /**
-     * List global enterprise companies.
+     * List global enterprise companies with multi-level geo and industry taxonomy filtering.
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Company::withCount(['articles', 'executives'])
-            ->where('is_active', true);
+        $query = Company::with([
+            'category:id,name,slug,color,industry',
+            'subcategory:id,name,slug',
+        ])->withCount(['articles', 'executives'])
+          ->where('is_active', true);
 
         if ($sector = $request->query('sector')) {
             $query->where('sector', $sector);
+        }
+
+        if ($industry = $request->query('industry')) {
+            $query->where('industry', $industry);
+        }
+
+        if ($continent = $request->query('continent')) {
+            $query->where('continent', $continent);
+        }
+
+        if ($country = $request->query('country')) {
+            $query->where(function ($q) use ($country) {
+                $q->where('country', $country)
+                  ->orWhere('headquarters_country', strtoupper($country));
+            });
+        }
+
+        if ($division = $request->query('division')) {
+            $query->where(function ($q) use ($division) {
+                $q->where('division', $division)
+                  ->orWhere(fn($sq) => $sq->where('admin_level_1_type', 'division')->where('admin_level_1', $division));
+            });
+        }
+
+        if ($district = $request->query('district')) {
+            $query->where(function ($q) use ($district) {
+                $q->where('district', $district)
+                  ->orWhere('admin_level_2', $district);
+            });
+        }
+
+        if ($upazila = $request->query('upazila')) {
+            $query->where(function ($q) use ($upazila) {
+                $q->where('upazila', $upazila)
+                  ->orWhere(fn($sq) => $sq->where('admin_level_3_type', 'upazila')->where('admin_level_3', $upazila));
+            });
+        }
+
+        if ($state = $request->query('state')) {
+            $query->where(function ($q) use ($state) {
+                $q->where('state', $state)
+                  ->orWhere('admin_level_1', $state);
+            });
+        }
+
+        if ($categorySlug = $request->query('category')) {
+            $query->whereHas('category', fn($q) => $q->where('slug', $categorySlug));
         }
 
         if ($tier = $request->query('market_cap_tier')) {
@@ -30,7 +80,12 @@ class CompanyController
         if ($search = $request->query('q')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('ticker', 'like', "%{$search}%");
+                  ->orWhere('ticker', 'like', "%{$search}%")
+                  ->orWhere('city', 'like', "%{$search}%")
+                  ->orWhere('upazila', 'like', "%{$search}%")
+                  ->orWhere('district', 'like', "%{$search}%")
+                  ->orWhere('division', 'like', "%{$search}%")
+                  ->orWhere('country', 'like', "%{$search}%");
             });
         }
 

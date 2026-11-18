@@ -46,6 +46,7 @@ import AdminReportsView from '@/views/admin/AdminReportsView.vue'
 import AdminSystemView from '@/views/admin/AdminSystemView.vue'
 import AdminAuditLogsView from '@/views/admin/AdminAuditLogsView.vue'
 import AdminTaxonomyView from '@/views/admin/AdminTaxonomyView.vue'
+import AdminCompaniesView from '@/views/admin/AdminCompaniesView.vue'
 import AdminNotificationsView from '@/views/admin/AdminNotificationsView.vue'
 import IntelligenceControlCenter from '@/views/admin/IntelligenceControlCenter.vue'
 import ResearchControlCenter from '@/views/admin/ResearchControlCenter.vue'
@@ -302,6 +303,12 @@ const routes = [
     path: '/admin/articles',
     name: 'admin-articles',
     component: AdminArticlesView,
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/companies',
+    name: 'admin-companies',
+    component: AdminCompaniesView,
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {

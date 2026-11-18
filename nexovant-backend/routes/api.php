@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Admin\UserAdminController;
 use App\Http\Controllers\Api\V1\Admin\AdAdminController;
 use App\Http\Controllers\Api\V1\Admin\SystemAdminController;
 use App\Http\Controllers\Api\V1\Admin\TaxonomyAdminController;
+use App\Http\Controllers\Api\V1\Admin\CompanyAdminController;
 use App\Http\Controllers\Api\V1\Admin\NotificationAdminController;
 use App\Http\Controllers\Api\V1\Admin\IntelligenceAdminController;
 use App\Http\Controllers\Api\V1\Admin\ResearchAdminController;
@@ -560,6 +561,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/taxonomy/tags/{id}', [TaxonomyAdminController::class, 'destroyTag']);
         Route::get('/taxonomy/series', [TaxonomyAdminController::class, 'series']);
         Route::post('/taxonomy/series', [TaxonomyAdminController::class, 'storeSeries'])->name('api.admin.taxonomy.series.store');
+
+        // 7.1 Company Directory & Geo-Hierarchy
+        Route::get('/companies/geo-options', [CompanyAdminController::class, 'geoHierarchyOptions'])->name('api.admin.companies.geo-options');
+        Route::get('/companies', [CompanyAdminController::class, 'index'])->name('api.admin.companies.index');
+        Route::post('/companies', [CompanyAdminController::class, 'store'])->name('api.admin.companies.store');
+        Route::get('/companies/{id}', [CompanyAdminController::class, 'show'])->name('api.admin.companies.show');
+        Route::put('/companies/{id}', [CompanyAdminController::class, 'update'])->name('api.admin.companies.update');
+        Route::delete('/companies/{id}', [CompanyAdminController::class, 'destroy'])->name('api.admin.companies.destroy');
 
         // 8. RAG & Knowledge
         Route::get('/rag-knowledge', [RagAdminController::class, 'index'])->name('api.admin.rag.index');

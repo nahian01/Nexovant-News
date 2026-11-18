@@ -472,6 +472,8 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
+        $this->call(CompanyDirectorySeeder::class);
+
         // 6. Seed Sample 10-Dimension Articles & Initial Revision
         $article1 = Article::updateOrCreate(
             ['slug' => 'nvidia-custom-silicon-foundry-emea'],
