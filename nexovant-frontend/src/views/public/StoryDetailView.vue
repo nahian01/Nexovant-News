@@ -124,6 +124,27 @@ const storyTimeline = computed(() => {
   return events
 })
 
+const formattedNarrative = computed(() => {
+  const raw = article.value?.content_normalized || article.value?.content_raw || ''
+  if (!raw) return ''
+
+  // If content already contains HTML tags like <p>, <br>, sanitize disallowed tags
+  const hasHtml = /<[a-z][\s\S]*>/i.test(raw)
+  if (hasHtml) {
+    // Strip script, style, iframe, object, embed
+    let clean = raw.replace(/<(script|style|iframe|object|embed)[^>]*?>.*?<\/\1>/gis, '')
+    // Strip on* inline attributes
+    clean = clean.replace(/<([a-z][a-z0-9]*)[^>]*?(\bon[a-z]+\s*=\s*(['"]).*?\3)[^>]*?>/gi, '<$1>')
+    return clean
+  }
+
+  // If plain text, convert double newlines into <p> paragraphs
+  return raw
+    .split(/\n\s*\n/)
+    .map((para: string) => `<p class="mb-4 leading-relaxed">${para.trim()}</p>`)
+    .join('')
+})
+
 onMounted(() => {
   fetchDetail()
 })
@@ -288,9 +309,10 @@ onMounted(() => {
         <!-- Core Reading Body (Editorial Typography: Newsreader serif 17px/28px) -->
         <section class="space-y-4 border-t border-[#D0D9CF] pt-6">
           <h3 class="section-label">Full intelligence narrative</h3>
-          <div class="font-serif text-[17px] leading-[28px] text-[#0E1A2B] space-y-4 max-w-[66ch]">
-            <p>{{ article.content_normalized || article.content_raw }}</p>
-          </div>
+          <div
+            class="font-serif text-[17px] leading-[28px] text-[#0E1A2B] space-y-4 max-w-[66ch] article-narrative"
+            v-html="formattedNarrative"
+          />
         </section>
 
         <!-- Additional Coverage Table (per Mockup 2 Story detail.png) -->

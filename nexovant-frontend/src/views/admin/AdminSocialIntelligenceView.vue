@@ -8,6 +8,7 @@ import { apiClient } from '@/services/api/client'
 
 const trends = ref<any[]>([])
 const isLoading = ref(true)
+const isScanning = ref(false)
 const statusMessage = ref('')
 
 const headers = ['Topic & Entity', 'Velocity', 'Cross-Platform', 'Credibility Score', 'Status', 'Actions']
@@ -21,6 +22,23 @@ const fetchTrends = async () => {
     //
   } finally {
     isLoading.value = false
+  }
+}
+
+const triggerRadarScan = async () => {
+  isScanning.value = true
+  statusMessage.value = ''
+  try {
+    const res = await apiClient.post('/trends/scan')
+    if (res.data?.success) {
+      statusMessage.value = res.data.message || `Evaluated ${res.data.count} active intelligence radar topics.`
+      await fetchTrends()
+    }
+  } catch (err: any) {
+    statusMessage.value = 'Failed to execute radar scan.'
+  } finally {
+    isScanning.value = false
+    setTimeout(() => (statusMessage.value = ''), 4000)
   }
 }
 
@@ -48,9 +66,14 @@ onMounted(() => {
           </p>
         </div>
 
-        <Button variant="secondary" size="sm" @click="fetchTrends">
-          Refresh Trends
-        </Button>
+        <div class="flex items-center gap-2">
+          <Button variant="secondary" size="sm" @click="fetchTrends" :disabled="isLoading">
+            Refresh Trends
+          </Button>
+          <Button variant="primary" size="sm" @click="triggerRadarScan" :loading="isScanning">
+            Auto-Scan Radar
+          </Button>
+        </div>
       </div>
 
       <div

@@ -95,6 +95,8 @@ Route::prefix('executives')->group(function () {
 
 Route::prefix('trends')->group(function () {
     Route::get('/', [SocialTrendController::class, 'index'])->name('api.trends.index');
+    Route::post('/scan', [SocialTrendController::class, 'scan'])->name('api.trends.scan');
+    Route::post('/custom-prediction', [SocialTrendController::class, 'customPrediction'])->name('api.trends.custom-prediction');
     Route::get('/{id}', [SocialTrendController::class, 'show'])->name('api.trends.show');
 });
 

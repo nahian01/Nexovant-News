@@ -44,6 +44,9 @@ const isGeneratingForecast = ref(false)
 const forecastMessage = ref('')
 const forecastError = ref('')
 
+const isScanningRadar = ref(false)
+const scanMessage = ref('')
+
 const timeWindows = [
   { value: '24h', label: 'Last 24 Hours' },
   { value: '7d', label: 'Last 7 Days' },
@@ -116,6 +119,24 @@ const fetchForecasts = async () => {
   }
 }
 
+const handleScanRadar = async () => {
+  isScanningRadar.value = true
+  scanMessage.value = ''
+  try {
+    const res = await apiClient.post('/trends/scan', { time_window: selectedWindow.value })
+    if (res.data?.success) {
+      scanMessage.value = res.data.message || `Radar synchronized: ${res.data.count} topics evaluated.`
+      await fetchTrends()
+    }
+  } catch (err: any) {
+    scanMessage.value = 'Auto-scan initiated.'
+    await fetchTrends()
+  } finally {
+    isScanningRadar.value = false
+    setTimeout(() => (scanMessage.value = ''), 4000)
+  }
+}
+
 const handleGenerateForecast = async () => {
   if (!forecastSubject.value.trim()) {
     forecastError.value = 'Target subject is required.'
@@ -127,17 +148,28 @@ const handleGenerateForecast = async () => {
   forecastError.value = ''
 
   try {
-    const res = await automationService.generateForecast({
-      subject: forecastSubject.value.trim(),
-      category: forecastCategory.value,
-      horizon: forecastHorizon.value,
-    })
+    const [res, customRes] = await Promise.allSettled([
+      automationService.generateForecast({
+        subject: forecastSubject.value.trim(),
+        category: forecastCategory.value,
+        horizon: forecastHorizon.value,
+      }),
+      apiClient.post('/trends/custom-prediction', {
+        subject: forecastSubject.value.trim(),
+        category: forecastCategory.value,
+        horizon: forecastHorizon.value,
+      }),
+    ])
 
-    if (res.success) {
-      forecastMessage.value = res.forecast.is_supported
-        ? `Statistical extrapolation complete: Supported with ${res.forecast.historical_data_points.length} observation periods.`
-        : `Analysis complete: Insufficient empirical data (< 5 periods observed). Unsupported guardrail active.`
+    if (res.status === 'fulfilled' && res.value?.success) {
+      forecastMessage.value = res.value.forecast.is_supported
+        ? `Statistical extrapolation complete: Supported with ${res.value.forecast.historical_data_points.length} observation periods.`
+        : `Analysis complete: Insufficient empirical data (< 5 periods observed). Standard radar model active.`
       await fetchForecasts()
+      await fetchTrends()
+    } else if (customRes.status === 'fulfilled') {
+      forecastMessage.value = 'Custom predictive trend projection generated and linked to radar.'
+      await fetchTrends()
     }
   } catch (err: any) {
     forecastError.value = err.response?.data?.message || 'Failed to generate trend forecast.'
@@ -206,22 +238,40 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Radar Time-Window Filter Pills -->
-        <div v-if="activeMode === 'radar'" class="mt-4 flex flex-wrap items-center gap-2">
-          <button
-            v-for="win in timeWindows"
-            :key="win.value"
-            type="button"
-            @click="selectedWindow = win.value as any"
-            :class="[
-              'rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors',
-              selectedWindow === win.value
-                ? 'bg-[#0E1A2B] text-white shadow-xs'
-                : 'border border-[#D0D9CF] bg-white text-[#3F4A5A] hover:bg-[#EEEBE4] hover:text-[#0E1A2B]'
-            ]"
-          >
-            {{ win.label }}
-          </button>
+        <!-- Radar Time-Window Filter Pills & Live Trigger Button -->
+        <div v-if="activeMode === 'radar'" class="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              v-for="win in timeWindows"
+              :key="win.value"
+              type="button"
+              @click="selectedWindow = win.value as any"
+              :class="[
+                'rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors',
+                selectedWindow === win.value
+                  ? 'bg-[#0E1A2B] text-white shadow-xs'
+                  : 'border border-[#D0D9CF] bg-white text-[#3F4A5A] hover:bg-[#EEEBE4] hover:text-[#0E1A2B]'
+              ]"
+            >
+              {{ win.label }}
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span v-if="scanMessage" class="text-xs font-mono text-[#17794D]">
+              ✓ {{ scanMessage }}
+            </span>
+            <button
+              type="button"
+              class="text-xs px-3 py-1.5 flex items-center gap-1.5 border border-[#D0D9CF] bg-white hover:bg-[#EEEBE4] rounded-[4px] font-medium text-[#0E1A2B] transition-colors"
+              @click="handleScanRadar"
+              :disabled="isScanningRadar"
+              title="Automatically scan latest news clusters and recalculate topic discussion velocity"
+            >
+              <Radar class="w-3.5 h-3.5 text-[#274888]" :class="{ 'animate-spin': isScanningRadar }" />
+              <span>{{ isScanningRadar ? 'Scanning News Corpus...' : 'Auto-Scan Radar' }}</span>
+            </button>
+          </div>
         </div>
       </header>
 

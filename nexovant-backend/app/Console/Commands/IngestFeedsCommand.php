@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\NewsSource;
 use App\Services\Ingestion\IntelligencePipelineCoordinator;
+use App\Services\Intelligence\TrendingIntelligenceRadarService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Throwable;
@@ -107,6 +108,15 @@ class IngestFeedsCommand extends Command
         }
 
         $this->info("Pipeline cycle completed. {$totalProcessed} sources processed, {$totalArticles} articles synthesized.");
+
+        // Automatically synchronize Trending Intelligence Radar from newly ingested stories
+        try {
+            app(TrendingIntelligenceRadarService::class)->detectAndSyncTrends();
+            $this->info("  ✓ Trending Intelligence Radar automatically synchronized.");
+        } catch (Throwable $e) {
+            $this->warn("  ⚠ Trending Intelligence Radar sync skipped: {$e->getMessage()}");
+        }
+
         return self::SUCCESS;
     }
 

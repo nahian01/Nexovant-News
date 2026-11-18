@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { ArrowLeft, ExternalLink } from 'lucide-vue-next'
 import PublicNavbar from '@/components/layout/PublicNavbar.vue'
@@ -26,6 +26,23 @@ const fetchArticleDetail = async () => {
     isLoading.value = false
   }
 }
+
+const formattedNarrative = computed(() => {
+  const raw = article.value?.content_normalized || article.value?.content_raw || ''
+  if (!raw) return ''
+
+  const hasHtml = /<[a-z][\s\S]*>/i.test(raw)
+  if (hasHtml) {
+    let clean = raw.replace(/<(script|style|iframe|object|embed)[^>]*?>.*?<\/\1>/gis, '')
+    clean = clean.replace(/<([a-z][a-z0-9]*)[^>]*?(\bon[a-z]+\s*=\s*(['"]).*?\3)[^>]*?>/gi, '<$1>')
+    return clean
+  }
+
+  return raw
+    .split(/\n\s*\n/)
+    .map((para: string) => `<p class="mb-4 leading-relaxed">${para.trim()}</p>`)
+    .join('')
+})
 
 onMounted(() => {
   fetchArticleDetail()
@@ -121,9 +138,7 @@ onMounted(() => {
         </Card>
 
         <!-- Normalized Core Story Content -->
-        <div class="editorial-body text-base text-nexo-text-secondary leading-relaxed space-y-4">
-          <p>{{ article.content_normalized || article.content_raw }}</p>
-        </div>
+        <div class="editorial-body text-base text-nexo-text-secondary leading-relaxed space-y-4" v-html="formattedNarrative" />
 
         <!-- The 10 Dimensions of Executive Assessment -->
         <section v-if="article.assessment" class="space-y-6 pt-6 border-t border-nexo-border/80">
