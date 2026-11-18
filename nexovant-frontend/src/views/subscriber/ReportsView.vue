@@ -7,6 +7,7 @@ import { automationService, type AutomatedReport } from '@/services/api/automati
 import {
   FileText,
   Download,
+  Mail,
   Sparkles,
   Calendar,
   Shield,
@@ -27,6 +28,7 @@ const activeTab = ref<'publications' | 'automated'>('automated')
 // 1. Publications State
 const publications = ref<PublicPublication[]>([])
 const isDownloadingId = ref<string | null>(null)
+const isEmailingId = ref<string | null>(null)
 const searchQuery = ref('')
 const selectedType = ref('all')
 
@@ -87,6 +89,22 @@ const handleDownload = async (pub: PublicPublication) => {
     errorMessage.value = err.response?.data?.message || 'Subscription entitlement check failed. Upgrade to access premium dossiers.'
   } finally {
     isDownloadingId.value = null
+  }
+}
+
+const handleEmailReport = async (pub: PublicPublication) => {
+  isEmailingId.value = pub.id
+  statusMessage.value = ''
+  errorMessage.value = ''
+  try {
+    const res = await publicationService.emailPublication(pub.id)
+    if (res.success) {
+      statusMessage.value = res.message || `Executive intelligence dossier dispatched to your email.`
+    }
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || 'Failed to dispatch publication via email. Please check your account profile.'
+  } finally {
+    isEmailingId.value = null
   }
 }
 
@@ -405,15 +423,27 @@ onMounted(() => {
               <span class="text-[10px] font-mono text-[#5F6875]">
                 {{ pub.page_count }} pages
               </span>
-              <button
-                type="button"
-                class="btn-ink text-xs px-3.5 py-1.5 flex items-center gap-1.5"
-                @click="handleDownload(pub)"
-                :disabled="isDownloadingId === pub.id"
-              >
-                <Download class="w-3.5 h-3.5" />
-                <span>{{ isDownloadingId === pub.id ? 'Verifying...' : 'Download PDF' }}</span>
-              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="text-xs px-2.5 py-1.5 flex items-center gap-1.5 border border-[#D0D9CF] rounded-[2px] bg-white text-[#0E1A2B] hover:bg-[#F0EFEA] transition-colors"
+                  @click="handleEmailReport(pub)"
+                  :disabled="isEmailingId === pub.id"
+                  title="Dispatch executive brief dossier to your verified email"
+                >
+                  <Mail class="w-3.5 h-3.5 text-[#274888]" />
+                  <span>{{ isEmailingId === pub.id ? 'Sending...' : 'Email' }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="btn-ink text-xs px-3.5 py-1.5 flex items-center gap-1.5"
+                  @click="handleDownload(pub)"
+                  :disabled="isDownloadingId === pub.id"
+                >
+                  <Download class="w-3.5 h-3.5" />
+                  <span>{{ isDownloadingId === pub.id ? 'Verifying...' : 'Download PDF' }}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

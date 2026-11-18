@@ -158,6 +158,10 @@ Route::prefix('auth')->group(function () {
     Route::post('/admin/login', [AuthController::class, 'adminLogin'])->middleware('throttle:6,1')->name('api.auth.admin-login');
     Route::post('/admin-login', [AuthController::class, 'adminLogin'])->middleware('throttle:6,1');
 
+    // Password Reset via Brevo SMTP
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:6,1')->name('api.auth.forgot-password');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:6,1')->name('api.auth.reset-password');
+
     // Protected Auth
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/user', [AuthController::class, 'user'])->name('api.auth.user');
@@ -224,8 +228,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // RAG Search Interface
     Route::post('/rag/query', [RagSearchController::class, 'query'])->name('api.rag.query');
 
-    // Publication Downloads
+    // Publication Downloads & Email Delivery
     Route::get('/publications/{id}/download', [PublicationController::class, 'download'])->name('api.publications.download');
+    Route::post('/publications/{id}/email', [PublicationController::class, 'emailReport'])->name('api.publications.email');
 
     // User Feed & Interaction Signals
     Route::post('/user/interact', [UserInteractionController::class, 'interact'])->name('api.user.interact');

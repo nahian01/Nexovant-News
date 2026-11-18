@@ -8,6 +8,8 @@ import PublicArticleDetailView from '@/views/public/PublicArticleDetailView.vue'
 import LandingView from '@/views/public/LandingView.vue'
 import LoginView from '@/views/public/LoginView.vue'
 import RegisterView from '@/views/public/RegisterView.vue'
+import ForgotPasswordView from '@/views/public/ForgotPasswordView.vue'
+import ResetPasswordView from '@/views/public/ResetPasswordView.vue'
 
 // Subscriber Views
 import DashboardView from '@/views/subscriber/DashboardView.vue'
@@ -124,6 +126,16 @@ const routes = [
     path: '/register',
     name: 'register',
     component: RegisterView,
+  },
+  {
+    path: '/forgot-password',
+    name: 'forgot-password',
+    component: ForgotPasswordView,
+  },
+  {
+    path: '/reset-password',
+    name: 'reset-password',
+    component: ResetPasswordView,
   },
 
   // 2. Subscriber & Workspace Routes

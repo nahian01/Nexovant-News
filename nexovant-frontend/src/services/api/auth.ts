@@ -56,4 +56,27 @@ export const authService = {
   async logout(): Promise<void> {
     await apiClient.post('/auth/logout')
   },
+
+  /**
+   * Request password reset instructions dispatched via Brevo SMTP
+   */
+  async forgotPassword(payload: { email: string }): Promise<{ success: boolean; message: string }> {
+    await this.getCsrfCookie()
+    const response = await apiClient.post<{ success: boolean; message: string }>('/auth/forgot-password', payload)
+    return response.data
+  },
+
+  /**
+   * Reset credentials using verified token
+   */
+  async resetPassword(payload: {
+    token: string
+    email: string
+    password: string
+    password_confirmation: string
+  }): Promise<{ success: boolean; message: string }> {
+    await this.getCsrfCookie()
+    const response = await apiClient.post<{ success: boolean; message: string }>('/auth/reset-password', payload)
+    return response.data
+  },
 }

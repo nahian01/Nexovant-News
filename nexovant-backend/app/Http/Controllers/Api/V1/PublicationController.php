@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Mail\ExecutiveReportDeliveryMail;
 use App\Models\Publication;
 use App\Services\Publication\PdfRenderingService;
 use App\Services\Publication\PublicationDistributionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -139,5 +142,62 @@ class PublicationController
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . basename($publication->file_path) . '"',
         ]);
+    }
+
+    /**
+     * Dispatch executive publication dossier directly to user's email via Brevo SMTP.
+     */
+    public function emailReport(string $id, Request $request): JsonResponse
+    {
+        $publication = Publication::with('template')->findOrFail($id);
+        $user = $request->user();
+
+        $recipientEmail = $request->input('recipient_email', $request->input('email', $user?->email));
+        if (empty($recipientEmail)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A valid recipient email address is required.',
+            ], 422);
+        }
+
+        // Render PDF to disk if missing
+        if (! Storage::disk('local')->exists($publication->file_path)) {
+            try {
+                $this->pdfRenderer->render($publication);
+            } catch (\Throwable $e) {
+                Log::warning('Could not render PDF before emailing: ' . $e->getMessage());
+            }
+        }
+
+        $tokenData = $this->distributor->generateDownloadToken(
+            publication: $publication,
+            user: $user,
+            ttlMinutes: 60 * 24 * 7, // 7 days valid
+            maxDownloads: 10
+        );
+
+        try {
+            Mail::to($recipientEmail)->send(new ExecutiveReportDeliveryMail(
+                recipient: $user ?? $recipientEmail,
+                publication: $publication,
+                downloadUrl: $tokenData['download_url'],
+                attachmentPath: $publication->file_path
+            ));
+
+            return response()->json([
+                'success' => true,
+                'message' => "Executive intelligence dossier dispatched to {$recipientEmail}.",
+                'download_url' => $tokenData['download_url'],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to send publication report email: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to dispatch report via email. Please check SMTP configuration.',
+                'error' => $e->getMessage(),
+                'download_url' => $tokenData['download_url'],
+            ], 500);
+        }
     }
 }
