@@ -158,11 +158,11 @@ onMounted(() => {
     </div>
 
     <!-- Footer -->
-    <div class="p-2.5 border-t border-nexo-border text-center bg-nexo-surface/30 flex items-center justify-between px-4">
-      <RouterLink to="/workspace/notifications" @click="emit('close')" class="text-[11px] font-mono text-nexo-accent-cyan hover:underline flex items-center gap-1">
-        Inbox & Notification Settings →
+    <div class="p-2.5 border-t border-nexo-border bg-nexo-surface/30 flex items-center justify-between px-4">
+      <RouterLink to="/workspace/notifications" @click="emit('close')" class="text-xs font-medium text-[#274888] hover:underline flex items-center justify-between w-full">
+        <span>View all notifications in workspace</span>
+        <span>→</span>
       </RouterLink>
-      <span class="text-[10px] text-nexo-text-muted">Real-Time Sync</span>
     </div>
   </div>
 </template>

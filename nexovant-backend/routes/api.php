@@ -85,6 +85,7 @@ Route::prefix('articles')->group(function () {
 
 Route::prefix('companies')->group(function () {
     Route::get('/', [CompanyController::class, 'index'])->name('api.companies.index');
+    Route::get('/taxonomy', [CompanyController::class, 'taxonomy'])->name('api.companies.taxonomy');
     Route::get('/{slug}', [CompanyController::class, 'show'])->name('api.companies.show');
 });
 

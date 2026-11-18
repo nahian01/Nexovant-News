@@ -40,10 +40,15 @@ const handleLogout = async () => {
 </script>
 
 <template>
-  <!-- Top Environment Fixture Banner (Design System v0.1) -->
-  <div class="bg-[#08121C] text-white/90 text-xs py-1.5 px-4 sm:px-6 flex items-center justify-between border-b border-[#263244]">
-    <span class="truncate">Development fixtures: stories, companies, people and publishers shown here are fictional.</span>
-    <span class="text-white/60 text-[11px] shrink-0 ml-4">{{ authStore.isAuthenticated ? 'Signed-in view' : 'Public view' }}</span>
+  <!-- Top Real-Time Platform Status Banner -->
+  <div class="bg-[#08121C] text-white/90 text-xs py-1 px-4 sm:px-6 flex items-center justify-between border-b border-[#263244]">
+    <span class="truncate flex items-center gap-2">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span class="font-mono text-[11px] text-white/80">Nexovant Live Intelligence Network</span>
+      <span class="hidden sm:inline text-white/40">|</span>
+      <span class="hidden sm:inline text-white/70 text-[11px]">Global Corporate Directory & Real-Time Strategic Scanners Active</span>
+    </span>
+    <span class="text-white/60 text-[11px] shrink-0 ml-4 font-mono">{{ authStore.isAuthenticated ? 'Enterprise Member' : 'Global Access' }}</span>
   </div>
 
   <header class="sticky top-0 z-40 h-[64px] w-full border-b border-nexo-border bg-white px-4 sm:px-6">

@@ -32,6 +32,7 @@ export interface Company {
   isin?: string
   sector?: string
   industry?: string
+  tab?: string
   category_id?: string
   category?: {
     id: string
@@ -72,6 +73,7 @@ export interface Company {
   founded_year?: number
   summary?: string
   is_active: boolean
+  is_followed?: boolean
   created_at?: string
   updated_at?: string
   geo_summary?: string
@@ -103,6 +105,7 @@ export interface CompanyFilters {
   admin_level_2?: string
   admin_level_3?: string
   industry?: string
+  tab?: string
   category_id?: string
   category_slug?: string
   market_cap_tier?: string
@@ -182,6 +185,21 @@ export const companiesService = {
 
   async getSubscriberCompanies(params?: CompanyFilters): Promise<CompanyListResponse> {
     const res = await apiClient.get('/companies', { params })
+    return res.data
+  },
+
+  async getTaxonomy(): Promise<any> {
+    const res = await apiClient.get('/companies/taxonomy')
+    return res.data
+  },
+
+  async toggleFollow(companyId: string): Promise<{ success: boolean; is_followed: boolean; message: string }> {
+    const res = await apiClient.post(`/companies/${companyId}/follow`)
+    return res.data
+  },
+
+  async getCompany(slug: string): Promise<any> {
+    const res = await apiClient.get(`/companies/${slug}`)
     return res.data
   },
 }
