@@ -8,17 +8,17 @@ use Illuminate\Support\Facades\Schedule;
 |--------------------------------------------------------------------------
 */
 
-// Scheduled Ingestion & Automation Pipeline
+// Scheduled Ingestion & Automation Pipeline (Runs every 6 hours to scan global news)
 $settingsPath = storage_path('app/settings.json');
-$intervalMinutes = 15;
+$intervalMinutes = 360; // 6 hours
 if (\Illuminate\Support\Facades\File::exists($settingsPath)) {
     $settings = json_decode(\Illuminate\Support\Facades\File::get($settingsPath), true) ?? [];
-    $intervalMinutes = (int) ($settings['feed_fetch_interval_minutes'] ?? $settings['rss_polling_interval_minutes'] ?? 15);
+    $intervalMinutes = (int) ($settings['feed_fetch_interval_minutes'] ?? $settings['rss_polling_interval_minutes'] ?? 360);
 }
-$intervalMinutes = max(1, min(1440, $intervalMinutes));
+$intervalMinutes = max(60, min(1440, $intervalMinutes));
 
 Schedule::command('nexovant:ingest-feeds')
-    ->cron("*/{$intervalMinutes} * * * *")
+    ->everySixHours()
     ->withoutOverlapping();
 Schedule::call(function () {
     app(\App\Services\Ingestion\AutoIngestSchedulerService::class)->runDueIngestionCycles();

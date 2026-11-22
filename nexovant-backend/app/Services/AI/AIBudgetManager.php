@@ -9,7 +9,10 @@ use App\Models\AIProviderCredential;
 use App\Models\AITaskConfig;
 use App\Models\SystemSetting;
 use App\Services\AI\Exceptions\AIQuotaExceededException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class AIBudgetManager
 {
@@ -119,5 +122,64 @@ class AIBudgetManager
             // Update Provider
             $provider->increment('current_monthly_spend_usd', $actualCostUsd);
         });
+
+        // Evaluate token thresholds and auto-rotate when limit is reached
+        $this->evaluateQuotaThresholds($provider, $credential->fresh() ?? $credential);
+    }
+
+    /**
+     * Monitor token consumption against daily free quota, send alerts to operator, and auto-rotate.
+     */
+    public function evaluateQuotaThresholds(AIProvider $provider, AIProviderCredential $credential): void
+    {
+        $dailyBudget = $credential->daily_token_budget ?: 500000;
+        $currentTokens = (int) $credential->current_daily_tokens;
+        $ratio = (float) $currentTokens / (float) $dailyBudget;
+        $alertRecipient = 'abdullahalnahian0@gmail.com';
+
+        // 1. Approaching free limit warning (80% - 99%)
+        if ($ratio >= 0.80 && $ratio < 1.0) {
+            $cacheKey = "ai_quota_warning_{$credential->id}";
+            if (!Cache::has($cacheKey)) {
+                Cache::put($cacheKey, true, now()->addHours(12));
+                try {
+                    Mail::to($alertRecipient)->send(new \App\Mail\AIQuotaWarningMail(
+                        provider: $provider,
+                        credential: $credential,
+                        currentTokens: $currentTokens,
+                        dailyTokenBudget: $dailyBudget,
+                        usagePercentage: $ratio * 100,
+                        isRotated: false
+                    ));
+                } catch (\Throwable $e) {
+                    Log::warning("Failed to dispatch AI quota warning: {$e->getMessage()}");
+                }
+            }
+        }
+
+        // 2. Limit reached: Mark exhausted, rotate key & notify
+        if ($ratio >= 1.0) {
+            $credential->update([
+                'status' => 'quota_exhausted',
+                'last_error_reason' => 'Daily free token limit reached (' . number_format($currentTokens) . ' tokens). Key rotated.'
+            ]);
+
+            $rotationCacheKey = "ai_quota_rotated_{$credential->id}";
+            if (!Cache::has($rotationCacheKey)) {
+                Cache::put($rotationCacheKey, true, now()->addHours(12));
+                try {
+                    Mail::to($alertRecipient)->send(new \App\Mail\AIQuotaWarningMail(
+                        provider: $provider,
+                        credential: $credential,
+                        currentTokens: $currentTokens,
+                        dailyTokenBudget: $dailyBudget,
+                        usagePercentage: $ratio * 100,
+                        isRotated: true
+                    ));
+                } catch (\Throwable $e) {
+                    Log::warning("Failed to dispatch AI rotation alert: {$e->getMessage()}");
+                }
+            }
+        }
     }
 }

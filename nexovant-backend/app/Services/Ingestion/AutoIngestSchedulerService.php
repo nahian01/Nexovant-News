@@ -71,10 +71,10 @@ class AutoIngestSchedulerService
 
             foreach ($sources as $source) {
                 if (!$force && $source->last_successful_fetch_at) {
-                    // If we are below the hourly quota (20+ articles/hr), shorten interval threshold to 5 mins
+                    // Default interval to 6 hours (360 mins) unless customized on source
                     $intervalMinutes = $needsQuotaCatchup
-                        ? 5
-                        : max(1, (int) ($source->fetch_interval_minutes ?? 15));
+                        ? 15
+                        : max(15, (int) ($source->fetch_interval_minutes ?? 360));
 
                     if ($source->last_successful_fetch_at->diffInMinutes(now()) < $intervalMinutes) {
                         continue;

@@ -45,14 +45,6 @@ const accountItems = [
   { name: 'Settings & Preferences', path: '/workspace/preferences', icon: Sliders },
 ]
 
-const adminItems = [
-  { name: 'Admin Console', path: '/admin/dashboard', icon: ShieldCheck },
-  { name: 'Intelligence Control', path: '/admin/intelligence', icon: Activity },
-  { name: 'AI Gateway', path: '/admin/ai-router', icon: Activity },
-  { name: 'Payment Review', path: '/admin/payments', icon: CreditCard },
-  { name: 'Search Analytics', path: '/admin/search-analytics', icon: Activity },
-]
-
 const isActive = (path: string) => {
   if (path === '/dashboard') return route.path === '/dashboard'
   if (path === '/feed') return route.path === '/feed'
@@ -104,25 +96,6 @@ const isActive = (path: string) => {
             'flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition',
             isActive(item.path)
               ? 'bg-[#e9f3ed] text-nexo-accent-cyan font-semibold shadow-2xs'
-              : 'text-nexo-text-secondary hover:bg-nexo-bg hover:text-nexo-text-primary'
-          ]"
-        >
-          <component :is="item.icon" class="h-[17px] w-[17px] shrink-0" />
-          <span class="truncate">{{ item.name }}</span>
-        </RouterLink>
-      </nav>
-
-      <!-- Administrative Navigation (Admin Only) -->
-      <nav v-if="authStore.user?.account_type === 'admin'" class="mt-5 space-y-0.5 border-t border-nexo-border/70 pt-4">
-        <p class="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-nexo-accent-gold">Administration</p>
-        <RouterLink
-          v-for="item in adminItems"
-          :key="item.path"
-          :to="item.path"
-          :class="[
-            'flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition',
-            isActive(item.path)
-              ? 'bg-amber-50 text-nexo-accent-gold font-semibold shadow-2xs'
               : 'text-nexo-text-secondary hover:bg-nexo-bg hover:text-nexo-text-primary'
           ]"
         >

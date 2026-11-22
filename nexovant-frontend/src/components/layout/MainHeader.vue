@@ -148,9 +148,6 @@ const handleLogout = async () => {
               <RouterLink to="/billing" @click="isProfileMenuOpen = false" class="flex items-center gap-2.5 rounded-[4px] px-3 py-2 text-sm text-nexo-text-2 transition hover:bg-nexo-paper hover:text-nexo-ink">
                 <CreditCard class="h-4 w-4" /> Subscription & billing
               </RouterLink>
-              <RouterLink v-if="authStore.user?.account_type === 'admin'" to="/admin/dashboard" @click="isProfileMenuOpen = false" class="flex items-center gap-2.5 rounded-[4px] px-3 py-2 text-sm text-nexo-brass-text transition hover:bg-nexo-brass-tint/30">
-                <ShieldCheck class="h-4 w-4" /> Admin console
-              </RouterLink>
               <button type="button" @click="handleLogout" class="flex w-full items-center gap-2.5 rounded-[4px] border-t border-nexo-border px-3 py-2 text-left text-sm text-nexo-breaking transition hover:bg-[#FBE4E1]/40">
                 <LogOut class="h-4 w-4" /> Sign out
               </button>

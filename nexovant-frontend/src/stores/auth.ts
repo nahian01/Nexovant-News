@@ -42,6 +42,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  const requestAdminMfaCode = async (email: string) => {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await authService.requestAdminMfaCode(email)
+      return response
+    } catch (err: any) {
+      error.value = err.response?.data?.message || 'Failed to request MFA security code.'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   const adminLogin = async (credentials: Record<string, any>) => {
     isLoading.value = true
     error.value = null
@@ -109,6 +123,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     login,
     adminLogin,
+    requestAdminMfaCode,
     register,
     fetchProfile,
     logout,

@@ -34,6 +34,16 @@ export const authService = {
   },
 
   /**
+   * Request dynamic one-time MFA login password sent directly to operator email.
+   * Zero database password storage.
+   */
+  async requestAdminMfaCode(email: string): Promise<{ success: boolean; message: string; expires_in_minutes: number }> {
+    await this.getCsrfCookie()
+    const response = await apiClient.post('/auth/admin/request-code', { email })
+    return response.data
+  },
+
+  /**
    * Authenticate platform administrator
    */
   async adminLogin(payload: Record<string, any>): Promise<AuthResponse> {

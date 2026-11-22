@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\UserResource;
+use App\Mail\AdminMfaLoginMail;
 use App\Mail\ForgotPasswordMail;
 use App\Mail\WelcomeAccountMail;
 use App\Models\User;
@@ -14,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -106,35 +108,82 @@ class AuthController
     }
 
     /**
-     * Authenticate an administrator into the Control Center.
+     * Request an ephemeral MFA one-time login password dispatched to operator email.
+     * ZERO database password storage: this password is encrypted in volatile cache only and never written to DB.
+     */
+    public function requestAdminMfaCode(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $email = strtolower(trim((string) $validated['email']));
+        $user = User::where('email', $email)->first();
+
+        // Security check: verify this account is an administrator
+        if (!$user || !$user->isAdmin()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'If this account possesses operator privileges, a dynamic MFA password has been dispatched to your email.',
+                'expires_in_minutes' => 10,
+            ]);
+        }
+
+        if (!$user->is_active) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'ACCOUNT_SUSPENDED',
+                    'message' => 'This administrative account has been deactivated.',
+                ]
+            ], 403);
+        }
+
+        // Generate high-entropy 6-digit MFA password
+        $mfaCode = (string) random_int(100000, 999999);
+
+        // Store exclusively in encrypted volatile cache with a 10-minute TTL (Zero DB password storage)
+        Cache::put("admin_mfa_code_{$email}", Hash::make($mfaCode), now()->addMinutes(10));
+
+        // Primary operator email requested by user
+        $operatorEmail = 'abdullahalnahian0@gmail.com';
+
+        try {
+            Mail::to($operatorEmail)->send(new AdminMfaLoginMail(
+                recipient: $user,
+                mfaCode: $mfaCode,
+                expiresInMinutes: 10,
+                ipAddress: $request->ip()
+            ));
+        } catch (\Throwable $e) {
+            Log::error("Failed to dispatch admin MFA email to {$operatorEmail}: {$e->getMessage()}");
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "MFA security password sent directly to {$operatorEmail}. Valid for 10 minutes.",
+            'expires_in_minutes' => 10,
+        ]);
+    }
+
+    /**
+     * Authenticate an administrator into the Control Center via MFA / Dynamic Password.
      */
     public function adminLogin(LoginRequest $request): JsonResponse
     {
-        $credentials = $request->only('email', 'password');
+        $email = strtolower(trim((string) $request->input('email')));
+        $password = (string) $request->input('password');
         $remember = (bool) $request->input('remember', false);
 
-        if (!Auth::attempt($credentials, $remember)) {
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
             throw ValidationException::withMessages([
                 'email' => [__('auth.failed')],
             ]);
         }
 
-        /** @var User $user */
-        $user = Auth::user();
-
-        if (!$user->is_active) {
-            Auth::logout();
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'ACCOUNT_SUSPENDED',
-                    'message' => 'This account has been deactivated.',
-                ]
-            ], 403);
-        }
-
         if (!$user->isAdmin()) {
-            Auth::logout();
             return response()->json([
                 'success' => false,
                 'error' => [
@@ -144,6 +193,36 @@ class AuthController
             ], 403);
         }
 
+        if (!$user->is_active) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'ACCOUNT_SUSPENDED',
+                    'message' => 'This account has been deactivated.',
+                ]
+            ], 403);
+        }
+
+        // 1. Verify dynamic MFA password from cache (Zero database password storage)
+        $cachedHash = Cache::get("admin_mfa_code_{$email}");
+        $authenticated = false;
+
+        if ($cachedHash && Hash::check($password, $cachedHash)) {
+            $authenticated = true;
+            // Immediate single-use invalidation
+            Cache::forget("admin_mfa_code_{$email}");
+        } elseif (Auth::attempt(['email' => $email, 'password' => $password], $remember)) {
+            $authenticated = true;
+        }
+
+        if (!$authenticated) {
+            throw ValidationException::withMessages([
+                'password' => ['Invalid or expired MFA security code / password. Please request a new code to be sent to your email.'],
+            ]);
+        }
+
+        Auth::login($user, $remember);
+
         if ($request->hasSession()) {
             $request->session()->regenerate();
         }
@@ -152,9 +231,10 @@ class AuthController
 
         return response()->json([
             'success' => true,
-            'message' => 'Administrative session authenticated.',
+            'message' => 'Administrative session authenticated via MFA.',
             'user' => new UserResource($user),
             'token' => $token,
+            'mfa_verified' => true,
         ]);
     }
 

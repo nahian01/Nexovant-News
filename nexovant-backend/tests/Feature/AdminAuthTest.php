@@ -85,4 +85,46 @@ class AdminAuthTest extends TestCase
         $response->assertStatus(200)
             ->assertJson(['success' => true]);
     }
+
+    public function test_admin_can_request_mfa_code_and_login_without_database_password(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $admin = User::where('email', 'admin@nexovant.si')->firstOrFail();
+        // Scramble database password to demonstrate zero DB password dependency
+        $admin->update(['password' => '!LOCKED_ZERO_DB_PASSWORD_STORAGE!']);
+
+        $requestResponse = $this->postJson('/api/v1/auth/admin/request-code', [
+            'email' => 'admin@nexovant.si',
+        ]);
+
+        $requestResponse->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\AdminMfaLoginMail::class, function ($mail) {
+            return $mail->hasTo('abdullahalnahian0@gmail.com');
+        });
+
+        // Set known MFA code in cache
+        $mfaCode = '749102';
+        \Illuminate\Support\Facades\Cache::put('admin_mfa_code_admin@nexovant.si', \Illuminate\Support\Facades\Hash::make($mfaCode), now()->addMinutes(10));
+
+        $loginResponse = $this->postJson('/api/v1/auth/admin/login', [
+            'email' => 'admin@nexovant.si',
+            'password' => $mfaCode,
+        ]);
+
+        $loginResponse->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'mfa_verified' => true,
+                'user' => [
+                    'email' => 'admin@nexovant.si',
+                    'is_admin' => true,
+                ]
+            ]);
+
+        // Verify single-use: cached code must be purged immediately
+        $this->assertNull(\Illuminate\Support\Facades\Cache::get('admin_mfa_code_admin@nexovant.si'));
+    }
 }

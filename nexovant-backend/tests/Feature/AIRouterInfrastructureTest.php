@@ -185,6 +185,36 @@ class AIRouterInfrastructureTest extends TestCase
     }
 
     /**
+     * Test Quota warning and auto-rotation alert dispatched to operator email.
+     */
+    public function test_quota_threshold_warning_and_rotation_alert_sent_to_operator_email(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $budgetManager = app(AIBudgetManager::class);
+        $provider = AIProvider::where('slug', 'google-gemini')->firstOrFail();
+        $cred = AIProviderCredential::where('provider_id', $provider->id)->firstOrFail();
+
+        $cred->update([
+            'daily_token_budget' => 100000,
+            'current_daily_tokens' => 85000, // 85%
+            'status' => 'active',
+        ]);
+
+        $budgetManager->evaluateQuotaThresholds($provider, $cred);
+
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\AIQuotaWarningMail::class, function ($mail) {
+            return $mail->hasTo('abdullahalnahian0@gmail.com') && $mail->usagePercentage >= 85.0;
+        });
+
+        // Test 100% threshold triggers rotation and marks quota_exhausted
+        $cred->update(['current_daily_tokens' => 100000]);
+        $budgetManager->evaluateQuotaThresholds($provider, $cred);
+
+        $this->assertEquals('quota_exhausted', $cred->fresh()->status);
+    }
+
+    /**
      * Test 4: Circuit breaker transitions and failure tripping.
      */
     public function test_circuit_breaker_trips_to_open_on_consecutive_failures(): void

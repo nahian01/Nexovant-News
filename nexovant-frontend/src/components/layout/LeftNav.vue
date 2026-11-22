@@ -215,15 +215,6 @@ const isActive = (path: string) => {
             <span>{{ item.name }}</span>
           </RouterLink>
         </nav>
-
-        <!-- ADMIN LINK IF APPLICABLE -->
-        <nav v-if="authStore.user?.account_type === 'admin'" class="space-y-1 border-t border-nexo-border pt-4">
-          <p class="section-label px-2 pb-2 text-nexo-brass-text">ADMINISTRATION</p>
-          <RouterLink to="/admin/dashboard" class="flex items-center justify-between rounded-[4px] px-2.5 py-1.5 text-sm font-semibold text-nexo-brass-text hover:bg-nexo-brass-tint/30">
-            <span>Admin console</span>
-            <ShieldCheck class="h-3.5 w-3.5" />
-          </RouterLink>
-        </nav>
       </div>
 
       <!-- Signed-in Bottom Plan Card -->
