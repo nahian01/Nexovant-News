@@ -1,0 +1,27 @@
+# ==============================================================================
+# Cloudflare Zero Trust Tunnel Configuration (cloudflared)
+# Connects Backend and Database to Cloudflare Edge without opening any firewall ports
+# ==============================================================================
+
+# Replace with your Cloudflare Tunnel ID created via:
+# cloudflared tunnel create nexovant-tunnel
+tunnel: REPLACE_WITH_TUNNEL_ID_OR_UUID
+credentials-file: /etc/cloudflared/REPLACE_WITH_TUNNEL_ID_OR_UUID.json
+
+ingress:
+  # 1. Route API Gateway traffic to Docker Nginx reverse proxy
+  - hostname: api.nexovant.si
+    service: http://127.0.0.1:80
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+      http2Origin: true
+
+  # 2. (Optional) Route AI Engine directly
+  - hostname: ai-engine.nexovant.si
+    service: http://127.0.0.1:8001
+    originRequest:
+      connectTimeout: 60s
+
+  # 3. Default catch-all rule (required)
+  - service: http_status:404

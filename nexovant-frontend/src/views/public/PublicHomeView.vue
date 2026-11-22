@@ -146,6 +146,21 @@ onMounted(fetchStories)
               </RouterLink>
             </h2>
 
+            <!-- Hero Crawled Source Image (Zero local storage) -->
+            <div v-if="heroStory.featured_image || heroStory.primary_image || heroStory.hero_image" class="relative overflow-hidden rounded-[3px] border border-[#D0D9CF] max-h-72 bg-[#0E1A2B]/5">
+              <img
+                :src="heroStory.featured_image || heroStory.primary_image || heroStory.hero_image"
+                :alt="heroStory.title"
+                class="w-full h-64 object-cover"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+                @error="(e: any) => e.target.parentElement.style.display = 'none'"
+              />
+              <div class="absolute bottom-2 left-2 bg-black/80 backdrop-blur-xs text-white text-[10px] font-mono px-2 py-0.5 rounded-[2px]">
+                {{ heroStory.featured_image_caption || (heroStory.source?.name ? `Source: ${heroStory.source.name}` : 'Source: Wire Service') }}
+              </div>
+            </div>
+
             <!-- Editorial Summary -->
             <p class="text-sm sm:text-[15px] text-[#3F4A5A] leading-relaxed max-w-3xl">
               {{ heroStory.summary?.executive_summary || heroStory.content_normalized?.slice(0, 260) || heroStory.content_raw?.slice(0, 260) || 'Primary corporate and regulatory disclosure consolidated from verified cross-border intelligence feeds.' }}
@@ -226,6 +241,18 @@ onMounted(fetchStories)
                   {{ item.title }}
                 </RouterLink>
               </h4>
+
+              <!-- Remote Crawled Thumbnail (Zero local storage) -->
+              <div v-if="item.featured_image || item.primary_image || item.hero_image" class="overflow-hidden rounded-[2px] border border-[#D0D9CF] h-28 bg-[#0E1A2B]/5">
+                <img
+                  :src="item.featured_image || item.primary_image || item.hero_image"
+                  :alt="item.title"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                  @error="(e: any) => e.target.parentElement.style.display = 'none'"
+                />
+              </div>
 
               <p class="text-xs text-[#5F6875] line-clamp-2 leading-relaxed">
                 {{ item.summary?.executive_summary || item.content_normalized || item.content_raw?.slice(0, 140) || 'Consolidated intelligence from verified multi-publisher disclosures.' }}

@@ -186,6 +186,22 @@ onMounted(() => {
                 >
                   {{ item.title }}
                 </RouterLink>
+
+                <!-- Remote Crawled Source Image (Zero local storage) -->
+                <div v-if="item.featured_image || item.primary_image || item.hero_image" class="my-3 overflow-hidden rounded-[4px] border border-nexo-border/60 max-h-56 bg-nexo-surface">
+                  <img
+                    :src="item.featured_image || item.primary_image || item.hero_image"
+                    :alt="item.title"
+                    class="w-full h-48 object-cover"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    @error="(e: any) => e.target.parentElement.style.display = 'none'"
+                  />
+                  <div class="px-2.5 py-1 bg-nexo-surface/90 border-t border-nexo-border/40 text-[10px] font-mono text-nexo-text-muted">
+                    {{ item.featured_image_caption || (item.source?.name ? `Source: ${item.source.name}` : 'Source: Wire Service') }}
+                  </div>
+                </div>
+
                 <p class="mt-2 text-sm text-nexo-text-secondary leading-relaxed">
                   {{ item.content_normalized || item.content_raw }}
                 </p>

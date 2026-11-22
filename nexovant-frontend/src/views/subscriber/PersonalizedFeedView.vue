@@ -412,6 +412,7 @@ onMounted(async () => {
                 :alt="item.headline || item.title"
                 class="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-[1.01]"
                 loading="lazy"
+                referrerpolicy="no-referrer"
                 @error="(e: any) => e.target.parentElement.style.display = 'none'"
               />
               <div class="absolute bottom-2 left-2 bg-black/75 backdrop-blur-xs text-white text-[10px] font-mono px-2 py-0.5 rounded-[2px]">

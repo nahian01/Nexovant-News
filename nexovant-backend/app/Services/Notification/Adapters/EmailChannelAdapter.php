@@ -22,11 +22,15 @@ class EmailChannelAdapter implements ChannelAdapterInterface
     public function isConfigured(): bool
     {
         $mailer = Config::get('mail.default');
+        if ($mailer !== 'smtp') {
+            return false;
+        }
+
         $smtpHost = Config::get('mail.mailers.smtp.host');
         $username = Config::get('mail.mailers.smtp.username');
 
         // Check if real authenticated outbound mail provider is configured
-        return !empty($smtpHost) && !in_array($smtpHost, ['mailpit', 'localhost', '127.0.0.1', '']) && $mailer !== 'log' && !empty($username);
+        return !empty($smtpHost) && !in_array($smtpHost, ['mailpit', 'localhost', '127.0.0.1', '']) && !empty($username);
     }
 
     public function send(Notification $notification, User $recipient, array $context = []): array

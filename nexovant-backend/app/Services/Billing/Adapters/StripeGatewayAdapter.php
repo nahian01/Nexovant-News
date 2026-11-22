@@ -237,6 +237,12 @@ class StripeGatewayAdapter implements PaymentGatewayInterface
         $signedPayload = "{$timestamp}.{$payload}";
         $expectedSignature = hash_hmac('sha256', $signedPayload, $secret);
 
-        return in_array($expectedSignature, $signatures, true);
+        foreach ($signatures as $sig) {
+            if (hash_equals($expectedSignature, (string) $sig)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

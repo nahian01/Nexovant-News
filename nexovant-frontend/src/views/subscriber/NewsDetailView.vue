@@ -73,6 +73,7 @@ onMounted(() => {
               :alt="article.title"
               class="w-full max-h-[460px] object-cover bg-black/20"
               loading="lazy"
+              referrerpolicy="no-referrer"
               @error="(e: any) => e.target.parentElement.style.display = 'none'"
             />
             <div class="px-3.5 py-2 bg-nexo-surface/90 border-t border-nexo-border/40 text-[11px] font-mono text-nexo-text-muted flex justify-between items-center">

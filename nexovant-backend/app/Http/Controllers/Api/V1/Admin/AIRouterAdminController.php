@@ -538,7 +538,8 @@ class AIRouterAdminController
             $apiKey = $credential->encrypted_api_key; // legacy plaintext fallback
         }
 
-        $httpOpts = ['verify' => false, 'timeout' => 15];
+        $verifySsl = !(app()->isLocal() && empty(ini_get('curl.cainfo')) && empty(ini_get('openssl.cafile')));
+        $httpOpts = ['verify' => $verifySsl, 'timeout' => 15];
         $slug = $provider->slug;
         $models = [];
 

@@ -20,6 +20,7 @@ import NewsletterSubscribe from '@/components/common/NewsletterSubscribe.vue'
 import MoreCoverageModal from '@/components/common/MoreCoverageModal.vue'
 import { feedService } from '@/services/api/feed.service'
 import { useAuthStore } from '@/stores/auth'
+import { sanitizeHtml } from '@/utils/sanitize'
 
 const route = useRoute()
 const router = useRouter()
@@ -137,23 +138,7 @@ const storyTimeline = computed(() => {
 
 const formattedNarrative = computed(() => {
   const raw = article.value?.content_normalized || article.value?.content_raw || ''
-  if (!raw) return ''
-
-  // If content already contains HTML tags like <p>, <br>, sanitize disallowed tags
-  const hasHtml = /<[a-z][\s\S]*>/i.test(raw)
-  if (hasHtml) {
-    // Strip script, style, iframe, object, embed
-    let clean = raw.replace(/<(script|style|iframe|object|embed)[^>]*?>.*?<\/\1>/gis, '')
-    // Strip on* inline attributes
-    clean = clean.replace(/<([a-z][a-z0-9]*)[^>]*?(\bon[a-z]+\s*=\s*(['"]).*?\3)[^>]*?>/gi, '<$1>')
-    return clean
-  }
-
-  // If plain text, convert double newlines into <p> paragraphs
-  return raw
-    .split(/\n\s*\n/)
-    .map((para: string) => `<p class="mb-4 leading-relaxed">${para.trim()}</p>`)
-    .join('')
+  return sanitizeHtml(raw)
 })
 
 onMounted(() => {

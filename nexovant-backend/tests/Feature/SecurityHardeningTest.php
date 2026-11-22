@@ -354,4 +354,72 @@ class SecurityHardeningTest extends TestCase
 
         $this->assertEquals('admin', $superAdmin->fresh()->account_type);
     }
+
+    public function test_trends_scan_endpoint_rate_limiting_enforces_limit_and_returns_429(): void
+    {
+        // Allowed threshold is 10 requests per minute
+        for ($i = 0; $i < 10; $i++) {
+            $response = $this->postJson('/api/v1/trends/scan', ['time_window' => '24h']);
+            $this->assertNotEquals(429, $response->status(), "Scan attempt {$i} should not be throttled yet.");
+        }
+
+        // The 11th request must be throttled with HTTP 429
+        $throttled = $this->postJson('/api/v1/trends/scan', ['time_window' => '24h']);
+        $throttled->assertStatus(429);
+    }
+
+    public function test_forgot_password_rate_limiting_enforces_limit_and_returns_429(): void
+    {
+        for ($i = 0; $i < 6; $i++) {
+            $response = $this->postJson('/api/v1/auth/forgot-password', [
+                'email' => 'victim-recovery@nexovant.test',
+            ]);
+            $this->assertNotEquals(429, $response->status(), "Forgot password attempt {$i} should not be throttled.");
+        }
+
+        $throttled = $this->postJson('/api/v1/auth/forgot-password', [
+            'email' => 'victim-recovery@nexovant.test',
+        ]);
+        $throttled->assertStatus(429);
+    }
+
+    public function test_stripe_webhook_constant_time_hmac_verification(): void
+    {
+        Config::set('services.stripe.webhook_secret', 'whsec_test_secret_for_audit_32bytes');
+
+        $payload = json_encode(['id' => 'evt_test_audit_1', 'type' => 'payment_intent.succeeded']);
+        $time = time();
+        $signedPayload = "{$time}.{$payload}";
+        $validSignature = hash_hmac('sha256', $signedPayload, 'whsec_test_secret_for_audit_32bytes');
+
+        // Valid signature passes
+        $validResponse = $this->call(
+            'POST',
+            '/api/v1/webhooks/stripe',
+            [],
+            [],
+            [],
+            [
+                'HTTP_STRIPE_SIGNATURE' => "t={$time},v1={$validSignature}",
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            $payload
+        );
+        $validResponse->assertStatus(200);
+
+        // Tampered signature fails
+        $invalidResponse = $this->call(
+            'POST',
+            '/api/v1/webhooks/stripe',
+            [],
+            [],
+            [],
+            [
+                'HTTP_STRIPE_SIGNATURE' => "t={$time},v1=bad_signature_digest_12345",
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            $payload
+        );
+        $invalidResponse->assertStatus(400);
+    }
 }

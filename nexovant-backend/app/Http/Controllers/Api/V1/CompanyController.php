@@ -166,21 +166,28 @@ class CompanyController
             }
 
             $orderClauses = [];
+            $bindings = [];
 
             if (!empty($followedIds)) {
-                $sanitizedFollowed = array_map(fn($id) => "'" . addslashes((string)$id) . "'", $followedIds);
-                $orderClauses[] = "CASE WHEN id IN (" . implode(',', $sanitizedFollowed) . ") THEN 100 ELSE 0 END";
+                $placeholders = implode(',', array_fill(0, count($followedIds), '?'));
+                $orderClauses[] = "CASE WHEN id IN ({$placeholders}) THEN 100 ELSE 0 END";
+                foreach ($followedIds as $fid) {
+                    $bindings[] = (string) $fid;
+                }
             }
 
             if (!empty($preferredIndustries)) {
-                $sanitizedIndustries = array_map(fn($ind) => "'" . addslashes((string)$ind) . "'", $preferredIndustries);
-                $orderClauses[] = "CASE WHEN industry IN (" . implode(',', $sanitizedIndustries) . ") THEN 60 ELSE 0 END";
+                $placeholders = implode(',', array_fill(0, count($preferredIndustries), '?'));
+                $orderClauses[] = "CASE WHEN industry IN ({$placeholders}) THEN 60 ELSE 0 END";
+                foreach ($preferredIndustries as $ind) {
+                    $bindings[] = (string) $ind;
+                }
             }
 
             $orderClauses[] = "CASE WHEN market_cap_tier = 'mega' THEN 25 WHEN market_cap_tier = 'large' THEN 15 ELSE 5 END";
 
             $orderSql = '(' . implode(' + ', $orderClauses) . ') DESC';
-            $query->orderByRaw($orderSql)->orderBy('name', 'asc');
+            $query->orderByRaw($orderSql, $bindings)->orderBy('name', 'asc');
         } elseif ($tab === 'global_giants') {
             $query->orderByDesc('employee_count')->orderBy('name', 'asc');
         } elseif ($tab === 'national_champions') {

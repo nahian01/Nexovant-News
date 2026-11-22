@@ -194,4 +194,35 @@ class CompanyGeoTaxonomyAndPersonalizationTest extends TestCase
             'company_id' => $company->id,
         ]);
     }
+
+    /**
+     * Test that user preferences with SQL injection payloads are safely parameterized and executed.
+     */
+    public function test_personalization_sorting_safely_handles_sql_injection_vectors(): void
+    {
+        $user = User::factory()->create();
+
+        UserPreference::create([
+            'user_id' => $user->id,
+            'preferred_industries' => [
+                "Technology') THEN 100 ELSE 0 END --",
+                "Semiconductors' OR '1'='1",
+                "'; DROP TABLE companies; --",
+                "Arbitrary'\"\\`/*",
+            ],
+            'personalization_enabled' => true,
+        ]);
+
+        $initialCompanyCount = Company::count();
+        $this->assertGreaterThan(0, $initialCompanyCount);
+
+        // Fetch personalized list with malicious preferences
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/companies?tab=for_you');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true);
+
+        // Ensure database integrity is maintained and no tables dropped
+        $this->assertEquals($initialCompanyCount, Company::count());
+    }
 }

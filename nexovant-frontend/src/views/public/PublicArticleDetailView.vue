@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { apiClient } from '@/services/api/client'
+import { sanitizeHtml } from '@/utils/sanitize'
 
 const route = useRoute()
 const article = ref<any>(null)
@@ -29,19 +30,7 @@ const fetchArticleDetail = async () => {
 
 const formattedNarrative = computed(() => {
   const raw = article.value?.content_normalized || article.value?.content_raw || ''
-  if (!raw) return ''
-
-  const hasHtml = /<[a-z][\s\S]*>/i.test(raw)
-  if (hasHtml) {
-    let clean = raw.replace(/<(script|style|iframe|object|embed)[^>]*?>.*?<\/\1>/gis, '')
-    clean = clean.replace(/<([a-z][a-z0-9]*)[^>]*?(\bon[a-z]+\s*=\s*(['"]).*?\3)[^>]*?>/gi, '<$1>')
-    return clean
-  }
-
-  return raw
-    .split(/\n\s*\n/)
-    .map((para: string) => `<p class="mb-4 leading-relaxed">${para.trim()}</p>`)
-    .join('')
+  return sanitizeHtml(raw)
 })
 
 onMounted(() => {
@@ -108,6 +97,22 @@ onMounted(() => {
             </a>
           </div>
         </header>
+
+        <!-- Remote Featured Image & Source Attribution (Zero local storage) -->
+        <div v-if="article.featured_image || article.primary_image || article.hero_image" class="overflow-hidden rounded-[4px] border border-nexo-border/60 bg-nexo-surface">
+          <img
+            :src="article.featured_image || article.primary_image || article.hero_image"
+            :alt="article.title"
+            class="w-full max-h-[460px] object-cover bg-black/20"
+            loading="lazy"
+            referrerpolicy="no-referrer"
+            @error="(e: any) => e.target.parentElement.style.display = 'none'"
+          />
+          <div class="px-3.5 py-2 bg-nexo-surface/90 border-t border-nexo-border/40 text-[11px] font-mono text-nexo-text-muted flex justify-between items-center">
+            <span>{{ article.featured_image_caption || (article.source?.name ? `Source: ${article.source.name}` : 'Source: Wire Service') }}</span>
+            <span class="text-[10px] text-nexo-accent-cyan/80">Source Image Attribution</span>
+          </div>
+        </div>
 
         <!-- Executive Summary & Key Takeaways Card -->
         <Card v-if="article.summary" class="p-6 bg-gradient-to-r from-nexo-card to-nexo-surface border-l-4 border-l-nexo-accent-cyan">

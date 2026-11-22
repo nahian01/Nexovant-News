@@ -161,6 +161,21 @@ const supportingSources = [
       </RouterLink>
     </h2>
 
+    <!-- Remote Crawled Source Image (Zero local storage - hotlinked directly from source) -->
+    <div v-if="story.featured_image || story.primary_image || story.hero_image" class="mt-2.5 relative overflow-hidden rounded-[2px] border border-nexo-border max-h-52 bg-nexo-paper-2">
+      <img
+        :src="story.featured_image || story.primary_image || story.hero_image"
+        :alt="story.title"
+        class="w-full h-44 object-cover transition-transform duration-300 hover:scale-[1.01]"
+        loading="lazy"
+        referrerpolicy="no-referrer"
+        @error="(e: any) => e.target.parentElement.style.display = 'none'"
+      />
+      <div v-if="story.featured_image_caption || story.source?.name" class="absolute bottom-1.5 left-1.5 bg-black/75 backdrop-blur-xs text-white text-[9px] font-mono px-1.5 py-0.5 rounded-[2px]">
+        {{ story.featured_image_caption || `Source: ${story.source?.name || 'Wire Service'}` }}
+      </div>
+    </div>
+
     <!-- Summary Header & Text -->
     <div class="mt-2.5">
       <p class="section-label text-[10px] text-nexo-muted uppercase tracking-[0.08em]">
