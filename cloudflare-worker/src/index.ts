@@ -14,6 +14,7 @@ export interface Env {
   BACKEND_API_URL: string;
   FRONTEND_URL?: string;
   ENABLE_EDGE_CACHE?: string;
+  ASSETS?: Fetcher;
   // Cloudflare Hyperdrive binding for PostgreSQL
   HYPERDRIVE?: {
     connectionString: string;
@@ -73,7 +74,11 @@ export default {
       return handleApiProxy(request, env, ctx, url);
     }
 
-    // 5. Default: Proxy to Frontend SPA or fallback status
+    // 5. Default: Serve Static Assets or Proxy to Frontend SPA
+    if (env.ASSETS) {
+      return env.ASSETS.fetch(request);
+    }
+
     if (env.FRONTEND_URL) {
       const frontendUrl = new URL(url.pathname + url.search, env.FRONTEND_URL);
       const frontendReq = new Request(frontendUrl.toString(), request);
